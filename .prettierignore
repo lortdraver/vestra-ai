@@ -1,0 +1,6 @@
+.next
+node_modules
+pnpm-lock.yaml
+tsconfig.tsbuildinfo
+MASTER_CONTEXT.md
+next-env.d.ts

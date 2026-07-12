@@ -1,0 +1,584 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { getStylistProvider } from '@/lib/stylist'
+import {
+  filterDiverseCandidates,
+  getCandidateOverlap,
+  validateStylistOutfit,
+  validateStylistBatchResult,
+  validateStylistResult,
+} from '@/lib/stylist/validation'
+import {
+  findMissingCoreItems,
+  getRequiredCategoriesForStylistRequest,
+  getStylistWardrobeDiagnostics,
+  hasCompleteOutfit,
+  isSingleItemStylistRequest,
+  normalizeStylistCategory,
+} from '@/lib/stylist/wardrobe'
+import type { StylistWardrobeItem } from '@/lib/stylist'
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
+const wardrobe: StylistWardrobeItem[] = [
+  {
+    id: '11111111-1111-4111-8111-111111111111',
+    name: 'White shirt',
+    category: 'tops',
+    clothingType: 'shirt',
+    colors: ['white'],
+    seasons: ['spring'],
+    styles: ['business'],
+    material: 'cotton',
+    brand: '',
+    notes: '',
+    imageUrl: '/shirt.webp',
+  },
+  {
+    id: '22222222-2222-4222-8222-222222222222',
+    name: 'Dark trousers',
+    category: 'bottoms',
+    clothingType: 'trousers',
+    colors: ['black'],
+    seasons: ['spring'],
+    styles: ['business'],
+    material: 'wool',
+    brand: '',
+    notes: '',
+    imageUrl: '/trousers.webp',
+  },
+  {
+    id: '33333333-3333-4333-8333-333333333333',
+    name: 'Leather sneakers',
+    category: 'shoes',
+    clothingType: 'sneakers',
+    colors: ['white'],
+    seasons: ['spring'],
+    styles: ['business'],
+    material: 'leather',
+    brand: '',
+    notes: '',
+    imageUrl: '/sneakers.webp',
+  },
+]
+
+const batchCandidate = {
+  title: 'Candidate',
+  occasion: 'work',
+  styleDirection: 'classic',
+  seasonLabel: 'spring',
+  formalityLabel: 'business',
+  items: wardrobe.map((item) => ({
+    wardrobeItemId: item.id,
+    role: item.category,
+    explanation: `Uses ${item.name}.`,
+  })),
+  overallExplanation: 'A complete outfit using owned items.',
+  confidenceScore: 0.8,
+  alternativeSuggestions: [],
+  missingItems: [],
+}
+
+const extraWardrobe: StylistWardrobeItem[] = [
+  ...wardrobe,
+  {
+    ...wardrobe[0],
+    id: '44444444-4444-4444-8444-444444444444',
+    name: 'Blue oxford',
+  },
+  {
+    ...wardrobe[1],
+    id: '55555555-5555-4555-8555-555555555555',
+    name: 'Grey chinos',
+  },
+  {
+    ...wardrobe[2],
+    id: '66666666-6666-4666-8666-666666666666',
+    name: 'Black loafers',
+  },
+]
+
+describe('stylist provider behavior', () => {
+  it('uses the mock provider in development', async () => {
+    vi.stubEnv('NODE_ENV', 'development')
+    vi.stubEnv('STYLIST_AI_PROVIDER', 'mock')
+
+    const result = validateStylistResult(
+      await getStylistProvider().generateOutfit({
+        userId: 'user_1',
+        locale: 'en',
+        request: {
+          message: 'work outfit',
+          locale: 'en',
+          quickRequest: 'work',
+          lockedItemIds: [],
+          wearHistoryMode: 'none',
+        },
+        wardrobeItems: wardrobe,
+        missingItems: [],
+      }),
+      wardrobe,
+    )
+
+    expect(result.status).toBe('success')
+    if (result.status !== 'success') throw new Error('expected success')
+
+    expect(result.outfit.items.map((item) => item.wardrobeItemId)).toEqual([
+      wardrobe[0].id,
+      wardrobe[1].id,
+      wardrobe[2].id,
+    ])
+  })
+
+  it('blocks the mock provider in production', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('STYLIST_AI_PROVIDER', 'mock')
+
+    expect(() => getStylistProvider()).toThrow(
+      'Mock stylist provider is not allowed in production',
+    )
+  })
+})
+
+describe('outfit validation', () => {
+  it('returns insufficient wardrobe for a completely empty wardrobe', () => {
+    const result = validateStylistResult(
+      {
+        status: 'insufficient_wardrobe',
+        message: 'Missing core items.',
+        missingCategories: ['tops', 'bottoms', 'shoes'],
+        availableCategories: [],
+      },
+      [],
+    )
+
+    expect(result.status).toBe('insufficient_wardrobe')
+  })
+
+  it('detects only one top as missing bottoms and shoes', () => {
+    expect(findMissingCoreItems(wardrobe.slice(0, 1))).toEqual([
+      'bottoms',
+      'shoes',
+    ])
+  })
+
+  it('detects top but no bottoms or shoes', () => {
+    const topOnly = [wardrobe[0]]
+    expect(hasCompleteOutfit(topOnly)).toBe(false)
+    expect(findMissingCoreItems(topOnly)).toEqual(['bottoms', 'shoes'])
+  })
+
+  it('uses manual categories even when AI analysis failed', () => {
+    const diagnostics = getStylistWardrobeDiagnostics([
+      {
+        id: '44444444-4444-4444-8444-444444444444',
+        userId: 'user_1',
+        name: 'Manual jeans',
+        category: 'bottom',
+        clothingType: 'jeans',
+        colors: ['blue'],
+        seasons: [],
+        styles: [],
+        material: '',
+        brand: '',
+        notes: '',
+        imageUrl: '/jeans.webp',
+        imageStorageKey: 'jeans.webp',
+        imageContentType: 'image/webp',
+        imageSize: '100',
+        imageColorHints: null,
+        originalImageUrl: null,
+        originalImageStorageKey: null,
+        originalImageContentType: null,
+        originalImageSize: null,
+        processedImageUrl: null,
+        processedImageStorageKey: null,
+        processedImageContentType: null,
+        processedImageSize: null,
+        backgroundRemovalStatus: 'done',
+        backgroundRemovalProvider: 'mock',
+        backgroundRemovalModelId: 'mock',
+        imageDeletionStatus: 'active',
+        imageDeleteRequestedAt: null,
+        analysisStatus: 'failed',
+        aiAnalysis: null,
+        userCorrections: null,
+        analysisError: 'failed',
+        analysisPromptVersion: null,
+        analysisModelId: null,
+        analyzedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ])
+
+    expect(diagnostics.categories).toEqual({ bottoms: 1 })
+    expect(diagnostics.analysisStatuses).toEqual({ failed: 1 })
+  })
+
+  it('normalizes common category and clothing type aliases', () => {
+    expect(normalizeStylistCategory('top')).toBe('tops')
+    expect(normalizeStylistCategory('other', 't-shirt')).toBe('tops')
+    expect(normalizeStylistCategory('other', 'pants')).toBe('bottoms')
+    expect(normalizeStylistCategory('shoe')).toBe('shoes')
+    expect(normalizeStylistCategory('other', 'sneakers')).toBe('shoes')
+  })
+
+  it('accepts a valid complete wardrobe result', () => {
+    const result = validateStylistResult(
+      {
+        status: 'success',
+        outfit: {
+          title: 'Complete outfit',
+          occasion: 'work',
+          items: wardrobe.map((item) => ({
+            wardrobeItemId: item.id,
+            role: item.category,
+            explanation: 'Selected from owned wardrobe.',
+          })),
+          overallExplanation: 'Complete outfit.',
+          confidenceScore: 0.8,
+          alternativeSuggestions: [],
+          missingItems: [],
+        },
+      },
+      wardrobe,
+    )
+
+    expect(result.status).toBe('success')
+  })
+
+  it('rejects complete wardrobe success when provider returns only tops', () => {
+    expect(() =>
+      validateStylistResult(
+        {
+          status: 'success',
+          outfit: {
+            title: 'Only top',
+            occasion: 'work',
+            items: [
+              {
+                wardrobeItemId: wardrobe[0].id,
+                role: 'tops',
+                explanation: 'Selected from owned wardrobe.',
+              },
+            ],
+            overallExplanation: 'Only a shirt.',
+            confidenceScore: 0.4,
+            alternativeSuggestions: [],
+            missingItems: [],
+          },
+        },
+        wardrobe,
+      ),
+    ).toThrow('incomplete_outfit:bottoms,shoes')
+  })
+
+  it('rejects complete wardrobe success when provider omits shoes', () => {
+    expect(() =>
+      validateStylistResult(
+        {
+          status: 'success',
+          outfit: {
+            title: 'No shoes',
+            occasion: 'work',
+            items: wardrobe.slice(0, 2).map((item) => ({
+              wardrobeItemId: item.id,
+              role: item.category,
+              explanation: 'Selected from owned wardrobe.',
+            })),
+            overallExplanation: 'No shoes.',
+            confidenceScore: 0.5,
+            alternativeSuggestions: [],
+            missingItems: ['shoes'],
+          },
+        },
+        wardrobe,
+      ),
+    ).toThrow('incomplete_outfit:shoes')
+  })
+
+  it('allows explicit single-item recommendations', () => {
+    const request = {
+      message: 'choose shoes',
+      locale: 'en' as const,
+      lockedItemIds: [],
+      wearHistoryMode: 'none' as const,
+    }
+
+    expect(isSingleItemStylistRequest(request)).toBe(true)
+    expect(getRequiredCategoriesForStylistRequest(request)).toEqual([])
+
+    const result = validateStylistResult(
+      {
+        status: 'success',
+        outfit: {
+          title: 'Shoes',
+          occasion: 'single item',
+          items: [
+            {
+              wardrobeItemId: wardrobe[2].id,
+              role: 'shoes',
+              explanation: 'Selected from owned wardrobe.',
+            },
+          ],
+          overallExplanation: 'These shoes work best.',
+          confidenceScore: 0.75,
+          alternativeSuggestions: [],
+          missingItems: [],
+        },
+      },
+      wardrobe,
+      { requiredCategories: getRequiredCategoriesForStylistRequest(request) },
+    )
+
+    expect(result.status).toBe('success')
+  })
+
+  it('rejects provider success with empty items without leaking Zod errors', () => {
+    expect(() =>
+      validateStylistResult(
+        {
+          status: 'success',
+          outfit: {
+            title: 'Empty outfit',
+            occasion: 'work',
+            items: [],
+            overallExplanation: 'Nothing selected.',
+            confidenceScore: 0.1,
+            alternativeSuggestions: [],
+            missingItems: [],
+          },
+        },
+        wardrobe,
+      ),
+    ).toThrow('invalid_stylist_result')
+  })
+
+  it('prevents hallucinated clothing ids', () => {
+    expect(() =>
+      validateStylistOutfit(
+        {
+          title: 'Bad outfit',
+          occasion: 'work',
+          items: [
+            {
+              wardrobeItemId: '99999999-9999-4999-8999-999999999999',
+              role: 'top',
+              explanation: 'Not owned.',
+            },
+          ],
+          overallExplanation: 'Uses an item outside the wardrobe.',
+          confidenceScore: 0.2,
+          alternativeSuggestions: [],
+          missingItems: [],
+        },
+        wardrobe,
+      ),
+    ).toThrow('hallucinated_items')
+  })
+
+  it('prevents hallucinated clothing ids in result validation', () => {
+    expect(() =>
+      validateStylistResult(
+        {
+          status: 'success',
+          outfit: {
+            title: 'Bad outfit',
+            occasion: 'work',
+            items: [
+              {
+                wardrobeItemId: '99999999-9999-4999-8999-999999999999',
+                role: 'top',
+                explanation: 'Not owned.',
+              },
+            ],
+            overallExplanation: 'Uses an item outside the wardrobe.',
+            confidenceScore: 0.2,
+            alternativeSuggestions: [],
+            missingItems: [],
+          },
+        },
+        wardrobe,
+      ),
+    ).toThrow('hallucinated_items')
+  })
+
+  it('rejects malformed provider responses through a controlled error', () => {
+    expect(() => validateStylistResult({ nope: true }, wardrobe)).toThrow(
+      'invalid_stylist_result',
+    )
+  })
+
+  it('keeps localized insufficient wardrobe messages valid', () => {
+    const result = validateStylistResult(
+      {
+        status: 'insufficient_wardrobe',
+        message: 'Для праздничного образа не хватает низа и обуви.',
+        missingCategories: ['bottoms', 'shoes'],
+        availableCategories: ['tops'],
+      },
+      wardrobe.slice(0, 1),
+    )
+
+    expect(result).toMatchObject({
+      status: 'insufficient_wardrobe',
+      missingCategories: ['bottoms', 'shoes'],
+      availableCategories: ['tops'],
+    })
+  })
+
+  it('requires complete outfits unless missing pieces are declared', () => {
+    expect(hasCompleteOutfit(wardrobe)).toBe(true)
+    expect(findMissingCoreItems(wardrobe.slice(0, 2))).toEqual(['shoes'])
+    expect(() =>
+      validateStylistOutfit(
+        {
+          title: 'Incomplete',
+          occasion: 'work',
+          items: wardrobe.slice(0, 2).map((item) => ({
+            wardrobeItemId: item.id,
+            role: item.category,
+            explanation: 'Selected from owned wardrobe.',
+          })),
+          overallExplanation: 'No shoes included.',
+          confidenceScore: 0.4,
+          alternativeSuggestions: [],
+          missingItems: [],
+        },
+        wardrobe,
+      ),
+    ).toThrow('incomplete_outfit')
+  })
+
+  it('does not allow incomplete success even when missing items are explicit', () => {
+    expect(() =>
+      validateStylistOutfit(
+        {
+          title: 'Needs shoes',
+          occasion: 'work',
+          items: wardrobe.slice(0, 2).map((item) => ({
+            wardrobeItemId: item.id,
+            role: item.category,
+            explanation: 'Selected from owned wardrobe.',
+          })),
+          overallExplanation: 'This needs shoes.',
+          confidenceScore: 0.4,
+          alternativeSuggestions: [],
+          missingItems: ['shoes'],
+        },
+        wardrobe,
+      ),
+    ).toThrow('incomplete_outfit:shoes')
+  })
+})
+
+describe('batch outfit validation', () => {
+  it('validates three owned candidates', () => {
+    const result = validateStylistBatchResult(
+      {
+        status: 'success',
+        candidates: [
+          batchCandidate,
+          {
+            ...batchCandidate,
+            title: 'Candidate 2',
+            styleDirection: 'relaxed',
+            items: [
+              {
+                wardrobeItemId: '44444444-4444-4444-8444-444444444444',
+                role: 'tops',
+                explanation: 'Uses blue oxford.',
+              },
+              batchCandidate.items[1],
+              batchCandidate.items[2],
+            ],
+          },
+          {
+            ...batchCandidate,
+            title: 'Candidate 3',
+            styleDirection: 'elevated',
+            items: [
+              batchCandidate.items[0],
+              {
+                wardrobeItemId: '55555555-5555-4555-8555-555555555555',
+                role: 'bottoms',
+                explanation: 'Uses grey chinos.',
+              },
+              {
+                wardrobeItemId: '66666666-6666-4666-8666-666666666666',
+                role: 'shoes',
+                explanation: 'Uses black loafers.',
+              },
+            ],
+          },
+        ],
+      },
+      extraWardrobe,
+    )
+
+    expect(result.status).toBe('success')
+    if (result.status !== 'success') throw new Error('expected success')
+    expect(result.candidates.length).toBe(3)
+  })
+
+  it('rejects hallucinated ids in batch candidates', () => {
+    expect(() =>
+      validateStylistBatchResult(
+        {
+          status: 'success',
+          candidates: [
+            {
+              ...batchCandidate,
+              items: [
+                ...batchCandidate.items,
+                {
+                  wardrobeItemId: '99999999-9999-4999-8999-999999999999',
+                  role: 'tops',
+                  explanation: 'Fake item.',
+                },
+              ],
+            },
+          ],
+        },
+        wardrobe,
+      ),
+    ).toThrow(/hallucinated_items/)
+  })
+
+  it('rejects candidates that omit locked items', () => {
+    expect(() =>
+      validateStylistBatchResult(
+        {
+          status: 'success',
+          candidates: [
+            {
+              ...batchCandidate,
+              items: batchCandidate.items.filter(
+                (item) =>
+                  item.wardrobeItemId !==
+                  '11111111-1111-4111-8111-111111111111',
+              ),
+            },
+          ],
+        },
+        wardrobe,
+        {
+          requiredCategories: ['bottoms', 'shoes'],
+          lockedItemIds: ['11111111-1111-4111-8111-111111111111'],
+        },
+      ),
+    ).toThrow(/missing_locked_items/)
+  })
+
+  it('filters duplicate candidates by exact item set and style', () => {
+    const filtered = filterDiverseCandidates([batchCandidate, batchCandidate])
+
+    expect(filtered.length).toBe(1)
+  })
+
+  it('measures excessive overlap', () => {
+    expect(getCandidateOverlap(batchCandidate, batchCandidate)).toBe(1)
+  })
+})
