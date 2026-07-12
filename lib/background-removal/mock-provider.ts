@@ -8,15 +8,10 @@ export class MockBackgroundRemovalProvider implements BackgroundRemovalProvider 
   async removeBackground(
     input: BackgroundRemovalInput,
   ): Promise<BackgroundRemovalResult> {
-    const transparentPng = Uint8Array.from(
-      atob(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
-      ),
-      (char) => char.charCodeAt(0),
-    )
-    const processedFile = new File([transparentPng], 'mock-processed.png', {
-      type: 'image/png',
-      lastModified: Date.now(),
+    const buffer = await input.file.arrayBuffer()
+    const processedFile = new File([buffer], input.file.name, {
+      type: input.file.type,
+      lastModified: input.file.lastModified,
     })
 
     return {

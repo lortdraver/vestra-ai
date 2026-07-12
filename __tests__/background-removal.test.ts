@@ -2,6 +2,25 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiBackgroundRemovalProvider } from '@/lib/background-removal/api-provider'
 import { getBackgroundRemovalProvider } from '@/lib/background-removal'
 
+const twoByTwoPng = Uint8Array.from(
+  Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFElEQVR42mNk+M+ABzAxMIjGoQMAWnMCCXy6X6QAAAAASUVORK5CYII=',
+    'base64',
+  ),
+)
+
+function readPngDimensions(bytes: Uint8Array) {
+  const dataView = new DataView(
+    bytes.buffer,
+    bytes.byteOffset,
+    bytes.byteLength,
+  )
+  return {
+    width: dataView.getUint32(16),
+    height: dataView.getUint32(20),
+  }
+}
+
 afterEach(() => {
   vi.unstubAllEnvs()
   vi.restoreAllMocks()
@@ -11,17 +30,27 @@ describe('background removal provider behavior', () => {
   it('uses the mock provider in development', async () => {
     vi.stubEnv('NODE_ENV', 'development')
     vi.stubEnv('BACKGROUND_REMOVAL_PROVIDER', 'mock')
+    const inputFile = new File([twoByTwoPng], 'item.png', {
+      type: 'image/png',
+      lastModified: 1_700_000_000_000,
+    })
 
     const result = await getBackgroundRemovalProvider().removeBackground({
       userId: 'user_1',
-      file: new File(['image'], 'item.webp', { type: 'image/webp' }),
+      file: inputFile,
       mode: 'single_item',
     })
+    const returnedBytes = new Uint8Array(await result.file.arrayBuffer())
+    const dimensions = readPngDimensions(returnedBytes)
 
     expect(result.provider).toBe('mock')
     expect(result.modelId).toBe('mock-background-removal-v1')
-    expect(result.file.name).toBe('mock-processed.png')
+    expect(result.file.name).toBe('item.png')
     expect(result.file.type).toBe('image/png')
+    expect(result.file.lastModified).toBe(inputFile.lastModified)
+    expect(dimensions.width).toBeGreaterThan(1)
+    expect(dimensions.height).toBeGreaterThan(1)
+    expect(returnedBytes).toEqual(twoByTwoPng)
   })
 
   it('blocks the mock provider in production', () => {
