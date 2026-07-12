@@ -10,7 +10,7 @@ Vestra is designed to deploy as a Next.js application with:
 - production object storage for wardrobe images;
 - production AI providers for clothing analysis, background removal, and styling.
 
-Railway can be used for future workers or supporting services.
+Railway is the current staging target for Milestone 6.5A.
 
 ## GitHub
 
@@ -68,19 +68,29 @@ Important production settings:
 - ensure Better Auth trusted origins include only approved production origins;
 - do not use mock AI or mock background-removal providers in production.
 
-## Railway
+## Railway Staging
 
-Railway is optional for the current app, but useful for background services.
+Recommended Railway app settings:
 
-Good future Railway services:
+- Build command: `pnpm install --frozen-lockfile && pnpm build`
+- Start command: `pnpm start`
+- Pre-deploy command: `pnpm db:apply`
+- Healthcheck path: `/api/health`
+- Restart policy: restart on failure
+- Source: GitHub repository
 
-- image deletion worker;
-- scheduled wardrobe insight generation;
-- email/notification worker;
-- partner inventory import worker;
-- second-hand listing sync worker.
+Use Railway's generated HTTPS staging domain for:
 
-Railway should not be required for the first Vercel web deployment unless a worker is introduced.
+```bash
+NEXT_PUBLIC_APP_URL="https://your-railway-domain"
+BETTER_AUTH_URL="https://your-railway-domain"
+```
+
+Do not add wildcard trusted origins. `BETTER_AUTH_TRUSTED_ORIGINS` should be
+empty unless you explicitly need another HTTPS origin.
+
+`pnpm db:apply` is safe for the committed SQL migration flow, but avoid
+concurrent deployments applying migrations to the same database at the same time.
 
 ## Neon PostgreSQL
 
@@ -150,8 +160,15 @@ BETTER_AUTH_TRUSTED_ORIGINS=""
 Storage:
 
 ```bash
-STORAGE_DRIVER=""
-STORAGE_PUBLIC_BASE_URL=""
+STORAGE_DRIVER="r2"
+R2_ACCOUNT_ID=""
+R2_ACCESS_KEY_ID=""
+R2_SECRET_ACCESS_KEY=""
+R2_BUCKET_NAME=""
+R2_ENDPOINT=""
+R2_PUBLIC_BASE_URL=""
+R2_SIGNED_URL_TTL_SECONDS="900"
+R2_REQUEST_TIMEOUT_MS="10000"
 ```
 
 AI clothing analysis:
@@ -208,6 +225,7 @@ Before launch:
 - [ ] Better Auth secret is strong and private.
 - [ ] Trusted origins are production-safe.
 - [ ] Production storage provider is configured.
+- [ ] `pnpm storage:diagnose` succeeds with sanitized output.
 - [ ] Local file storage is not used for public deployment.
 - [ ] Production AI clothing analysis provider is configured.
 - [ ] `pnpm ai:diagnose:openrouter` succeeds with sanitized output.

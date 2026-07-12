@@ -1,5 +1,4 @@
 import { and, eq, ne } from 'drizzle-orm'
-import { readFile } from 'node:fs/promises'
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getClothingAnalysisProvider } from '@/lib/ai'
@@ -12,9 +11,9 @@ import { enhanceClothingAnalysis } from '@/lib/ai/quality'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { wardrobeItem } from '@/lib/db/schema'
+import { getObjectStorage } from '@/lib/storage'
 import { getWearStatsForItems } from '@/lib/wear/server'
 import { toWardrobeItemDto } from '@/lib/wardrobe/serialize'
-import path from 'node:path'
 
 async function getCurrentUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -43,17 +42,15 @@ async function getLocalImageDataUrl(
   }
 
   try {
-    const filePath = path.join(
-      process.cwd(),
-      'public',
-      'uploads',
+    const readStartedAt = performance.now()
+    const storedObject = await getObjectStorage().getObject(
       item.imageStorageKey,
     )
-    const readStartedAt = performance.now()
-    const buffer = await readFile(filePath)
     const localImageReadMs = Math.round(performance.now() - readStartedAt)
     const conversionStartedAt = performance.now()
-    const imageDataUrl = `data:${item.imageContentType};base64,${buffer.toString('base64')}`
+    const imageDataUrl = `data:${storedObject.contentType};base64,${Buffer.from(
+      storedObject.body,
+    ).toString('base64')}`
     const base64ConversionMs = Math.round(
       performance.now() - conversionStartedAt,
     )

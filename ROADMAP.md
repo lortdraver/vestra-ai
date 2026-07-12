@@ -1,6 +1,6 @@
 # Roadmap
 
-Completed through M6.2. The next milestone is the next approved M6.x slice.
+Completed through M6.5A. M7 remains postponed until explicitly approved.
 
 ## M6.1: Wear Tracking And Wardrobe Insights
 
@@ -137,3 +137,20 @@ Exit criteria:
   timeout handling, and stale fallback.
 - Weather-aware stylist request context and deterministic suitability filtering.
 - Today planner UI, 7-day list, mark worn/skipped actions, and dashboard access.
+
+## Recently Completed: M6.4 Production Integration Readiness
+
+- Added production diagnostics and provider contracts for weather and background
+  removal.
+- Migrated deprecated Next.js middleware behavior to `proxy.ts`.
+- Expanded production environment and deployment checklists.
+
+## Recently Completed: M6.5A Railway Deployment Foundation And R2 Storage
+
+- Prepared Railway staging deployment settings.
+- Added Cloudflare R2 production storage adapter.
+- Added authenticated private wardrobe image proxy.
+- Added storage diagnostic and local-to-R2 migration utility.
+- Added `/api/health` for Railway health checks.
+- Kept catalogs, stores, shopping, payments, virtual try-on, WeatherAPI,
+  remove.bg, Resend, and Sentry out of scope.

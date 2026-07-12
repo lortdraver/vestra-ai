@@ -149,6 +149,22 @@
 - Expanded environment and deployment production checklists for AI, weather,
   background removal, storage, database, and Better Auth credentials.
 
+### M6.5A: Railway Deployment Foundation And Cloudflare R2 Storage
+
+- Added Cloudflare R2 storage adapter using the S3-compatible API.
+- Expanded storage abstraction with upload, read, delete, exists, and health
+  checks.
+- Added authenticated private wardrobe image delivery through
+  `/api/wardrobe/images/[...key]`.
+- Moved AI image reads onto the storage abstraction so Railway/R2 does not
+  depend on `public/uploads`.
+- Added `/api/health` for Railway health checks.
+- Added Railway-compatible standalone Next.js output and `pnpm start` wrapper.
+- Added `pnpm storage:diagnose` and `pnpm storage:migrate:r2` utility scripts.
+- Tightened Better Auth trusted-origin parsing for production HTTPS origins.
+- Documented Railway staging, R2 storage, public beta readiness, and migration
+  steps.
+
 ## Current Architecture
 
 - Production-oriented monolith using Next.js App Router.
@@ -215,7 +231,9 @@
 ## Storage
 
 - Storage is abstracted behind `lib/storage`.
-- Local development storage is supported.
+- Local development storage is supported only for explicit local development.
+- Cloudflare R2 is prepared for staging and production wardrobe images.
+- Private wardrobe images are served through authenticated app routes.
 - Production storage is intentionally credential-gated.
 - Wardrobe items store original and processed image metadata.
 - Image deletion queue exists for future cleanup workers and account deletion workflows.
@@ -226,7 +244,8 @@
 - Laundry remains UI-ready, but wear frequency and long-unused status now come
   from immutable wear logs.
 - The outfits page can display saved/history data, but deeper outfit management still belongs to future milestones.
-- Production cloud storage adapter still needs final provider selection and verification.
+- Cloudflare R2 credentials still need to be entered manually in local and
+  Railway environments.
 - Real clothing analysis now requires AI credentials; live provider accuracy still needs visual QA with production models.
 - Background removal mock does not perform real segmentation and now returns a
   synthetic transparent placeholder; production must use a real provider.
@@ -240,7 +259,8 @@
 - M6.4 Production Integration Readiness is implemented with weather/background
   diagnostics, provider contracts, proxy migration, and production environment
   checklist updates.
-- Decide the production storage provider.
+- M6.5A Railway/R2 deployment foundation is implemented in code and docs, but
+  credentials and Railway deployment remain manual.
 - Decide and verify production background-removal/stylist providers.
 - Run visual QA on real clothing analysis models with representative wardrobe images.
 - Add production error monitoring and analytics.

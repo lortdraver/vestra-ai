@@ -5,6 +5,33 @@ import { getAppUrl, getBetterAuthSecret } from '@/lib/env'
 
 const appUrl = getAppUrl()
 
+function parseTrustedOrigins() {
+  return (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+    .filter((origin) => {
+      if (origin.includes('*')) return false
+
+      try {
+        const url = new URL(origin)
+        if (process.env.NODE_ENV === 'production') {
+          return url.protocol === 'https:'
+        }
+
+        return url.protocol === 'http:' || url.protocol === 'https:'
+      } catch {
+        return false
+      }
+    })
+}
+
+function getDevelopmentOrigins() {
+  const appUrlValue = new URL(appUrl)
+  const port = appUrlValue.port ? `:${appUrlValue.port}` : ''
+  return [`http://localhost${port}`, `http://127.0.0.1${port}`]
+}
+
 function getDevelopmentLanOrigins() {
   if (process.env.NODE_ENV !== 'development') {
     return []
@@ -28,27 +55,36 @@ function getDevelopmentLanOrigins() {
       (networkInterface) => `${protocol}//${networkInterface.address}${port}`,
     )
 
-  const configuredOrigins = (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean)
+  return localNetworkOrigins
+}
 
-  return [...localNetworkOrigins, ...configuredOrigins]
+function getProductionAppOrigins() {
+  return [process.env.BETTER_AUTH_URL, process.env.NEXT_PUBLIC_APP_URL].filter(
+    (origin): origin is string => {
+      if (!origin) return false
+      try {
+        return new URL(origin).protocol === 'https:'
+      } catch {
+        return false
+      }
+    },
+  )
 }
 
 const trustedOrigins = Array.from(
-  new Set([
-    appUrl,
-    ...(process.env.NEXT_PUBLIC_APP_URL
-      ? [process.env.NEXT_PUBLIC_APP_URL]
-      : []),
-    ...(process.env.V0_RUNTIME_URL ? [process.env.V0_RUNTIME_URL] : []),
-    ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
-    ...(process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? [`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`]
-      : []),
-    ...getDevelopmentLanOrigins(),
-  ]),
+  new Set(
+    process.env.NODE_ENV === 'production'
+      ? [...getProductionAppOrigins(), ...parseTrustedOrigins()]
+      : [
+          appUrl,
+          ...(process.env.NEXT_PUBLIC_APP_URL
+            ? [process.env.NEXT_PUBLIC_APP_URL]
+            : []),
+          ...getDevelopmentOrigins(),
+          ...getDevelopmentLanOrigins(),
+          ...parseTrustedOrigins(),
+        ],
+  ),
 )
 
 export const auth = betterAuth({

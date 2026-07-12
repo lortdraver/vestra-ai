@@ -8,6 +8,14 @@
 - `BETTER_AUTH_TRUSTED_ORIGINS` - optional comma-separated local development
   origins, for example `http://192.168.100.8:3000`.
 - `STORAGE_DRIVER` - object storage adapter. Use `local` only for development.
+- `R2_ACCOUNT_ID` - Cloudflare account id for R2.
+- `R2_ACCESS_KEY_ID` - server-only R2 access key id.
+- `R2_SECRET_ACCESS_KEY` - server-only R2 secret access key.
+- `R2_BUCKET_NAME` - private R2 bucket for wardrobe images.
+- `R2_ENDPOINT` - S3-compatible R2 endpoint.
+- `R2_PUBLIC_BASE_URL` - optional public base URL; not required for private delivery.
+- `R2_SIGNED_URL_TTL_SECONDS` - reserved signed URL TTL setting.
+- `R2_REQUEST_TIMEOUT_MS` - timeout for R2 API calls.
 - `AI_PROVIDER` - `openai-compatible` for real clothing analysis. Use `mock`
   only for tests or explicit local mock mode.
 - `AI_API_KEY` - required when `AI_PROVIDER=openai-compatible`.
@@ -45,6 +53,36 @@ Auth automatically trusts private IPv4 LAN origins on the same port as
 `BETTER_AUTH_TRUSTED_ORIGINS` manually.
 
 Never commit `.env` or production secrets.
+
+## Storage
+
+Local development may use:
+
+```env
+STORAGE_DRIVER="local"
+```
+
+Staging and production must use Cloudflare R2:
+
+```env
+STORAGE_DRIVER="r2"
+R2_ACCOUNT_ID=""
+R2_ACCESS_KEY_ID=""
+R2_SECRET_ACCESS_KEY=""
+R2_BUCKET_NAME=""
+R2_ENDPOINT=""
+R2_REQUEST_TIMEOUT_MS="10000"
+```
+
+R2 credentials are server-only. Wardrobe images are delivered through
+authenticated app routes, not public bucket URLs or permanently stored signed
+URLs.
+
+Run a sanitized storage check after manually configuring credentials:
+
+```bash
+pnpm storage:diagnose
+```
 
 ## AI Analysis Credentials
 
@@ -127,4 +165,5 @@ Before public deployment, manually configure and verify:
 - `BACKGROUND_REMOVAL_PROVIDER=api` with valid background-removal credentials.
 - `STORAGE_DRIVER` uses a production cloud/object storage adapter. Local file
   storage is for development only and is not recommended for public deployment.
+- `STORAGE_DRIVER=r2` with valid R2 credentials for Railway staging.
 - Mock AI, weather, and background-removal providers are disabled in production.

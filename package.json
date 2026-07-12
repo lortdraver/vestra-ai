@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/start-next.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -18,7 +18,9 @@
     "db:studio": "drizzle-kit studio",
     "ai:diagnose:openrouter": "node scripts/diagnose-openrouter.mjs",
     "weather:diagnose": "node scripts/diagnose-weather.mjs",
-    "background-removal:diagnose": "node scripts/diagnose-background-removal.mjs"
+    "background-removal:diagnose": "node scripts/diagnose-background-removal.mjs",
+    "storage:diagnose": "node scripts/diagnose-storage.mjs",
+    "storage:migrate:r2": "node scripts/migrate-local-storage-to-r2.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
