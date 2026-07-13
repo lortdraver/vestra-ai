@@ -36,6 +36,7 @@ import {
   extractWardrobeImageColors,
   type WardrobeImageColorHints,
 } from '@/lib/wardrobe/image-compression'
+import { isWardrobeDeleteSuccessResponse } from '@/lib/wardrobe/delete'
 import type { WardrobeItemDto } from '@/lib/wardrobe/types'
 import { cn } from '@/lib/utils'
 
@@ -278,6 +279,9 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
   const [analyzingItemId, setAnalyzingItemId] = useState<string | null>(null)
   const [isSavingCorrections, setIsSavingCorrections] = useState(false)
   const [favoriteItemIds, setFavoriteItemIds] = useState<Set<string>>(
+    () => new Set(),
+  )
+  const [deletingItemIds, setDeletingItemIds] = useState<Set<string>>(
     () => new Set(),
   )
   const [wearSubmittingIds, setWearSubmittingIds] = useState<Set<string>>(
@@ -650,12 +654,23 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
   }
 
   const handleDelete = async (item: WardrobeItemDto) => {
+    if (deletingItemIds.has(item.id)) return
+
     setError(null)
+    setDeletingItemIds((current) => new Set(current).add(item.id))
+
     try {
       const response = await fetch(`/api/wardrobe/items/${item.id}`, {
         method: 'DELETE',
       })
-      if (!response.ok) throw new Error('delete_failed')
+      const data = (await response.json().catch(() => null)) as {
+        ok?: boolean
+        deletedItemId?: string
+        storageCleanup?: string
+      } | null
+      if (!response.ok || !isWardrobeDeleteSuccessResponse(data, item.id)) {
+        throw new Error('delete_failed')
+      }
 
       setItems((current) => current.filter((entry) => entry.id !== item.id))
       if (selectedItem?.id === item.id) setSelectedItem(null)
@@ -663,6 +678,12 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
       setToastMessage(t.toast.deleted)
     } catch {
       setError(t.errors.delete)
+    } finally {
+      setDeletingItemIds((current) => {
+        const next = new Set(current)
+        next.delete(item.id)
+        return next
+      })
     }
   }
 
@@ -1274,10 +1295,17 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
                     <Button
                       type="button"
                       variant="destructive"
+                      disabled={deletingItemIds.has(item.id)}
                       onClick={() => void handleDelete(item)}
                     >
-                      <Trash2 />
-                      {t.actions.delete}
+                      {deletingItemIds.has(item.id) ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <Trash2 />
+                      )}
+                      {deletingItemIds.has(item.id)
+                        ? dictionary.common.loading
+                        : t.actions.delete}
                     </Button>
                   </div>
                 </CardContent>

@@ -115,6 +115,7 @@ export async function GET(request: Request) {
 
   const filters = [
     eq(wardrobeItem.userId, userId),
+    eq(wardrobeItem.imageDeletionStatus, 'active'),
     category ? eq(wardrobeItem.category, category) : undefined,
     season ? sql`${wardrobeItem.seasons} ? ${season}` : undefined,
     style ? sql`${wardrobeItem.styles} ? ${style}` : undefined,

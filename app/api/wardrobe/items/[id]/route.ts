@@ -1,12 +1,25 @@
-import { and, eq } from 'drizzle-orm'
+import { and, count, eq } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { getBackgroundRemovalProvider } from '@/lib/background-removal'
 import { db } from '@/lib/db'
-import { wardrobeImageDeletionQueue, wardrobeItem } from '@/lib/db/schema'
+import {
+  outfitItem,
+  stylistPreferenceProfile,
+  wardrobeImageDeletionQueue,
+  wardrobeItem,
+  wearLogItem,
+} from '@/lib/db/schema'
 import { getObjectStorage } from '@/lib/storage'
 import { getWearStatsForItems } from '@/lib/wear/server'
+import {
+  getDeleteErrorMessage,
+  getWardrobeImageStorageKeys,
+  toStorageCleanupStatus,
+  withoutWardrobeItemId,
+  type WardrobeStorageCleanupStatus,
+} from '@/lib/wardrobe/delete'
 import { toWardrobeItemDto } from '@/lib/wardrobe/serialize'
 import {
   parseWardrobePayload,
@@ -18,26 +31,144 @@ async function getCurrentUserId() {
   return session?.user?.id ?? null
 }
 
-async function getOwnedItem(userId: string, itemId: string) {
+async function getOwnedItem(
+  userId: string,
+  itemId: string,
+  options: { includeDeleted?: boolean } = {},
+) {
+  const filters = [
+    eq(wardrobeItem.id, itemId),
+    eq(wardrobeItem.userId, userId),
+    options.includeDeleted
+      ? undefined
+      : eq(wardrobeItem.imageDeletionStatus, 'active'),
+  ].filter(Boolean)
+
   const [item] = await db
     .select()
     .from(wardrobeItem)
-    .where(and(eq(wardrobeItem.id, itemId), eq(wardrobeItem.userId, userId)))
+    .where(and(...filters))
     .limit(1)
 
   return item
 }
 
-function getImageStorageKeys(item: Awaited<ReturnType<typeof getOwnedItem>>) {
-  if (!item) return []
+type DeleteStage =
+  | 'DELETE_REQUEST_STARTED'
+  | 'AUTHENTICATED'
+  | 'ITEM_LOADED'
+  | 'OWNERSHIP_VERIFIED'
+  | 'DEPENDENCIES_CHECKED'
+  | 'DATABASE_DELETE_STARTED'
+  | 'DATABASE_DELETE_COMPLETED'
+  | 'STORAGE_DELETE_STARTED'
+  | 'STORAGE_DELETE_COMPLETED'
+  | 'SUCCESS'
 
-  return [
-    item.imageStorageKey,
-    item.originalImageStorageKey,
-    item.processedImageStorageKey,
-  ].filter((key, index, keys): key is string =>
-    Boolean(key && keys.indexOf(key) === index),
+function logDeleteStage(stage: DeleteStage, context?: Record<string, unknown>) {
+  console.info(`[wardrobe-delete] ${stage}`, context ?? {})
+}
+
+function logDeleteError(stage: DeleteStage, error: unknown) {
+  const normalized =
+    error instanceof Error
+      ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        }
+      : {
+          name: 'UnknownError',
+          message: String(error),
+          stack: null,
+        }
+
+  console.error('[wardrobe-delete] failed', {
+    stage,
+    ...normalized,
+  })
+}
+
+async function countRowsByItemId(
+  table:
+    typeof outfitItem | typeof wearLogItem | typeof wardrobeImageDeletionQueue,
+  itemId: string,
+) {
+  const [result] = await db
+    .select({ value: count() })
+    .from(table)
+    .where(eq(table.wardrobeItemId, itemId))
+
+  return Number(result?.value ?? 0)
+}
+
+async function enqueueStorageCleanup(
+  userId: string,
+  itemId: string,
+  storageKeys: string[],
+) {
+  if (storageKeys.length === 0) return
+
+  const existingRows = await db
+    .select({ storageKey: wardrobeImageDeletionQueue.storageKey })
+    .from(wardrobeImageDeletionQueue)
+    .where(
+      and(
+        eq(wardrobeImageDeletionQueue.userId, userId),
+        eq(wardrobeImageDeletionQueue.wardrobeItemId, itemId),
+        eq(wardrobeImageDeletionQueue.status, 'pending'),
+      ),
+    )
+
+  const existingKeys = new Set(existingRows.map((row) => row.storageKey))
+  const newKeys = storageKeys.filter(
+    (storageKey) => !existingKeys.has(storageKey),
   )
+  if (newKeys.length === 0) return
+
+  await db.insert(wardrobeImageDeletionQueue).values(
+    newKeys.map((storageKey) => ({
+      userId,
+      wardrobeItemId: itemId,
+      storageKey,
+      reason: 'item_deleted',
+    })),
+  )
+}
+
+async function deleteStorageObjects(
+  userId: string,
+  itemId: string,
+  storageKeys: string[],
+): Promise<WardrobeStorageCleanupStatus> {
+  if (storageKeys.length === 0) return 'completed'
+
+  const failedKeys: string[] = []
+
+  try {
+    const storage = getObjectStorage()
+    for (const storageKey of storageKeys) {
+      try {
+        await storage.deleteObject(storageKey)
+      } catch (error) {
+        failedKeys.push(storageKey)
+        console.warn('[wardrobe-delete] storage object cleanup failed', {
+          itemId,
+          storageKey,
+          error: getDeleteErrorMessage(error),
+        })
+      }
+    }
+  } catch (error) {
+    console.warn('[wardrobe-delete] storage provider unavailable for cleanup', {
+      itemId,
+      error: getDeleteErrorMessage(error),
+    })
+    failedKeys.push(...storageKeys)
+  }
+
+  await enqueueStorageCleanup(userId, itemId, failedKeys)
+  return toStorageCleanupStatus(failedKeys.length > 0)
 }
 
 export async function GET(
@@ -119,7 +250,7 @@ export async function PATCH(
         variant: 'processed',
       })
 
-      const replacedKeys = getImageStorageKeys(existingItem)
+      const replacedKeys = getWardrobeImageStorageKeys(existingItem)
       if (replacedKeys.length > 0) {
         await db.insert(wardrobeImageDeletionQueue).values(
           replacedKeys.map((storageKey) => ({
@@ -177,32 +308,134 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<unknown> },
 ) {
-  const userId = await getCurrentUserId()
-  if (!userId) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-  }
+  let stage: DeleteStage = 'DELETE_REQUEST_STARTED'
 
-  const { id } = (await params) as { id: string }
-  const existingItem = await getOwnedItem(userId, id)
-  if (!existingItem) {
-    return NextResponse.json({ error: 'not_found' }, { status: 404 })
-  }
+  try {
+    logDeleteStage(stage)
 
-  const storageKeys = getImageStorageKeys(existingItem)
-  if (storageKeys.length > 0) {
-    await db.insert(wardrobeImageDeletionQueue).values(
-      storageKeys.map((storageKey) => ({
-        userId,
-        wardrobeItemId: existingItem.id,
-        storageKey,
-        reason: 'item_deleted',
-      })),
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json(
+        {
+          code: 'unauthorized',
+          stage,
+          message: 'Authentication is required.',
+        },
+        { status: 401 },
+      )
+    }
+
+    stage = 'AUTHENTICATED'
+    const { id } = (await params) as { id: string }
+    logDeleteStage(stage, { itemId: id })
+
+    const existingItem = await getOwnedItem(userId, id, {
+      includeDeleted: true,
+    })
+    stage = 'ITEM_LOADED'
+    logDeleteStage(stage, {
+      itemId: id,
+      found: Boolean(existingItem),
+      deletionStatus: existingItem?.imageDeletionStatus ?? null,
+    })
+
+    if (!existingItem) {
+      return NextResponse.json(
+        {
+          code: 'not_found',
+          stage,
+          message: 'Wardrobe item was not found.',
+        },
+        { status: 404 },
+      )
+    }
+
+    stage = 'OWNERSHIP_VERIFIED'
+    logDeleteStage(stage, { itemId: id })
+
+    const storageKeys = getWardrobeImageStorageKeys(existingItem)
+    const [outfitReferenceCount, wearReferenceCount, queuedCleanupCount] =
+      await Promise.all([
+        countRowsByItemId(outfitItem, id),
+        countRowsByItemId(wearLogItem, id),
+        countRowsByItemId(wardrobeImageDeletionQueue, id),
+      ])
+
+    stage = 'DEPENDENCIES_CHECKED'
+    logDeleteStage(stage, {
+      itemId: id,
+      outfitReferenceCount,
+      wearReferenceCount,
+      queuedCleanupCount,
+      storageKeyCount: storageKeys.length,
+    })
+
+    stage = 'DATABASE_DELETE_STARTED'
+    logDeleteStage(stage, { itemId: id })
+
+    await db.transaction(async (tx) => {
+      const [preferences] = await tx
+        .select()
+        .from(stylistPreferenceProfile)
+        .where(eq(stylistPreferenceProfile.userId, userId))
+        .limit(1)
+
+      if (preferences) {
+        await tx
+          .update(stylistPreferenceProfile)
+          .set({
+            preferredWardrobeItemIds: withoutWardrobeItemId(
+              preferences.preferredWardrobeItemIds,
+              id,
+            ),
+            dislikedWardrobeItemIds: withoutWardrobeItemId(
+              preferences.dislikedWardrobeItemIds,
+              id,
+            ),
+            updatedAt: new Date(),
+          })
+          .where(eq(stylistPreferenceProfile.userId, userId))
+      }
+
+      if (existingItem.imageDeletionStatus === 'active') {
+        await tx
+          .update(wardrobeItem)
+          .set({
+            imageDeletionStatus: 'deleted',
+            imageDeleteRequestedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(and(eq(wardrobeItem.id, id), eq(wardrobeItem.userId, userId)))
+      }
+    })
+
+    stage = 'DATABASE_DELETE_COMPLETED'
+    logDeleteStage(stage, { itemId: id })
+
+    stage = 'STORAGE_DELETE_STARTED'
+    logDeleteStage(stage, { itemId: id, storageKeyCount: storageKeys.length })
+    const storageCleanup = await deleteStorageObjects(userId, id, storageKeys)
+
+    stage = 'STORAGE_DELETE_COMPLETED'
+    logDeleteStage(stage, { itemId: id, storageCleanup })
+
+    stage = 'SUCCESS'
+    logDeleteStage(stage, { itemId: id, storageCleanup })
+
+    return NextResponse.json({
+      ok: true,
+      deletedItemId: id,
+      storageCleanup,
+    })
+  } catch (error) {
+    logDeleteError(stage, error)
+    return NextResponse.json(
+      {
+        code: 'delete_failed',
+        stage,
+        message: getDeleteErrorMessage(error),
+      },
+      { status: 500 },
     )
   }
-
-  await db
-    .delete(wardrobeItem)
-    .where(and(eq(wardrobeItem.id, id), eq(wardrobeItem.userId, userId)))
-
-  return NextResponse.json({ ok: true })
 }
