@@ -28,6 +28,7 @@ const timeoutMs = Number(
 )
 const modelId =
   process.env.BACKGROUND_REMOVAL_MODEL_ID ?? 'background-removal-v1'
+const size = process.env.BACKGROUND_REMOVAL_SIZE ?? 'auto'
 
 function safeUrl(value) {
   if (!value) return null
@@ -47,6 +48,7 @@ async function main() {
     hasEndpoint: Boolean(endpoint),
     endpoint: safeUrl(endpoint),
     modelId,
+    size,
     timeoutMs,
   }
 
@@ -59,7 +61,7 @@ async function main() {
           message:
             process.env.NODE_ENV === 'production'
               ? 'Mock background removal is blocked in production.'
-              : 'Mock background removal returns a synthetic transparent PNG and is local-only.',
+              : 'Mock background removal returns the original uploaded image unchanged and is local-only.',
         },
         null,
         2,
@@ -68,11 +70,23 @@ async function main() {
     return
   }
 
-  if (
-    provider !== 'api' ||
-    !process.env.BACKGROUND_REMOVAL_API_KEY ||
-    !endpoint
-  ) {
+  if (!['api', 'removebg'].includes(provider)) {
+    console.log(
+      JSON.stringify(
+        {
+          ...summary,
+          ok: false,
+          error: 'background_removal_provider_unsupported',
+        },
+        null,
+        2,
+      ),
+    )
+    process.exitCode = 1
+    return
+  }
+
+  if (!process.env.BACKGROUND_REMOVAL_API_KEY) {
     console.log(
       JSON.stringify(
         {
@@ -90,34 +104,71 @@ async function main() {
 
   const pngBytes = Uint8Array.from(
     atob(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+      'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFElEQVR42mNk+M+ABzAxMIjGoQMAWnMCCXy6X6QAAAAASUVORK5CYII=',
     ),
     (char) => char.charCodeAt(0),
   )
   const body = new FormData()
-  body.set(
-    'image',
-    new Blob([pngBytes], { type: 'image/png' }),
-    'diagnostic.png',
-  )
-  body.set('mode', 'single_item')
-  body.set('modelId', modelId)
+  if (provider === 'removebg') {
+    body.set(
+      'image_file',
+      new Blob([pngBytes], { type: 'image/png' }),
+      'diagnostic.png',
+    )
+    body.set('size', size)
+  } else {
+    if (!endpoint) {
+      console.log(
+        JSON.stringify(
+          {
+            ...summary,
+            ok: false,
+            error: 'background_removal_credentials_missing',
+          },
+          null,
+          2,
+        ),
+      )
+      process.exitCode = 1
+      return
+    }
+    body.set(
+      'image',
+      new Blob([pngBytes], { type: 'image/png' }),
+      'diagnostic.png',
+    )
+    body.set('mode', 'single_item')
+    body.set('modelId', modelId)
+  }
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  const requestEndpoint =
+    provider === 'removebg'
+      ? endpoint || 'https://api.remove.bg/v1.0/removebg'
+      : endpoint
 
   try {
     const startedAt = performance.now()
-    const response = await fetch(endpoint, {
+    const response = await fetch(requestEndpoint, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.BACKGROUND_REMOVAL_API_KEY}`,
-        Accept: 'image/png, application/json',
-      },
+      headers:
+        provider === 'removebg'
+          ? {
+              'X-Api-Key': process.env.BACKGROUND_REMOVAL_API_KEY,
+              Accept: 'image/png',
+            }
+          : {
+              Authorization: `Bearer ${process.env.BACKGROUND_REMOVAL_API_KEY}`,
+              Accept: 'image/png, application/json',
+            },
       body,
       signal: controller.signal,
     })
     const contentType = response.headers.get('content-type')
+    const outputSize = response.ok
+      ? (await response.clone().arrayBuffer()).byteLength
+      : null
     const message = response.ok ? null : (await response.text()).slice(0, 500)
 
     console.log(
@@ -127,6 +178,7 @@ async function main() {
           ok: response.ok,
           status: response.status,
           contentType,
+          outputSize,
           durationMs: Math.round(performance.now() - startedAt),
           message,
         },

@@ -1,5 +1,6 @@
 import { ApiBackgroundRemovalProvider } from './api-provider'
 import { MockBackgroundRemovalProvider } from './mock-provider'
+import { RemoveBgBackgroundRemovalProvider } from './removebg-provider'
 import type { BackgroundRemovalProvider } from './provider'
 
 export function getBackgroundRemovalProvider(): BackgroundRemovalProvider {
@@ -15,6 +16,10 @@ export function getBackgroundRemovalProvider(): BackgroundRemovalProvider {
 
   if (provider === 'api') {
     return new ApiBackgroundRemovalProvider()
+  }
+
+  if (provider === 'removebg') {
+    return new RemoveBgBackgroundRemovalProvider()
   }
 
   throw new Error(`Unsupported background removal provider: ${provider}`)

@@ -30,6 +30,7 @@
 - `BACKGROUND_REMOVAL_API_URL` - required production background-removal endpoint.
 - `BACKGROUND_REMOVAL_MODEL_ID` - model identifier sent to the background-removal API.
 - `BACKGROUND_REMOVAL_REQUEST_TIMEOUT_MS` - timeout for background-removal API calls.
+- `BACKGROUND_REMOVAL_SIZE` - remove.bg output size, defaults to `auto`.
 - `WEATHER_PROVIDER` - `mock` for explicit local development or `api` for a real provider.
 - `WEATHER_API_KEY` - required when `WEATHER_PROVIDER=api`.
 - `WEATHER_API_BASE_URL` - required weather API base URL. Vestra calls `/forecast`.
@@ -113,11 +114,12 @@ pnpm ai:diagnose:openrouter
 
 Real background removal requires:
 
-- `BACKGROUND_REMOVAL_PROVIDER=api`
+- `BACKGROUND_REMOVAL_PROVIDER=removebg` or `BACKGROUND_REMOVAL_PROVIDER=api`
 - `BACKGROUND_REMOVAL_API_KEY`
 - `BACKGROUND_REMOVAL_API_URL`
 - optional `BACKGROUND_REMOVAL_MODEL_ID`
 - optional `BACKGROUND_REMOVAL_REQUEST_TIMEOUT_MS`
+- optional `BACKGROUND_REMOVAL_SIZE=auto` for remove.bg
 
 Run a server-only sanitized connectivity check with:
 

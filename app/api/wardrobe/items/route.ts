@@ -9,7 +9,10 @@ import {
 } from '@/lib/api/errors'
 import { auth } from '@/lib/auth'
 import { getBackgroundRemovalProvider } from '@/lib/background-removal'
-import type { BackgroundRemovalResult } from '@/lib/background-removal/provider'
+import {
+  BackgroundRemovalProviderError,
+  type BackgroundRemovalResult,
+} from '@/lib/background-removal/provider'
 import { db } from '@/lib/db'
 import { wardrobeItem } from '@/lib/db/schema'
 import { getObjectStorage } from '@/lib/storage'
@@ -222,19 +225,15 @@ export async function POST(request: Request) {
         storageDriver === 'r2'
           ? Boolean(
               process.env.R2_BUCKET_NAME &&
-                process.env.R2_ENDPOINT &&
-                process.env.R2_ACCESS_KEY_ID &&
-                process.env.R2_SECRET_ACCESS_KEY,
+              process.env.R2_ENDPOINT &&
+              process.env.R2_ACCESS_KEY_ID &&
+              process.env.R2_SECRET_ACCESS_KEY,
             )
           : null,
     })
 
     const backgroundProvider = process.env.BACKGROUND_REMOVAL_PROVIDER ?? 'mock'
     stage = 'BACKGROUND_PROVIDER_SELECTED'
-    logUploadStage(stage, { userId, backgroundProvider })
-    const backgroundRemovalProvider = getBackgroundRemovalProvider()
-
-    stage = 'BACKGROUND_CLIENT_CREATED'
     logUploadStage(stage, { userId, backgroundProvider })
 
     const storageStartedAt = performance.now()
@@ -268,45 +267,85 @@ export async function POST(request: Request) {
       provider: process.env.BACKGROUND_REMOVAL_PROVIDER ?? 'mock',
     })
 
-    stage = 'BACKGROUND_REMOVAL_STARTED'
-    logUploadStage(stage, { userId, backgroundProvider })
-    const backgroundRemoval: BackgroundRemovalResult =
-      await backgroundRemovalProvider.removeBackground({
+    let processedImage: StoredObject = originalImage
+    let backgroundRemoval: BackgroundRemovalResult | null = null
+    let backgroundRemovalStatus = 'failed'
+    let backgroundRemovalError: string | null = null
+    let backgroundRemovalMs = 0
+
+    try {
+      const backgroundRemovalProvider = getBackgroundRemovalProvider()
+      stage = 'BACKGROUND_CLIENT_CREATED'
+      logUploadStage(stage, { userId, backgroundProvider })
+
+      stage = 'BACKGROUND_REMOVAL_STARTED'
+      logUploadStage(stage, { userId, backgroundProvider })
+      backgroundRemoval = await backgroundRemovalProvider.removeBackground({
         userId,
         file: imageResult.data,
         mode: 'single_item',
       })
-    stage = 'BACKGROUND_REMOVAL_COMPLETED'
-    logUploadStage(stage, {
-      userId,
-      backgroundProvider,
-      modelId: backgroundRemoval.modelId,
-    })
-    const backgroundRemovalMs = Math.round(
+      backgroundRemovalStatus = 'done'
+      stage = 'BACKGROUND_REMOVAL_COMPLETED'
+      logUploadStage(stage, {
+        userId,
+        backgroundProvider,
+        modelId: backgroundRemoval.modelId,
+      })
+
+      const processedStorageStartedAt = performance.now()
+      stage = 'PROCESSED_UPLOAD_STARTED'
+      logUploadStage(stage, { userId, storageDriver })
+      processedImage = await storage.putWardrobeImage({
+        userId,
+        file: backgroundRemoval.file,
+        variant: 'processed',
+      })
+      stage = 'PROCESSED_UPLOAD_COMPLETED'
+      logUploadStage(stage, {
+        userId,
+        storageDriver,
+        storageKey: processedImage.storageKey,
+      })
+      logDev('Wardrobe create processed image stored', {
+        userId,
+        processedImageStorageMs: Math.round(
+          performance.now() - processedStorageStartedAt,
+        ),
+      })
+    } catch (error) {
+      backgroundRemovalMs = Math.round(
+        performance.now() - backgroundRemovalStartedAt,
+      )
+      backgroundRemovalError =
+        error instanceof BackgroundRemovalProviderError
+          ? error.code
+          : error instanceof Error
+            ? error.message
+            : 'background_removal_failed'
+      logUploadError(stage, error)
+      logUploadStage('PROCESSED_UPLOAD_STARTED', {
+        userId,
+        storageDriver,
+        fallback: 'original_image',
+      })
+      logUploadStage('PROCESSED_UPLOAD_COMPLETED', {
+        userId,
+        storageDriver,
+        storageKey: originalImage.storageKey,
+        fallback: 'original_image',
+      })
+    }
+
+    backgroundRemovalMs ||= Math.round(
       performance.now() - backgroundRemovalStartedAt,
     )
-
-    const processedStorageStartedAt = performance.now()
-    stage = 'PROCESSED_UPLOAD_STARTED'
-    logUploadStage(stage, { userId, storageDriver })
-    const processedImage: StoredObject = await storage.putWardrobeImage({
-      userId,
-      file: backgroundRemoval.file,
-      variant: 'processed',
-    })
-    stage = 'PROCESSED_UPLOAD_COMPLETED'
-    logUploadStage(stage, {
-      userId,
-      storageDriver,
-      storageKey: processedImage.storageKey,
-    })
     logDev('Wardrobe create image processing completed', {
       userId,
       originalImageStorageMs,
       backgroundRemovalMs,
-      processedImageStorageMs: Math.round(
-        performance.now() - processedStorageStartedAt,
-      ),
+      backgroundRemovalStatus,
+      backgroundRemovalError,
       totalImageProcessingMs: Math.round(performance.now() - storageStartedAt),
     })
 
@@ -337,13 +376,22 @@ export async function POST(request: Request) {
         originalImageStorageKey: originalImage.storageKey,
         originalImageContentType: originalImage.contentType,
         originalImageSize: String(originalImage.size),
-        processedImageUrl: processedImage.url,
-        processedImageStorageKey: processedImage.storageKey,
-        processedImageContentType: processedImage.contentType,
-        processedImageSize: String(processedImage.size),
-        backgroundRemovalStatus: 'done',
-        backgroundRemovalProvider: backgroundRemoval.provider,
-        backgroundRemovalModelId: backgroundRemoval.modelId,
+        processedImageUrl:
+          backgroundRemovalStatus === 'done' ? processedImage.url : null,
+        processedImageStorageKey:
+          backgroundRemovalStatus === 'done' ? processedImage.storageKey : null,
+        processedImageContentType:
+          backgroundRemovalStatus === 'done'
+            ? processedImage.contentType
+            : null,
+        processedImageSize:
+          backgroundRemovalStatus === 'done'
+            ? String(processedImage.size)
+            : null,
+        backgroundRemovalStatus,
+        backgroundRemovalProvider:
+          backgroundRemoval?.provider ?? backgroundProvider,
+        backgroundRemovalModelId: backgroundRemoval?.modelId ?? null,
         analysisStatus: 'pending',
       })
       .returning()

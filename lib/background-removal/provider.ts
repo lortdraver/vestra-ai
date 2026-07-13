@@ -14,6 +14,26 @@ export type BackgroundRemovalResult = {
   mode: BackgroundRemovalMode
 }
 
+export type BackgroundRemovalErrorCode =
+  | 'background_removal_invalid_request'
+  | 'background_removal_invalid_api_key'
+  | 'background_removal_insufficient_credits'
+  | 'background_removal_rate_limited'
+  | 'background_removal_timeout'
+  | 'background_removal_provider_unavailable'
+  | 'background_removal_invalid_response'
+
+export class BackgroundRemovalProviderError extends Error {
+  constructor(
+    readonly code: BackgroundRemovalErrorCode,
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message)
+    this.name = 'BackgroundRemovalProviderError'
+  }
+}
+
 export type BackgroundRemovalApiResponse = {
   imageUrl?: string
   imageBase64?: string

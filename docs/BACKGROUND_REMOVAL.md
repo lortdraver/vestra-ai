@@ -15,11 +15,13 @@ try-on. It prepares the architecture for those later workflows.
 
 Current providers:
 
-- `mock` - development-only provider. It returns a synthetic transparent PNG so
-  development can exercise the processing pipeline without pretending the
-  original image was successfully segmented.
+- `mock` - development-only provider. It returns the original uploaded image
+  unchanged so development can exercise the processing pipeline without fake
+  segmentation.
 - `api` - production adapter. It requires real credentials and sends the image to
   a configured background-removal API.
+- `removebg` - production remove.bg adapter. It uses `X-Api-Key` authentication
+  and the remove.bg multipart contract.
 
 Production must not use the mock provider. The provider selector throws when
 `BACKGROUND_REMOVAL_PROVIDER=mock` is used in production.
@@ -32,6 +34,7 @@ BACKGROUND_REMOVAL_API_KEY=""
 BACKGROUND_REMOVAL_API_URL=""
 BACKGROUND_REMOVAL_MODEL_ID=""
 BACKGROUND_REMOVAL_REQUEST_TIMEOUT_MS="15000"
+BACKGROUND_REMOVAL_SIZE="auto"
 ```
 
 Use `BACKGROUND_REMOVAL_PROVIDER=api` with real credentials before deploying
@@ -72,6 +75,31 @@ and records provider/model metadata on `wardrobe_item`.
 The API must return an actual processed image with the clothing item isolated on
 a transparent background. The original upload is stored separately and must not
 be treated as a successful processed result.
+
+## remove.bg Contract
+
+Use:
+
+```env
+BACKGROUND_REMOVAL_PROVIDER="removebg"
+BACKGROUND_REMOVAL_API_KEY=""
+BACKGROUND_REMOVAL_API_URL="https://api.remove.bg/v1.0/removebg"
+BACKGROUND_REMOVAL_REQUEST_TIMEOUT_MS="15000"
+BACKGROUND_REMOVAL_SIZE="auto"
+```
+
+The remove.bg adapter sends:
+
+- `POST https://api.remove.bg/v1.0/removebg`
+- multipart field `image_file`
+- multipart field `size`
+- header `X-Api-Key: <BACKGROUND_REMOVAL_API_KEY>`
+- no `Authorization: Bearer` header
+
+Successful responses must be binary images with transparent background. If
+remove.bg fails after the original image is stored, Vestra keeps the wardrobe
+creation successful, stores the original image as the display image, marks
+`backgroundRemovalStatus=failed`, and allows the user to retry later.
 
 Production background removal is considered configured only when:
 

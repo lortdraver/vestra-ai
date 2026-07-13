@@ -250,6 +250,13 @@ export const dictionaries = {
         image_too_large: 'Şəkil çox böyükdür. Daha kiçik şəkil seçin.',
         background_removal_not_configured:
           'Fon silmə servisi bu mühitdə konfigurasiya edilməyib.',
+        background_removal_invalid_api_key: 'Fon silmə API açarı düzgün deyil.',
+        background_removal_insufficient_credits:
+          'Fon silmə servisi üçün kredit kifayət deyil.',
+        background_removal_rate_limited:
+          'Fon silmə servisi çox sorğu aldı. Bir az sonra yenidən yoxlayın.',
+        background_removal_provider_unavailable:
+          'Fon silmə servisi müvəqqəti olaraq əlçatan deyil.',
         storage_not_configured:
           'Şəkil saxlama servisi bu mühitdə konfigurasiya edilməyib.',
         storage_write_failed: 'Şəkli saxlamaq olmadı.',
@@ -857,6 +864,14 @@ export const dictionaries = {
         image_too_large: 'The image is too large. Choose a smaller image.',
         background_removal_not_configured:
           'Background removal is not configured for this environment.',
+        background_removal_invalid_api_key:
+          'The background removal API key is invalid.',
+        background_removal_insufficient_credits:
+          'The background removal account does not have enough credits.',
+        background_removal_rate_limited:
+          'The background removal provider is rate limited. Try again shortly.',
+        background_removal_provider_unavailable:
+          'The background removal provider is temporarily unavailable.',
         storage_not_configured:
           'Image storage is not configured for this environment.',
         storage_write_failed: 'Unable to store this image.',
@@ -1463,6 +1478,13 @@ export const dictionaries = {
         image_too_large: 'Изображение слишком большое. Выберите файл меньше.',
         background_removal_not_configured:
           'Удаление фона не настроено для этой среды.',
+        background_removal_invalid_api_key: 'API-ключ удаления фона неверный.',
+        background_removal_insufficient_credits:
+          'На аккаунте удаления фона недостаточно кредитов.',
+        background_removal_rate_limited:
+          'Провайдер удаления фона ограничил запросы. Попробуйте чуть позже.',
+        background_removal_provider_unavailable:
+          'Провайдер удаления фона временно недоступен.',
         storage_not_configured:
           'Хранилище изображений не настроено для этой среды.',
         storage_write_failed: 'Не удалось сохранить изображение.',
