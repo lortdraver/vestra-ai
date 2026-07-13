@@ -8,6 +8,9 @@ export type StylistProviderResponseMetadata = {
   requestCount: number
   retryCount: number
   fallbackUsed: boolean
+  elapsedMs?: number
+  timeoutMs?: number
+  aborted?: boolean
 }
 
 export type StylistProviderEnvelope = {

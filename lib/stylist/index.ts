@@ -122,3 +122,8 @@ export function getStylistProvider(): StylistProvider {
 
 export * from './types'
 export * from './batch'
+export {
+  StylistProviderRequestError,
+  getStylistModelCapability,
+  getStylistRequestTimeoutMs,
+} from './api-provider'

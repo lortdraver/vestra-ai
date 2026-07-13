@@ -22,6 +22,8 @@ describe('i18n foundation', () => {
   it('localizes stylist provider-format errors', () => {
     for (const locale of locales) {
       expect(dictionaries[locale].stylist.errors.providerFormat).toBeTruthy()
+      expect(dictionaries[locale].stylist.errors.timeout).toBeTruthy()
+      expect(dictionaries[locale].stylist.errors.inProgress).toBeTruthy()
       expect(dictionaries[locale].stylist.errors.providerFormat).not.toBe(
         dictionaries[locale].stylist.errors.generate,
       )

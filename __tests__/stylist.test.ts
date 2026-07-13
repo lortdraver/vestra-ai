@@ -1,9 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  getStylistModelCapability,
   getStylistProvider,
   getStylistProviderDiagnostics,
+  getStylistRequestTimeoutMs,
 } from '@/lib/stylist'
 import { ApiStylistProvider } from '@/lib/stylist/api-provider'
+import {
+  finishStylistGeneration,
+  getStylistGenerationKey,
+  tryStartStylistGeneration,
+} from '@/lib/stylist/concurrency'
 import {
   normalizeStylistProviderOutput,
   parseProviderJson,
@@ -28,6 +35,7 @@ import type { StylistWardrobeItem } from '@/lib/stylist'
 afterEach(() => {
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 const wardrobe: StylistWardrobeItem[] = [
@@ -296,6 +304,195 @@ describe('stylist provider behavior', () => {
         missingItems: [],
       }),
     ).rejects.toThrow()
+  })
+
+  it('uses json_object directly for nex-agi/nex-n2-mini', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  status: 'generation_failed',
+                  message: 'Model returned no stable outfit.',
+                  retryable: true,
+                }),
+              },
+            },
+          ],
+        }),
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const provider = new ApiStylistProvider({
+      apiKey: 'test-key',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      modelId: 'nex-agi/nex-n2-mini',
+    })
+
+    await provider.generateOutfit({
+      userId: 'user_1',
+      locale: 'en',
+      request: {
+        message: 'work outfit',
+        locale: 'en',
+        lockedItemIds: [],
+        wearHistoryMode: 'none',
+      },
+      wardrobeItems: wardrobe,
+      missingItems: [],
+    })
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as {
+      response_format: { type: string }
+    }
+    expect(getStylistModelCapability('nex-agi/nex-n2-mini')).toMatchObject({
+      supportsJsonSchema: false,
+      supportsJsonObject: true,
+    })
+    expect(body.response_format.type).toBe('json_object')
+  })
+
+  it('times out an unresponsive provider request with AbortController', async () => {
+    vi.useFakeTimers()
+    vi.stubEnv('STYLIST_AI_REQUEST_TIMEOUT_MS', '5000')
+    const fetchMock = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'))
+          })
+        }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const provider = new ApiStylistProvider({
+      apiKey: 'test-key',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      modelId: 'nex-agi/nex-n2-mini',
+    })
+    const promise = provider.generateOutfit({
+      userId: 'user_1',
+      locale: 'en',
+      request: {
+        message: 'work outfit',
+        locale: 'en',
+        lockedItemIds: [],
+        wearHistoryMode: 'none',
+      },
+      wardrobeItems: wardrobe,
+      missingItems: [],
+    })
+
+    const assertion = expect(promise).rejects.toMatchObject({
+      code: 'stylist_provider_timeout',
+      status: 504,
+      retryable: true,
+    })
+    await vi.advanceTimersByTimeAsync(10_000)
+    await assertion
+  })
+
+  it('retries transient provider failures once', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{}', { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    status: 'generation_failed',
+                    message: 'Recovered after retry.',
+                    retryable: true,
+                  }),
+                },
+              },
+            ],
+          }),
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const provider = new ApiStylistProvider({
+      apiKey: 'test-key',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      modelId: 'nex-agi/nex-n2-mini',
+    })
+    const result = await provider.generateOutfit({
+      userId: 'user_1',
+      locale: 'en',
+      request: {
+        message: 'work outfit',
+        locale: 'en',
+        lockedItemIds: [],
+        wearHistoryMode: 'none',
+      },
+      wardrobeItems: wardrobe,
+      missingItems: [],
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(result.metadata.retryCount).toBe(1)
+  })
+
+  it('does not retry auth, billing, not-found, or rate-limit failures', async () => {
+    for (const status of [401, 402, 403, 404, 429]) {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(new Response('{}', { status }))
+      vi.stubGlobal('fetch', fetchMock)
+
+      const provider = new ApiStylistProvider({
+        apiKey: 'test-key',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        modelId: 'nex-agi/nex-n2-mini',
+      })
+
+      await expect(
+        provider.generateOutfit({
+          userId: 'user_1',
+          locale: 'en',
+          request: {
+            message: 'work outfit',
+            locale: 'en',
+            lockedItemIds: [],
+            wearHistoryMode: 'none',
+          },
+          wardrobeItems: wardrobe,
+          missingItems: [],
+        }),
+      ).rejects.toMatchObject({ retryable: false })
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('prevents duplicate generation requests for the same user request', () => {
+    const request = {
+      message: 'work outfit',
+      locale: 'en' as const,
+      lockedItemIds: [],
+      wearHistoryMode: 'none' as const,
+    }
+    const key = getStylistGenerationKey('user_1', request)
+
+    expect(tryStartStylistGeneration(key)).toBe(true)
+    expect(tryStartStylistGeneration(key)).toBe(false)
+    finishStylistGeneration(key)
+    expect(tryStartStylistGeneration(key)).toBe(true)
+    finishStylistGeneration(key)
+  })
+
+  it('clamps stylist request timeout configuration', () => {
+    vi.stubEnv('STYLIST_AI_REQUEST_TIMEOUT_MS', '1')
+    expect(getStylistRequestTimeoutMs()).toBe(5000)
+    vi.stubEnv('STYLIST_AI_REQUEST_TIMEOUT_MS', '999999')
+    expect(getStylistRequestTimeoutMs()).toBe(45000)
   })
 })
 

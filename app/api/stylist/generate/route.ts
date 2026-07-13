@@ -12,6 +12,7 @@ import {
   wardrobeItem,
 } from '@/lib/db/schema'
 import {
+  StylistProviderRequestError,
   buildLocalCandidateBatch,
   getStylistProvider,
   getStylistProviderDiagnostics,
@@ -21,6 +22,11 @@ import {
   buildPreferenceContext,
   stylistPreferenceSchema,
 } from '@/lib/stylist/preferences'
+import {
+  finishStylistGeneration,
+  getStylistGenerationKey,
+  tryStartStylistGeneration,
+} from '@/lib/stylist/concurrency'
 import {
   getProviderCandidateCount,
   getProviderTopLevelKeys,
@@ -329,6 +335,7 @@ async function generateAndValidateStylistBatch(input: {
 
 export async function POST(request: Request) {
   let stage: StylistGenerateStage = 'REQUEST_STARTED'
+  let activeGenerationKey: string | null = null
 
   try {
     logStylistStage(stage)
@@ -356,6 +363,19 @@ export async function POST(request: Request) {
       hasQuickRequest: Boolean(parsed.data.quickRequest),
       lockedItemCount: parsed.data.lockedItemIds.length,
     })
+
+    activeGenerationKey = getStylistGenerationKey(userId, parsed.data)
+    if (!tryStartStylistGeneration(activeGenerationKey)) {
+      return NextResponse.json(
+        {
+          status: 'generation_failed',
+          code: 'stylist_generation_in_progress',
+          message: 'A stylist generation request is already in progress.',
+          retryable: true,
+        },
+        { status: 409 },
+      )
+    }
 
     const [preferenceRow] = await db
       .select()
@@ -526,6 +546,18 @@ export async function POST(request: Request) {
       })
     } catch (error) {
       logStylistStageFailure(stage, error)
+      if (error instanceof StylistProviderRequestError) {
+        return NextResponse.json(
+          {
+            status: 'generation_failed',
+            code: error.code,
+            message: error.message,
+            retryable: error.retryable,
+          },
+          { status: error.status },
+        )
+      }
+
       const message =
         error instanceof Error
           ? error.message
@@ -650,5 +682,9 @@ export async function POST(request: Request) {
   } catch (error) {
     logStylistStageFailure(stage, error)
     return stylistErrorResponse(stage, error)
+  } finally {
+    if (activeGenerationKey) {
+      finishStylistGeneration(activeGenerationKey)
+    }
   }
 }

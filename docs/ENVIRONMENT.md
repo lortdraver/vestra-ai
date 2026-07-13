@@ -34,6 +34,8 @@
   override. When empty, Vestra reuses `AI_API_BASE_URL`.
 - `STYLIST_AI_MODEL_ID` - optional stylist-specific model override. When empty,
   Vestra reuses `AI_MODEL_ID`.
+- `STYLIST_AI_REQUEST_TIMEOUT_MS` - stylist provider request timeout. Defaults
+  to `20000`; Vestra clamps this value between 5000 and 45000 ms.
 - `BACKGROUND_REMOVAL_PROVIDER` - `mock` for development or `api` for production.
 - `BACKGROUND_REMOVAL_API_KEY` - required when `BACKGROUND_REMOVAL_PROVIDER=api`.
 - `BACKGROUND_REMOVAL_API_URL` - required production background-removal endpoint.
@@ -132,6 +134,7 @@ AI_API_KEY="<your-openrouter-key>"
 AI_API_BASE_URL="https://openrouter.ai/api/v1"
 AI_MODEL_ID="<text-capable-openrouter-model>"
 OPENROUTER_HTTP_REFERER="https://your-production-domain"
+STYLIST_AI_REQUEST_TIMEOUT_MS="20000"
 ```
 
 `STYLIST_AI_API_KEY`, `STYLIST_AI_API_URL`, and `STYLIST_AI_MODEL_ID` are
@@ -143,6 +146,11 @@ Vestra never silently falls back to the mock stylist in production. If
 configuration error. If real credentials are missing, generation fails before
 the external request and logs only safe diagnostics: resolved provider,
 credential presence, model id, and request URL host.
+
+For `nex-agi/nex-n2-mini`, Vestra uses `json_object` directly because strict
+`json_schema` has not behaved reliably in production on OpenRouter. Other models
+default to strict `json_schema` first, with one controlled fallback to
+`json_object` for structured-output rejection or transient provider failure.
 
 ## Background Removal Credentials
 
@@ -200,6 +208,7 @@ Before public deployment, manually configure and verify:
   stylist can reuse valid `AI_API_KEY`, `AI_API_BASE_URL`, and `AI_MODEL_ID`;
   set `STYLIST_AI_API_KEY`, `STYLIST_AI_API_URL`, and `STYLIST_AI_MODEL_ID` only
   when stylist generation needs separate credentials.
+- `STYLIST_AI_REQUEST_TIMEOUT_MS=20000` for a bounded OpenRouter request.
 - `WEATHER_PROVIDER=api` with valid `WEATHER_API_KEY`,
   `WEATHER_API_BASE_URL`, and timeout/cache values.
 - `BACKGROUND_REMOVAL_PROVIDER=api` with valid background-removal credentials.

@@ -57,6 +57,11 @@ JSON, retries once with `json_object`. The model must have enough context to
 read the ranked wardrobe candidates and generate up to three complete outfit
 candidates without inventing item IDs.
 
+`nex-agi/nex-n2-mini` is treated as `json_object`-only in Vestra because strict
+`json_schema` has not been reliable for this production route on OpenRouter.
+Stylist requests are hard-limited by `STYLIST_AI_REQUEST_TIMEOUT_MS`, which
+defaults to 20000 ms and is clamped between 5000 and 45000 ms.
+
 ## Multi-Outfit Generation
 
 Milestone 6.2 returns a batch of outfit candidates for normal requests. The
@@ -109,6 +114,7 @@ AI_MODEL_ID=""
 STYLIST_AI_API_KEY=""
 STYLIST_AI_API_URL=""
 STYLIST_AI_MODEL_ID=""
+STYLIST_AI_REQUEST_TIMEOUT_MS="20000"
 ```
 
 For local development mock mode, set `STYLIST_AI_PROVIDER="mock"` explicitly.

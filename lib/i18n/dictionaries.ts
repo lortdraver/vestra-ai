@@ -608,6 +608,9 @@ export const dictionaries = {
         generate: 'Kombin yaratmaq olmadı.',
         providerFormat:
           'Stilist provayderi cavabı düzgün formatda qaytarmadı. Zəhmət olmasa bir az sonra yenidən cəhd edin.',
+        timeout:
+          'Stilist provayderi vaxtında cavab vermədi. Bir az sonra yenidən cəhd edin.',
+        inProgress: 'Kombin yaradılması artıq davam edir.',
         save: 'Kombini yeniləmək olmadı.',
         feedback: 'Rəyi saxlamaq olmadı.',
         insufficientAlternatives: 'Uyğun əvəzləmə tapılmadı.',
@@ -1226,6 +1229,9 @@ export const dictionaries = {
         generate: 'Unable to generate an outfit.',
         providerFormat:
           'The stylist provider returned an unexpected format. Please try again shortly.',
+        timeout:
+          'The stylist provider took too long to respond. Please try again shortly.',
+        inProgress: 'An outfit generation request is already in progress.',
         save: 'Unable to update this outfit.',
         feedback: 'Unable to save feedback.',
         insufficientAlternatives: 'No suitable replacement was found.',
@@ -1697,6 +1703,9 @@ export const dictionaries = {
         generate: 'Не удалось создать образ.',
         providerFormat:
           'Провайдер стилиста вернул неожиданный формат. Попробуйте еще раз чуть позже.',
+        timeout:
+          'Провайдер стилиста не ответил вовремя. Попробуйте еще раз чуть позже.',
+        inProgress: 'Создание образа уже выполняется.',
         save: 'Не удалось обновить этот образ.',
         feedback: 'Не удалось сохранить отзыв.',
         insufficientAlternatives: 'Подходящая замена не найдена.',

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Briefcase,
   CalendarHeart,
@@ -101,6 +101,7 @@ export function StylistPageClient({
     message: string
     quickRequest?: QuickRequestId
   } | null>(null)
+  const generationInFlightRef = useRef(false)
 
   const quickRequests = useMemo(
     () =>
@@ -194,6 +195,9 @@ export function StylistPageClient({
     message: string
     quickRequest?: QuickRequestId
   }) => {
+    if (generationInFlightRef.current) return
+
+    generationInFlightRef.current = true
     setError(null)
     setInsufficientWardrobe(null)
     setIsLoading(true)
@@ -245,13 +249,19 @@ export function StylistPageClient({
       setHistory((current) => [...nextCandidates, ...current])
       setMessage('')
     } catch (generateError) {
+      const errorCode =
+        generateError instanceof Error ? generateError.message : ''
       setError(
-        generateError instanceof Error &&
-          generateError.message === 'invalid_stylist_batch_result'
-          ? t.errors.providerFormat
-          : t.errors.generate,
+        errorCode === 'stylist_provider_timeout'
+          ? t.errors.timeout
+          : errorCode === 'stylist_generation_in_progress'
+            ? t.errors.inProgress
+            : errorCode === 'invalid_stylist_batch_result'
+              ? t.errors.providerFormat
+              : t.errors.generate,
       )
     } finally {
+      generationInFlightRef.current = false
       setIsLoading(false)
     }
   }
