@@ -44,6 +44,63 @@ async function getCurrentUserId() {
   return session?.user?.id ?? null
 }
 
+type StylistGenerateStage =
+  | 'REQUEST_STARTED'
+  | 'AUTHENTICATED'
+  | 'REQUEST_PARSED'
+  | 'PREFERENCES_LOADED'
+  | 'WARDROBE_LOADED'
+  | 'WARDROBE_FILTERED'
+  | 'PROVIDER_SELECTED'
+  | 'CLIENT_CREATED'
+  | 'PROVIDER_REQUEST_STARTED'
+
+function logStylistStage(
+  stage: StylistGenerateStage,
+  details: Record<string, unknown> = {},
+) {
+  console.info(`[stylist-generate] ${stage}`, details)
+}
+
+function getStylistErrorDetail(error: unknown) {
+  return error instanceof Error
+    ? {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      }
+    : {
+        name: 'UnknownError',
+        message: String(error),
+        stack: null,
+      }
+}
+
+function logStylistStageFailure(stage: StylistGenerateStage, error: unknown) {
+  console.error('[stylist-generate] failed', {
+    stage,
+    ...getStylistErrorDetail(error),
+  })
+}
+
+function stylistErrorResponse(
+  stage: StylistGenerateStage,
+  error: unknown,
+  code = 'stylist_generation_failed',
+  status = 502,
+) {
+  const detail = getStylistErrorDetail(error)
+
+  return NextResponse.json(
+    {
+      stage,
+      message: detail.message,
+      code,
+    },
+    { status },
+  )
+}
+
 const categoryLabels = {
   az: {
     tops: 'üst geyim',
@@ -128,12 +185,16 @@ async function generateAndValidateStylistBatch(input: {
   candidateCount: number
   preferenceContext: string
   lockedItemIds: string[]
+  onStage?: (stage: StylistGenerateStage) => void
 }) {
   const startedAt = performance.now()
+  input.onStage?.('PROVIDER_SELECTED')
   const provider = getStylistProvider()
+  input.onStage?.('CLIENT_CREATED')
   let retryCount = 0
 
   for (const attempt of [1, 2]) {
+    input.onStage?.('PROVIDER_REQUEST_STARTED')
     const output = await provider.generateOutfit({
       userId: input.userId,
       locale: input.request.locale,
@@ -207,84 +268,98 @@ async function generateAndValidateStylistBatch(input: {
 }
 
 export async function POST(request: Request) {
-  const userId = await getCurrentUserId()
-  if (!userId) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-  }
+  let stage: StylistGenerateStage = 'REQUEST_STARTED'
 
-  const body = await request.json().catch(() => ({}))
-  const parsed = stylistRequestSchema.safeParse(body)
-  if (!parsed.success || (!parsed.data.message && !parsed.data.quickRequest)) {
-    return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
-  }
+  try {
+    logStylistStage(stage)
 
-  const allWardrobeRows = await db
-    .select()
-    .from(wardrobeItem)
-    .where(eq(wardrobeItem.userId, userId))
-    .orderBy(desc(wardrobeItem.createdAt))
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    }
 
-  const [preferenceRow] = await db
-    .select()
-    .from(stylistPreferenceProfile)
-    .where(eq(stylistPreferenceProfile.userId, userId))
-    .limit(1)
-  const preferenceProfile = stylistPreferenceSchema.parse(preferenceRow ?? {})
-  const dislikedWardrobeItemIds = new Set(
-    preferenceProfile.dislikedWardrobeItemIds,
-  )
+    stage = 'AUTHENTICATED'
+    logStylistStage(stage)
 
-  const diagnostics = getStylistWardrobeDiagnostics(allWardrobeRows)
-  logStylistDev('[dev] Stylist wardrobe eligibility', diagnostics)
+    const body = await request.json().catch(() => ({}))
+    const parsed = stylistRequestSchema.safeParse(body)
+    if (
+      !parsed.success ||
+      (!parsed.data.message && !parsed.data.quickRequest)
+    ) {
+      return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
+    }
 
-  const lockedItemIdSet = new Set(parsed.data.lockedItemIds)
-  const wardrobeRows = allWardrobeRows.filter(
-    (item) =>
-      item.imageDeletionStatus === 'active' &&
-      (!dislikedWardrobeItemIds.has(item.id) || lockedItemIdSet.has(item.id)),
-  )
-  const wardrobe = wardrobeRows.map(toStylistWardrobeItem)
-  const lockedItems = wardrobe.filter((item) => lockedItemIdSet.has(item.id))
-  if (lockedItems.length !== parsed.data.lockedItemIds.length) {
-    return NextResponse.json(
-      { error: 'locked_item_unavailable' },
-      { status: 400 },
+    stage = 'REQUEST_PARSED'
+    logStylistStage(stage, {
+      locale: parsed.data.locale,
+      hasQuickRequest: Boolean(parsed.data.quickRequest),
+      lockedItemCount: parsed.data.lockedItemIds.length,
+    })
+
+    const [preferenceRow] = await db
+      .select()
+      .from(stylistPreferenceProfile)
+      .where(eq(stylistPreferenceProfile.userId, userId))
+      .limit(1)
+    const preferenceProfile = stylistPreferenceSchema.parse(preferenceRow ?? {})
+    const dislikedWardrobeItemIds = new Set(
+      preferenceProfile.dislikedWardrobeItemIds,
     )
-  }
-  const rankedWardrobe = [
-    ...lockedItems,
-    ...filterAndRankWardrobe(wardrobe, parsed.data).filter(
-      (item) => !lockedItemIdSet.has(item.id),
-    ),
-  ].slice(0, 24)
-  const requiredCategories = getRequiredCategoriesForStylistRequest(parsed.data)
-  const weatherSuitability = parsed.data.weatherContext
-    ? applyWeatherSuitability(
-        rankedWardrobe,
-        {
-          location: {
-            name: parsed.data.weatherContext.locationName,
-            latitude: 0,
-            longitude: 0,
-            timezone: parsed.data.weatherContext.timezone,
-          },
-          current: {
-            time: parsed.data.weatherContext.time,
-            temperatureC: parsed.data.weatherContext.temperatureC,
-            feelsLikeC: parsed.data.weatherContext.feelsLikeC,
-            precipitationProbability:
-              parsed.data.weatherContext.precipitationProbability,
-            rainMm: parsed.data.weatherContext.rainMm,
-            snowMm: parsed.data.weatherContext.snowMm,
-            windKph: parsed.data.weatherContext.windKph,
-            humidity: parsed.data.weatherContext.humidity ?? null,
-            uvIndex: parsed.data.weatherContext.uvIndex ?? null,
-            condition: parsed.data.weatherContext
-              .condition as WeatherForecast['current']['condition'],
-          },
-          hourly: [],
-          daily: [
-            {
+
+    stage = 'PREFERENCES_LOADED'
+    logStylistStage(stage, {
+      hasPreferenceProfile: Boolean(preferenceRow),
+      dislikedItemCount: dislikedWardrobeItemIds.size,
+      preferredItemCount: preferenceProfile.preferredWardrobeItemIds.length,
+    })
+
+    const allWardrobeRows = await db
+      .select()
+      .from(wardrobeItem)
+      .where(eq(wardrobeItem.userId, userId))
+      .orderBy(desc(wardrobeItem.createdAt))
+
+    stage = 'WARDROBE_LOADED'
+    logStylistStage(stage, { itemCount: allWardrobeRows.length })
+
+    const diagnostics = getStylistWardrobeDiagnostics(allWardrobeRows)
+    logStylistDev('[dev] Stylist wardrobe eligibility', diagnostics)
+
+    const lockedItemIdSet = new Set(parsed.data.lockedItemIds)
+    const wardrobeRows = allWardrobeRows.filter(
+      (item) =>
+        item.imageDeletionStatus === 'active' &&
+        (!dislikedWardrobeItemIds.has(item.id) || lockedItemIdSet.has(item.id)),
+    )
+    const wardrobe = wardrobeRows.map(toStylistWardrobeItem)
+    const lockedItems = wardrobe.filter((item) => lockedItemIdSet.has(item.id))
+    if (lockedItems.length !== parsed.data.lockedItemIds.length) {
+      return NextResponse.json(
+        { error: 'locked_item_unavailable' },
+        { status: 400 },
+      )
+    }
+    const rankedWardrobe = [
+      ...lockedItems,
+      ...filterAndRankWardrobe(wardrobe, parsed.data).filter(
+        (item) => !lockedItemIdSet.has(item.id),
+      ),
+    ].slice(0, 24)
+    const requiredCategories = getRequiredCategoriesForStylistRequest(
+      parsed.data,
+    )
+    const weatherSuitability = parsed.data.weatherContext
+      ? applyWeatherSuitability(
+          rankedWardrobe,
+          {
+            location: {
+              name: parsed.data.weatherContext.locationName,
+              latitude: 0,
+              longitude: 0,
+              timezone: parsed.data.weatherContext.timezone,
+            },
+            current: {
               time: parsed.data.weatherContext.time,
               temperatureC: parsed.data.weatherContext.temperatureC,
               feelsLikeC: parsed.data.weatherContext.feelsLikeC,
@@ -297,176 +372,208 @@ export async function POST(request: Request) {
               uvIndex: parsed.data.weatherContext.uvIndex ?? null,
               condition: parsed.data.weatherContext
                 .condition as WeatherForecast['current']['condition'],
-              minTemperatureC:
-                parsed.data.weatherContext.minTemperatureC ??
-                parsed.data.weatherContext.temperatureC,
-              maxTemperatureC:
-                parsed.data.weatherContext.maxTemperatureC ??
-                parsed.data.weatherContext.temperatureC,
-              sunrise: null,
-              sunset: null,
             },
-          ],
-          fetchedAt: new Date().toISOString(),
-          provider: 'request',
-          stale: false,
-        },
-        requiredCategories,
-      )
-    : null
-  const weatherRankedWardrobe =
-    weatherSuitability && weatherSuitability.suitableItems.length > 0
-      ? weatherSuitability.suitableItems
-      : rankedWardrobe
-  const missingItems = findMissingRequiredCategories(
-    weatherRankedWardrobe,
-    requiredCategories,
-  )
-  const missingWeatherItems = weatherSuitability?.missingCategories ?? []
-  const allMissingItems = Array.from(
-    new Set([...missingItems, ...missingWeatherItems]),
-  )
-  const availableCategories = Array.from(
-    new Set(weatherRankedWardrobe.map((item) => item.category)),
-  )
+            hourly: [],
+            daily: [
+              {
+                time: parsed.data.weatherContext.time,
+                temperatureC: parsed.data.weatherContext.temperatureC,
+                feelsLikeC: parsed.data.weatherContext.feelsLikeC,
+                precipitationProbability:
+                  parsed.data.weatherContext.precipitationProbability,
+                rainMm: parsed.data.weatherContext.rainMm,
+                snowMm: parsed.data.weatherContext.snowMm,
+                windKph: parsed.data.weatherContext.windKph,
+                humidity: parsed.data.weatherContext.humidity ?? null,
+                uvIndex: parsed.data.weatherContext.uvIndex ?? null,
+                condition: parsed.data.weatherContext
+                  .condition as WeatherForecast['current']['condition'],
+                minTemperatureC:
+                  parsed.data.weatherContext.minTemperatureC ??
+                  parsed.data.weatherContext.temperatureC,
+                maxTemperatureC:
+                  parsed.data.weatherContext.maxTemperatureC ??
+                  parsed.data.weatherContext.temperatureC,
+                sunrise: null,
+                sunset: null,
+              },
+            ],
+            fetchedAt: new Date().toISOString(),
+            provider: 'request',
+            stale: false,
+          },
+          requiredCategories,
+        )
+      : null
+    const weatherRankedWardrobe =
+      weatherSuitability && weatherSuitability.suitableItems.length > 0
+        ? weatherSuitability.suitableItems
+        : rankedWardrobe
+    const missingItems = findMissingRequiredCategories(
+      weatherRankedWardrobe,
+      requiredCategories,
+    )
+    const missingWeatherItems = weatherSuitability?.missingCategories ?? []
+    const allMissingItems = Array.from(
+      new Set([...missingItems, ...missingWeatherItems]),
+    )
+    const availableCategories = Array.from(
+      new Set(weatherRankedWardrobe.map((item) => item.category)),
+    )
 
-  if (allMissingItems.length > 0) {
-    const insufficient = buildInsufficientWardrobeResult({
-      locale: parsed.data.locale,
+    stage = 'WARDROBE_FILTERED'
+    logStylistStage(stage, {
+      activeItemCount: wardrobeRows.length,
+      rankedItemCount: weatherRankedWardrobe.length,
+      lockedItemCount: lockedItems.length,
+      requiredCategories,
       missingCategories: allMissingItems,
       availableCategories,
-      quickRequest: parsed.data.quickRequest,
-    })
-    await storeInsufficientRequest({
-      userId,
-      request: parsed.data,
-      rankedItemCount: weatherRankedWardrobe.length,
-      result: insufficient,
     })
 
-    return NextResponse.json({ result: insufficient })
-  }
-
-  let result
-  try {
-    result = await generateAndValidateStylistBatch({
-      userId,
-      request: parsed.data,
-      rankedWardrobe: weatherRankedWardrobe,
-      missingItems: allMissingItems,
-      requiredCategories,
-      candidateCount: 3,
-      preferenceContext: buildPreferenceContext(preferenceProfile),
-      lockedItemIds: parsed.data.lockedItemIds,
-    })
-  } catch {
-    return NextResponse.json(
-      { error: 'invalid_provider_output' },
-      { status: 502 },
-    )
-  }
-
-  if (result.status === 'insufficient_wardrobe') {
-    await storeInsufficientRequest({
-      userId,
-      request: parsed.data,
-      rankedItemCount: weatherRankedWardrobe.length,
-      result,
-    })
-
-    return NextResponse.json({ result })
-  }
-
-  if (result.status === 'generation_failed') {
-    return NextResponse.json({ result }, { status: 422 })
-  }
-
-  const [requestRow] = await db
-    .insert(outfitRequest)
-    .values({
-      userId,
-      locale: parsed.data.locale,
-      prompt: parsed.data.message,
-      quickRequest: parsed.data.quickRequest,
-      filters: {
+    if (allMissingItems.length > 0) {
+      const insufficient = buildInsufficientWardrobeResult({
+        locale: parsed.data.locale,
+        missingCategories: allMissingItems,
+        availableCategories,
+        quickRequest: parsed.data.quickRequest,
+      })
+      await storeInsufficientRequest({
+        userId,
+        request: parsed.data,
         rankedItemCount: weatherRankedWardrobe.length,
+        result: insufficient,
+      })
+
+      return NextResponse.json({ result: insufficient })
+    }
+
+    let result
+    try {
+      result = await generateAndValidateStylistBatch({
+        userId,
+        request: parsed.data,
+        rankedWardrobe: weatherRankedWardrobe,
         missingItems: allMissingItems,
-        weatherSignals: weatherSuitability?.signals ?? [],
-        candidateTarget: 3,
-      },
-      status: 'completed',
-      missingItems,
-    })
-    .returning()
+        requiredCategories,
+        candidateCount: 3,
+        preferenceContext: buildPreferenceContext(preferenceProfile),
+        lockedItemIds: parsed.data.lockedItemIds,
+        onStage: (nextStage) => {
+          stage = nextStage
+          logStylistStage(stage)
+        },
+      })
+    } catch (error) {
+      logStylistStageFailure(stage, error)
+      return stylistErrorResponse(stage, error, 'invalid_provider_output', 502)
+    }
 
-  const wardrobeById = new Map(wardrobe.map((item) => [item.id, item]))
-  const [batchRow] = await db
-    .insert(outfitGenerationBatch)
-    .values({
-      userId,
-      requestId: requestRow.id,
-      status: 'completed',
-      candidateCount: result.candidates.length,
-      providerRequestCount: result.metadata.providerRequestCount,
-      retryCount: result.metadata.retryCount,
-      durationMs: result.metadata.durationMs,
-      modelId: result.metadata.modelId,
-      promptVersion: result.metadata.promptVersion,
-      schemaVersion: result.metadata.schemaVersion,
-      metadata: {
-        limitedVariety: result.limitedVariety,
-        message: result.message,
-      },
-    })
-    .returning()
+    if (result.status === 'insufficient_wardrobe') {
+      await storeInsufficientRequest({
+        userId,
+        request: parsed.data,
+        rankedItemCount: weatherRankedWardrobe.length,
+        result,
+      })
 
-  const createdOutfits = []
-  for (const candidate of result.candidates) {
-    const [outfitRow] = await db
-      .insert(outfit)
+      return NextResponse.json({ result })
+    }
+
+    if (result.status === 'generation_failed') {
+      return NextResponse.json({ result }, { status: 422 })
+    }
+
+    const [requestRow] = await db
+      .insert(outfitRequest)
       .values({
         userId,
-        requestId: requestRow.id,
-        generationBatchId: batchRow.id,
-        title: candidate.title,
-        occasion: candidate.occasion,
-        styleDirection: candidate.styleDirection,
-        seasonLabel: candidate.seasonLabel,
-        formalityLabel: candidate.formalityLabel,
-        overallExplanation: candidate.overallExplanation,
-        confidenceScore: String(candidate.confidenceScore),
-        alternativeSuggestions: candidate.alternativeSuggestions,
-        missingItems: candidate.missingItems,
+        locale: parsed.data.locale,
+        prompt: parsed.data.message,
+        quickRequest: parsed.data.quickRequest,
+        filters: {
+          rankedItemCount: weatherRankedWardrobe.length,
+          missingItems: allMissingItems,
+          weatherSignals: weatherSuitability?.signals ?? [],
+          candidateTarget: 3,
+        },
+        status: 'completed',
+        missingItems,
       })
       .returning()
 
-    const itemRows = await db
-      .insert(outfitItem)
-      .values(
-        candidate.items.map((item, index) => ({
-          userId,
-          outfitId: outfitRow.id,
-          wardrobeItemId: item.wardrobeItemId,
-          role: item.role,
-          explanation: item.explanation,
-          position: String(index),
-        })),
-      )
+    const wardrobeById = new Map(wardrobe.map((item) => [item.id, item]))
+    const [batchRow] = await db
+      .insert(outfitGenerationBatch)
+      .values({
+        userId,
+        requestId: requestRow.id,
+        status: 'completed',
+        candidateCount: result.candidates.length,
+        providerRequestCount: result.metadata.providerRequestCount,
+        retryCount: result.metadata.retryCount,
+        durationMs: result.metadata.durationMs,
+        modelId: result.metadata.modelId,
+        promptVersion: result.metadata.promptVersion,
+        schemaVersion: result.metadata.schemaVersion,
+        metadata: {
+          limitedVariety: result.limitedVariety,
+          message: result.message,
+        },
+      })
       .returning()
 
-    createdOutfits.push(toOutfitDto(outfitRow, itemRows, wardrobeById))
-  }
+    const createdOutfits = []
+    for (const candidate of result.candidates) {
+      const [outfitRow] = await db
+        .insert(outfit)
+        .values({
+          userId,
+          requestId: requestRow.id,
+          generationBatchId: batchRow.id,
+          title: candidate.title,
+          occasion: candidate.occasion,
+          styleDirection: candidate.styleDirection,
+          seasonLabel: candidate.seasonLabel,
+          formalityLabel: candidate.formalityLabel,
+          overallExplanation: candidate.overallExplanation,
+          confidenceScore: String(candidate.confidenceScore),
+          alternativeSuggestions: candidate.alternativeSuggestions,
+          missingItems: candidate.missingItems,
+        })
+        .returning()
 
-  return NextResponse.json({
-    result: {
-      status: 'success',
+      const itemRows = await db
+        .insert(outfitItem)
+        .values(
+          candidate.items.map((item, index) => ({
+            userId,
+            outfitId: outfitRow.id,
+            wardrobeItemId: item.wardrobeItemId,
+            role: item.role,
+            explanation: item.explanation,
+            position: String(index),
+          })),
+        )
+        .returning()
+
+      createdOutfits.push(toOutfitDto(outfitRow, itemRows, wardrobeById))
+    }
+
+    return NextResponse.json({
+      result: {
+        status: 'success',
+        candidates: createdOutfits,
+        limitedVariety: result.limitedVariety,
+        message: result.message,
+        metadata: result.metadata,
+        generationBatchId: batchRow.id,
+      },
+      outfit: createdOutfits[0],
       candidates: createdOutfits,
-      limitedVariety: result.limitedVariety,
-      message: result.message,
-      metadata: result.metadata,
-      generationBatchId: batchRow.id,
-    },
-    outfit: createdOutfits[0],
-    candidates: createdOutfits,
-  })
+    })
+  } catch (error) {
+    logStylistStageFailure(stage, error)
+    return stylistErrorResponse(stage, error)
+  }
 }
