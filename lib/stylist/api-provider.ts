@@ -1,4 +1,8 @@
 import type { StylistProvider, StylistProviderInput } from './types'
+import {
+  parseProviderJson,
+  type StylistProviderEnvelope,
+} from './provider-output'
 
 export type ApiStylistProviderConfig = {
   apiKey: string
@@ -12,6 +16,111 @@ type ChatCompletionResponse = {
       content?: unknown
     }
   }>
+}
+
+const responseJsonSchema = {
+  name: 'vestra_stylist_batch',
+  strict: true,
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['status'],
+    oneOf: [
+      {
+        type: 'object',
+        additionalProperties: false,
+        required: ['status', 'candidates'],
+        properties: {
+          status: { const: 'success' },
+          candidates: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 5,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: [
+                'title',
+                'description',
+                'styleDirection',
+                'occasion',
+                'season',
+                'formality',
+                'confidence',
+                'items',
+              ],
+              properties: {
+                title: { type: 'string' },
+                description: { type: 'string' },
+                styleDirection: { type: 'string' },
+                occasion: { type: ['string', 'null'] },
+                season: { type: ['string', 'null'] },
+                formality: { type: ['string', 'null'] },
+                confidence: { type: 'number', minimum: 0, maximum: 1 },
+                items: {
+                  type: 'array',
+                  minItems: 1,
+                  maxItems: 8,
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    required: ['wardrobeItemId', 'role'],
+                    properties: {
+                      wardrobeItemId: { type: 'string' },
+                      role: {
+                        type: 'string',
+                        enum: [
+                          'tops',
+                          'bottoms',
+                          'shoes',
+                          'outerwear',
+                          'accessories',
+                          'dresses',
+                          'bags',
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      {
+        type: 'object',
+        additionalProperties: false,
+        required: [
+          'status',
+          'message',
+          'missingCategories',
+          'availableCategories',
+        ],
+        properties: {
+          status: { const: 'insufficient_wardrobe' },
+          message: { type: 'string' },
+          missingCategories: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          availableCategories: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+        },
+      },
+      {
+        type: 'object',
+        additionalProperties: false,
+        required: ['status', 'message', 'retryable'],
+        properties: {
+          status: { const: 'generation_failed' },
+          message: { type: 'string' },
+          retryable: { type: 'boolean' },
+        },
+      },
+    ],
+  },
 }
 
 function toCompletionsUrl(baseUrl: string) {
@@ -32,7 +141,10 @@ export class ApiStylistProvider implements StylistProvider {
     this.modelId = config.modelId
   }
 
-  async generateOutfit(input: StylistProviderInput): Promise<unknown> {
+  private async requestOutfit(
+    input: StylistProviderInput,
+    responseFormatMode: 'json_schema' | 'json_object',
+  ) {
     const response = await fetch(this.endpoint, {
       method: 'POST',
       headers: {
@@ -46,7 +158,10 @@ export class ApiStylistProvider implements StylistProvider {
       },
       body: JSON.stringify({
         model: this.modelId,
-        response_format: { type: 'json_object' },
+        response_format:
+          responseFormatMode === 'json_schema'
+            ? { type: 'json_schema', json_schema: responseJsonSchema }
+            : { type: 'json_object' },
         messages: [
           {
             role: 'system',
@@ -72,17 +187,82 @@ export class ApiStylistProvider implements StylistProvider {
       }),
     })
 
-    if (!response.ok) {
+    if (!response.ok && responseFormatMode !== 'json_schema') {
       throw new Error(`Stylist provider failed with status ${response.status}`)
+    }
+
+    if (!response.ok) {
+      return {
+        ok: false as const,
+        httpStatus: response.status,
+        output: null,
+      }
     }
 
     const json = (await response.json()) as ChatCompletionResponse
     const content = json.choices?.[0]?.message?.content
+    const output =
+      typeof content === 'string'
+        ? parseProviderJson(content)
+        : (content ?? json)
 
-    if (typeof content === 'string') {
-      return JSON.parse(content) as unknown
+    return {
+      ok: true as const,
+      httpStatus: response.status,
+      output,
+    }
+  }
+
+  async generateOutfit(
+    input: StylistProviderInput,
+  ): Promise<StylistProviderEnvelope> {
+    let requestCount = 1
+    let responseFormatMode: 'json_schema' | 'json_object' = 'json_schema'
+    let strictResult: Awaited<ReturnType<ApiStylistProvider['requestOutfit']>>
+
+    try {
+      strictResult = await this.requestOutfit(input, responseFormatMode)
+    } catch {
+      strictResult = {
+        ok: false,
+        httpStatus: 200,
+        output: null,
+      }
     }
 
-    return content ?? json
+    if (strictResult.ok) {
+      return {
+        output: strictResult.output,
+        metadata: {
+          httpStatus: strictResult.httpStatus,
+          modelId: this.modelId,
+          responseFormatMode,
+          requestCount,
+          retryCount: 0,
+          fallbackUsed: false,
+        },
+      }
+    }
+
+    requestCount += 1
+    responseFormatMode = 'json_object'
+    const fallbackResult = await this.requestOutfit(input, responseFormatMode)
+    if (!fallbackResult.ok) {
+      throw new Error(
+        `Stylist provider failed with status ${fallbackResult.httpStatus}`,
+      )
+    }
+
+    return {
+      output: fallbackResult.output,
+      metadata: {
+        httpStatus: fallbackResult.httpStatus,
+        modelId: this.modelId,
+        responseFormatMode,
+        requestCount,
+        retryCount: 1,
+        fallbackUsed: true,
+      },
+    }
   }
 }

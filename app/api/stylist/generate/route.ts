@@ -21,8 +21,17 @@ import {
   buildPreferenceContext,
   stylistPreferenceSchema,
 } from '@/lib/stylist/preferences'
+import {
+  getProviderCandidateCount,
+  getProviderTopLevelKeys,
+  getSanitizedProviderPreview,
+  normalizeStylistProviderOutput,
+  type StylistProviderEnvelope,
+  type StylistProviderResponseMetadata,
+} from '@/lib/stylist/provider-output'
 import { toOutfitDto } from '@/lib/stylist/serialize'
 import {
+  StylistValidationError,
   validateStylistBatchResult,
   validateStylistResult,
 } from '@/lib/stylist/validation'
@@ -100,6 +109,47 @@ function stylistErrorResponse(
     },
     { status },
   )
+}
+
+function isStylistProviderEnvelope(
+  value: unknown,
+): value is StylistProviderEnvelope {
+  return Boolean(
+    value &&
+    typeof value === 'object' &&
+    'output' in value &&
+    'metadata' in value,
+  )
+}
+
+function getValidationIssueDiagnostics(error: unknown) {
+  if (!(error instanceof StylistValidationError)) return []
+
+  return error.issues.map((issue) => ({
+    path: issue.path.join('.'),
+    code: issue.code,
+  }))
+}
+
+function logProviderValidationFailure(input: {
+  error: unknown
+  output: unknown
+  metadata?: StylistProviderResponseMetadata
+}) {
+  const details = {
+    httpStatus: input.metadata?.httpStatus ?? null,
+    modelId: input.metadata?.modelId ?? null,
+    responseFormatMode: input.metadata?.responseFormatMode ?? null,
+    topLevelKeys: getProviderTopLevelKeys(input.output),
+    candidateCount: getProviderCandidateCount(input.output),
+    zodIssues: getValidationIssueDiagnostics(input.error),
+    fallbackUsed: input.metadata?.fallbackUsed ?? false,
+    retryCount: input.metadata?.retryCount ?? 0,
+    requestCount: input.metadata?.requestCount ?? 1,
+    sanitizedPreview: getSanitizedProviderPreview(input.output),
+  }
+
+  console.warn('[stylist-generate] provider output validation failed', details)
 }
 
 const categoryLabels = {
@@ -197,84 +247,84 @@ async function generateAndValidateStylistBatch(input: {
   input.onStage?.('PROVIDER_SELECTED', providerDiagnostics)
   const provider = getStylistProvider()
   input.onStage?.('CLIENT_CREATED', providerDiagnostics)
-  let retryCount = 0
 
-  for (const attempt of [1, 2]) {
-    input.onStage?.('PROVIDER_REQUEST_STARTED', {
-      attempt,
-      modelId: providerDiagnostics.modelId,
-      requestUrlHost: providerDiagnostics.requestUrlHost,
-    })
-    const output = await provider.generateOutfit({
-      userId: input.userId,
-      locale: input.request.locale,
-      request: input.request,
-      wardrobeItems: input.rankedWardrobe,
-      missingItems: input.missingItems,
-      strictRetry: attempt === 2,
-      candidateCount: input.candidateCount,
-      preferenceContext: input.preferenceContext,
+  input.onStage?.('PROVIDER_REQUEST_STARTED', {
+    modelId: providerDiagnostics.modelId,
+    requestUrlHost: providerDiagnostics.requestUrlHost,
+  })
+  const providerOutput = await provider.generateOutfit({
+    userId: input.userId,
+    locale: input.request.locale,
+    request: input.request,
+    wardrobeItems: input.rankedWardrobe,
+    missingItems: input.missingItems,
+    candidateCount: input.candidateCount,
+    preferenceContext: input.preferenceContext,
+    lockedItemIds: input.lockedItemIds,
+  })
+  const envelope = isStylistProviderEnvelope(providerOutput)
+    ? providerOutput
+    : undefined
+  const output = normalizeStylistProviderOutput(
+    envelope?.output ?? providerOutput,
+  )
+  const providerMetadata = envelope?.metadata
+
+  try {
+    const batch = validateStylistBatchResult(output, input.rankedWardrobe, {
+      requiredCategories: input.requiredCategories,
       lockedItemIds: input.lockedItemIds,
+    })
+    if (batch.status === 'success') {
+      return {
+        ...batch,
+        metadata: {
+          ...batch.metadata,
+          retryCount: providerMetadata?.retryCount ?? 0,
+          providerRequestCount: providerMetadata?.requestCount ?? 1,
+          modelId:
+            providerMetadata?.modelId ??
+            providerDiagnostics.modelId ??
+            process.env.STYLIST_AI_MODEL_ID,
+          durationMs: Math.round(performance.now() - startedAt),
+        },
+      }
+    }
+    return batch
+  } catch (batchError) {
+    logProviderValidationFailure({
+      error: batchError,
+      output,
+      metadata: providerMetadata,
     })
 
     try {
-      const batch = validateStylistBatchResult(output, input.rankedWardrobe, {
+      const single = validateStylistResult(output, input.rankedWardrobe, {
         requiredCategories: input.requiredCategories,
         lockedItemIds: input.lockedItemIds,
       })
-      if (batch.status === 'success') {
-        return {
-          ...batch,
-          metadata: {
-            ...batch.metadata,
-            retryCount,
-            providerRequestCount: 1,
-            modelId: process.env.STYLIST_AI_MODEL_ID,
-            durationMs: Math.round(performance.now() - startedAt),
-          },
-        }
-      }
-      return batch
-    } catch (batchError) {
-      try {
-        const single = validateStylistResult(output, input.rankedWardrobe, {
+      if (single.status === 'success') {
+        const localBatch = buildLocalCandidateBatch({
+          baseOutfit: single.outfit,
+          wardrobeItems: input.rankedWardrobe,
+          request: input.request,
+          candidateCount: input.candidateCount,
+          lockedItemIds: input.lockedItemIds,
+        })
+        return validateStylistBatchResult(localBatch, input.rankedWardrobe, {
           requiredCategories: input.requiredCategories,
           lockedItemIds: input.lockedItemIds,
         })
-        if (single.status === 'success') {
-          const localBatch = buildLocalCandidateBatch({
-            baseOutfit: single.outfit,
-            wardrobeItems: input.rankedWardrobe,
-            request: input.request,
-            candidateCount: input.candidateCount,
-            lockedItemIds: input.lockedItemIds,
-          })
-          return validateStylistBatchResult(localBatch, input.rankedWardrobe, {
-            requiredCategories: input.requiredCategories,
-            lockedItemIds: input.lockedItemIds,
-          })
-        }
-      } catch (singleError) {
-        logStylistDev('[dev] Stylist legacy output fallback rejected', {
-          attempt,
-          message:
-            singleError instanceof Error ? singleError.message : 'unknown',
-        })
       }
-
-      const message =
-        batchError instanceof Error ? batchError.message : 'unknown'
-      logStylistDev('[dev] Stylist batch output rejected', {
-        attempt,
-        message,
+      return single
+    } catch (singleError) {
+      logStylistDev('[dev] Stylist legacy output fallback rejected', {
+        message: singleError instanceof Error ? singleError.message : 'unknown',
       })
-
-      if (attempt === 2) throw batchError
-      retryCount += 1
     }
-  }
 
-  throw new Error('invalid_stylist_batch_result')
+    throw batchError
+  }
 }
 
 export async function POST(request: Request) {
@@ -476,7 +526,22 @@ export async function POST(request: Request) {
       })
     } catch (error) {
       logStylistStageFailure(stage, error)
-      return stylistErrorResponse(stage, error, 'invalid_provider_output', 502)
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'The stylist provider returned an invalid outfit format.'
+      return NextResponse.json(
+        {
+          status: 'generation_failed',
+          code:
+            message === 'invalid_stylist_batch_result'
+              ? 'invalid_stylist_batch_result'
+              : 'invalid_provider_output',
+          message,
+          retryable: true,
+        },
+        { status: 502 },
+      )
     }
 
     if (result.status === 'insufficient_wardrobe') {

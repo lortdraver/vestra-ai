@@ -3,6 +3,11 @@ import {
   getStylistProvider,
   getStylistProviderDiagnostics,
 } from '@/lib/stylist'
+import { ApiStylistProvider } from '@/lib/stylist/api-provider'
+import {
+  normalizeStylistProviderOutput,
+  parseProviderJson,
+} from '@/lib/stylist/provider-output'
 import {
   filterDiverseCandidates,
   getCandidateOverlap,
@@ -22,6 +27,7 @@ import type { StylistWardrobeItem } from '@/lib/stylist'
 
 afterEach(() => {
   vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
 })
 
 const wardrobe: StylistWardrobeItem[] = [
@@ -184,6 +190,112 @@ describe('stylist provider behavior', () => {
     expect(() => getStylistProvider()).toThrow(
       'For local mock mode, set STYLIST_AI_PROVIDER=mock explicitly',
     )
+  })
+
+  it('falls back from strict json_schema to json_object once', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ error: { message: 'schema rejected' } }),
+          {
+            status: 400,
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    status: 'success',
+                    candidates: [
+                      {
+                        title: 'Fallback outfit',
+                        description: 'A complete fallback outfit.',
+                        styleDirection: 'minimal',
+                        occasion: null,
+                        season: null,
+                        formality: null,
+                        confidence: 0.8,
+                        items: [
+                          { wardrobeItemId: wardrobe[0].id, role: 'tops' },
+                          { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+                          { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
+                        ],
+                      },
+                    ],
+                  }),
+                },
+              },
+            ],
+          }),
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const provider = new ApiStylistProvider({
+      apiKey: 'test-key',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      modelId: 'openrouter/test-model',
+    })
+    const result = await provider.generateOutfit({
+      userId: 'user_1',
+      locale: 'en',
+      request: {
+        message: 'work outfit',
+        locale: 'en',
+        lockedItemIds: [],
+        wearHistoryMode: 'none',
+      },
+      wardrobeItems: wardrobe,
+      missingItems: [],
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(result.metadata).toMatchObject({
+      responseFormatMode: 'json_object',
+      requestCount: 2,
+      retryCount: 1,
+      fallbackUsed: true,
+    })
+  })
+
+  it('throws when strict schema fallback still returns malformed JSON', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{}', { status: 400 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: '```json\n{bad json}\n```' } }],
+          }),
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const provider = new ApiStylistProvider({
+      apiKey: 'test-key',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      modelId: 'openrouter/test-model',
+    })
+
+    await expect(
+      provider.generateOutfit({
+        userId: 'user_1',
+        locale: 'en',
+        request: {
+          message: 'work outfit',
+          locale: 'en',
+          lockedItemIds: [],
+          wearHistoryMode: 'none',
+        },
+        wardrobeItems: wardrobe,
+        missingItems: [],
+      }),
+    ).rejects.toThrow()
   })
 })
 
@@ -521,6 +633,188 @@ describe('outfit validation', () => {
 })
 
 describe('batch outfit validation', () => {
+  it('normalizes a production provider batch success shape', () => {
+    const normalized = normalizeStylistProviderOutput({
+      status: 'success',
+      candidates: [
+        {
+          title: 'Work outfit',
+          description: 'A clean complete work outfit.',
+          styleDirection: 'business',
+          occasion: null,
+          season: null,
+          formality: null,
+          confidence: 0.86,
+          items: [
+            { wardrobeItemId: wardrobe[0].id, role: 'tops' },
+            { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+            { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
+          ],
+        },
+      ],
+    })
+
+    const result = validateStylistBatchResult(normalized, wardrobe)
+
+    expect(result.status).toBe('success')
+  })
+
+  it('wraps a single unambiguous candidate object', () => {
+    const normalized = normalizeStylistProviderOutput({
+      status: 'success',
+      candidate: {
+        title: 'Single candidate',
+        description: 'A complete outfit.',
+        styleDirection: 'minimal',
+        occasion: null,
+        season: null,
+        formality: null,
+        confidence: 0.8,
+        items: [
+          { wardrobeItemId: wardrobe[0].id, role: 'tops' },
+          { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+          { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
+        ],
+      },
+    })
+
+    const result = validateStylistBatchResult(normalized, wardrobe)
+
+    expect(result.status).toBe('success')
+  })
+
+  it('normalizes safe role aliases and string confidence', () => {
+    const normalized = normalizeStylistProviderOutput({
+      status: 'success',
+      candidates: [
+        {
+          title: 'Alias outfit',
+          description: 'A complete outfit.',
+          styleDirection: 'casual',
+          occasion: null,
+          season: null,
+          formality: null,
+          confidence: '0.77',
+          items: [
+            { wardrobeItemId: wardrobe[0].id, role: 'top' },
+            { wardrobeItemId: wardrobe[1].id, role: 'bottom' },
+            { wardrobeItemId: wardrobe[2].id, role: 'shoe' },
+          ],
+        },
+      ],
+    })
+
+    const result = validateStylistBatchResult(normalized, wardrobe)
+    if (result.status !== 'success') throw new Error('expected success')
+
+    expect(result.candidates[0].confidenceScore).toBe(0.77)
+    expect(result.candidates[0].items.map((item) => item.role)).toEqual([
+      'tops',
+      'bottoms',
+      'shoes',
+    ])
+  })
+
+  it('converts a legacy single-outfit response when intent is clear', () => {
+    const normalized = normalizeStylistProviderOutput({
+      status: 'success',
+      outfit: {
+        title: 'Legacy outfit',
+        description: 'Converted safely.',
+        styleDirection: 'classic',
+        occasion: null,
+        season: null,
+        formality: null,
+        confidence: 0.7,
+        items: [
+          { wardrobeItemId: wardrobe[0].id, role: 'tops' },
+          { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+          { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
+        ],
+      },
+    })
+
+    const result = validateStylistBatchResult(normalized, wardrobe)
+
+    expect(result.status).toBe('success')
+  })
+
+  it('parses markdown code-fenced JSON', () => {
+    const parsed = parseProviderJson(`\`\`\`json
+{"status":"generation_failed","message":"No stable outfit.","retryable":true}
+\`\`\``)
+
+    expect(parsed).toMatchObject({
+      status: 'generation_failed',
+      retryable: true,
+    })
+  })
+
+  it('rejects malformed JSON', () => {
+    expect(() => parseProviderJson('```json\n{bad json}\n```')).toThrow()
+  })
+
+  it('rejects empty success candidates', () => {
+    expect(() =>
+      validateStylistBatchResult(
+        normalizeStylistProviderOutput({
+          status: 'success',
+          candidates: [],
+        }),
+        wardrobe,
+      ),
+    ).toThrow('invalid_stylist_batch_result')
+  })
+
+  it('rejects missing items', () => {
+    expect(() =>
+      validateStylistBatchResult(
+        normalizeStylistProviderOutput({
+          status: 'success',
+          candidates: [
+            {
+              title: 'Missing items',
+              description: 'No items.',
+              styleDirection: 'minimal',
+              occasion: null,
+              season: null,
+              formality: null,
+              confidence: 0.5,
+            },
+          ],
+        }),
+        wardrobe,
+      ),
+    ).toThrow('invalid_stylist_batch_result')
+  })
+
+  it('rejects unsupported roles', () => {
+    expect(() =>
+      validateStylistBatchResult(
+        normalizeStylistProviderOutput({
+          status: 'success',
+          candidates: [
+            {
+              title: 'Unsupported role',
+              description: 'Uses an unsupported role.',
+              styleDirection: 'minimal',
+              occasion: null,
+              season: null,
+              formality: null,
+              confidence: 0.5,
+              items: [
+                { wardrobeItemId: wardrobe[0].id, role: 'hat' },
+                { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+                { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
+              ],
+            },
+          ],
+        }),
+        wardrobe,
+      ),
+    ).toThrow('unsupported_roles')
+  })
+
   it('validates three owned candidates', () => {
     const result = validateStylistBatchResult(
       {

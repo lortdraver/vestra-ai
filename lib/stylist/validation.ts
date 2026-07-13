@@ -11,8 +11,35 @@ import {
 } from './types'
 import {
   findMissingRequiredCategories,
+  normalizeStylistCategory,
   requiredCoreCategories,
 } from './wardrobe'
+
+export type StylistValidationIssue = {
+  path: string[]
+  code: string
+  message: string
+}
+
+export class StylistValidationError extends Error {
+  constructor(
+    message: string,
+    readonly issues: StylistValidationIssue[] = [],
+  ) {
+    super(message)
+    this.name = 'StylistValidationError'
+  }
+}
+
+function toValidationIssues(
+  issues: Array<{ path: PropertyKey[]; code: string; message: string }>,
+): StylistValidationIssue[] {
+  return issues.map((issue) => ({
+    path: issue.path.map((part) => String(part)),
+    code: issue.code,
+    message: issue.message,
+  }))
+}
 
 function logValidationIssues(message: string, issues: unknown) {
   if (process.env.NODE_ENV !== 'development') return
@@ -69,12 +96,18 @@ export function validateStylistOutfit(
       '[dev] Stylist outfit validation failed',
       parsed.error.issues,
     )
-    throw new Error('invalid_stylist_outfit')
+    throw new StylistValidationError(
+      'invalid_stylist_outfit',
+      toValidationIssues(parsed.error.issues),
+    )
   }
 
   const outfit = parsed.data
   const allowedIds = new Set(wardrobeItems.map((item) => item.id))
   const selectedIds = outfit.items.map((item) => item.wardrobeItemId)
+  const unsupportedRoles = outfit.items
+    .map((item) => item.role)
+    .filter((role) => normalizeStylistCategory(role) === 'other')
   const hallucinatedIds = selectedIds.filter((id) => !allowedIds.has(id))
   const duplicateIds = selectedIds.filter(
     (id, index) => selectedIds.indexOf(id) !== index,
@@ -83,19 +116,31 @@ export function validateStylistOutfit(
     selectedIds.includes(item.id),
   )
 
+  if (unsupportedRoles.length > 0) {
+    throw new StylistValidationError(
+      `unsupported_roles:${unsupportedRoles.join(',')}`,
+    )
+  }
+
   if (hallucinatedIds.length > 0) {
-    throw new Error(`hallucinated_items:${hallucinatedIds.join(',')}`)
+    throw new StylistValidationError(
+      `hallucinated_items:${hallucinatedIds.join(',')}`,
+    )
   }
 
   if (duplicateIds.length > 0) {
-    throw new Error(`duplicate_items:${duplicateIds.join(',')}`)
+    throw new StylistValidationError(
+      `duplicate_items:${duplicateIds.join(',')}`,
+    )
   }
 
   const missingLockedIds = (options?.lockedItemIds ?? []).filter(
     (id) => !selectedIds.includes(id),
   )
   if (missingLockedIds.length > 0) {
-    throw new Error(`missing_locked_items:${missingLockedIds.join(',')}`)
+    throw new StylistValidationError(
+      `missing_locked_items:${missingLockedIds.join(',')}`,
+    )
   }
 
   const requiredCategories = options?.requiredCategories ?? [
@@ -107,7 +152,9 @@ export function validateStylistOutfit(
   )
 
   if (missingRequiredCategories.length > 0) {
-    throw new Error(`incomplete_outfit:${missingRequiredCategories.join(',')}`)
+    throw new StylistValidationError(
+      `incomplete_outfit:${missingRequiredCategories.join(',')}`,
+    )
   }
 
   for (const alternative of outfit.alternativeSuggestions) {
@@ -147,7 +194,10 @@ export function validateStylistResult(
       '[dev] Stylist result validation failed',
       parsed.error.issues,
     )
-    throw new Error('invalid_stylist_result')
+    throw new StylistValidationError(
+      'invalid_stylist_result',
+      toValidationIssues(parsed.error.issues),
+    )
   }
 
   if (parsed.data.status === 'insufficient_wardrobe') {
@@ -171,7 +221,10 @@ export function validateStylistBatchResult(
       '[dev] Stylist batch result validation failed',
       parsed.error.issues,
     )
-    throw new Error('invalid_stylist_batch_result')
+    throw new StylistValidationError(
+      'invalid_stylist_batch_result',
+      toValidationIssues(parsed.error.issues),
+    )
   }
 
   if (parsed.data.status !== 'success') return parsed.data

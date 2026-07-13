@@ -218,8 +218,12 @@ export function StylistPageClient({
         outfit?: OutfitDto
         candidates?: OutfitDto[]
         error?: string
+        code?: string
+        status?: string
       }
-      if (!response.ok) throw new Error(data.error ?? 'failed')
+      if (!response.ok) {
+        throw new Error(data.code ?? data.error ?? 'failed')
+      }
       if (data.result?.status === 'insufficient_wardrobe') {
         setInsufficientWardrobe(data.result)
         setCandidates([])
@@ -240,8 +244,13 @@ export function StylistPageClient({
       setCandidates(nextCandidates)
       setHistory((current) => [...nextCandidates, ...current])
       setMessage('')
-    } catch {
-      setError(t.errors.generate)
+    } catch (generateError) {
+      setError(
+        generateError instanceof Error &&
+          generateError.message === 'invalid_stylist_batch_result'
+          ? t.errors.providerFormat
+          : t.errors.generate,
+      )
     } finally {
       setIsLoading(false)
     }

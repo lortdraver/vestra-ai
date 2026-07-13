@@ -50,6 +50,13 @@ Providers:
 
 Production cannot use the mock provider and never silently falls back to it.
 
+The production model must be a text-capable OpenAI-compatible chat model that
+supports JSON output. Vestra first requests strict `json_schema` output and, if
+the configured model rejects structured output or returns recoverable malformed
+JSON, retries once with `json_object`. The model must have enough context to
+read the ranked wardrobe candidates and generate up to three complete outfit
+candidates without inventing item IDs.
+
 ## Multi-Outfit Generation
 
 Milestone 6.2 returns a batch of outfit candidates for normal requests. The

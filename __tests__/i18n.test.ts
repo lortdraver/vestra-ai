@@ -18,4 +18,13 @@ describe('i18n foundation', () => {
       expect(dictionaries[locale].auth.genericError).toBeTruthy()
     }
   })
+
+  it('localizes stylist provider-format errors', () => {
+    for (const locale of locales) {
+      expect(dictionaries[locale].stylist.errors.providerFormat).toBeTruthy()
+      expect(dictionaries[locale].stylist.errors.providerFormat).not.toBe(
+        dictionaries[locale].stylist.errors.generate,
+      )
+    }
+  })
 })

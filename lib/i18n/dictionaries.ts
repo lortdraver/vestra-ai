@@ -606,6 +606,8 @@ export const dictionaries = {
       },
       errors: {
         generate: 'Kombin yaratmaq olmadı.',
+        providerFormat:
+          'Stilist provayderi cavabı düzgün formatda qaytarmadı. Zəhmət olmasa bir az sonra yenidən cəhd edin.',
         save: 'Kombini yeniləmək olmadı.',
         feedback: 'Rəyi saxlamaq olmadı.',
         insufficientAlternatives: 'Uyğun əvəzləmə tapılmadı.',
@@ -1222,6 +1224,8 @@ export const dictionaries = {
       },
       errors: {
         generate: 'Unable to generate an outfit.',
+        providerFormat:
+          'The stylist provider returned an unexpected format. Please try again shortly.',
         save: 'Unable to update this outfit.',
         feedback: 'Unable to save feedback.',
         insufficientAlternatives: 'No suitable replacement was found.',
@@ -1691,6 +1695,8 @@ export const dictionaries = {
       },
       errors: {
         generate: 'Не удалось создать образ.',
+        providerFormat:
+          'Провайдер стилиста вернул неожиданный формат. Попробуйте еще раз чуть позже.',
         save: 'Не удалось обновить этот образ.',
         feedback: 'Не удалось сохранить отзыв.',
         insufficientAlternatives: 'Подходящая замена не найдена.',
