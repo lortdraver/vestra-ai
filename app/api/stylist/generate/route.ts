@@ -14,6 +14,7 @@ import {
 import {
   buildLocalCandidateBatch,
   getStylistProvider,
+  getStylistProviderDiagnostics,
   stylistRequestSchema,
 } from '@/lib/stylist'
 import {
@@ -185,16 +186,25 @@ async function generateAndValidateStylistBatch(input: {
   candidateCount: number
   preferenceContext: string
   lockedItemIds: string[]
-  onStage?: (stage: StylistGenerateStage) => void
+  onStage?: (
+    stage: StylistGenerateStage,
+    details?: Record<string, unknown>,
+  ) => void
 }) {
   const startedAt = performance.now()
   input.onStage?.('PROVIDER_SELECTED')
+  const providerDiagnostics = getStylistProviderDiagnostics()
+  input.onStage?.('PROVIDER_SELECTED', providerDiagnostics)
   const provider = getStylistProvider()
-  input.onStage?.('CLIENT_CREATED')
+  input.onStage?.('CLIENT_CREATED', providerDiagnostics)
   let retryCount = 0
 
   for (const attempt of [1, 2]) {
-    input.onStage?.('PROVIDER_REQUEST_STARTED')
+    input.onStage?.('PROVIDER_REQUEST_STARTED', {
+      attempt,
+      modelId: providerDiagnostics.modelId,
+      requestUrlHost: providerDiagnostics.requestUrlHost,
+    })
     const output = await provider.generateOutfit({
       userId: input.userId,
       locale: input.request.locale,
@@ -459,9 +469,9 @@ export async function POST(request: Request) {
         candidateCount: 3,
         preferenceContext: buildPreferenceContext(preferenceProfile),
         lockedItemIds: parsed.data.lockedItemIds,
-        onStage: (nextStage) => {
+        onStage: (nextStage, details) => {
           stage = nextStage
-          logStylistStage(stage)
+          logStylistStage(stage, details)
         },
       })
     } catch (error) {

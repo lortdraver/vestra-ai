@@ -44,10 +44,11 @@ Tables:
 Providers:
 
 - `mock` - development-only deterministic provider.
-- `api` - production provider requiring `STYLIST_AI_API_KEY` and
-  `STYLIST_AI_API_URL`.
+- `api` / `openai-compatible` - production provider. It reuses `AI_API_KEY`,
+  `AI_API_BASE_URL`, and `AI_MODEL_ID` by default, with optional
+  `STYLIST_AI_*` overrides.
 
-Production cannot use the mock provider.
+Production cannot use the mock provider and never silently falls back to it.
 
 ## Multi-Outfit Generation
 
@@ -91,11 +92,20 @@ available, the API returns `insufficient_alternatives`.
 ## Environment
 
 ```bash
-STYLIST_AI_PROVIDER="mock"
+STYLIST_AI_PROVIDER="api"
+AI_API_KEY=""
+AI_API_BASE_URL="https://openrouter.ai/api/v1"
+AI_MODEL_ID=""
+
+# Optional overrides only when stylist generation should use separate
+# credentials from clothing analysis.
 STYLIST_AI_API_KEY=""
 STYLIST_AI_API_URL=""
 STYLIST_AI_MODEL_ID=""
 ```
+
+For local development mock mode, set `STYLIST_AI_PROVIDER="mock"` explicitly.
+Do not set this value in Vercel production.
 
 ## Applying Schema
 

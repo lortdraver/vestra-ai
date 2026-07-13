@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getStylistProvider } from '@/lib/stylist'
+import {
+  getStylistProvider,
+  getStylistProviderDiagnostics,
+} from '@/lib/stylist'
 import {
   filterDiverseCandidates,
   getCandidateOverlap,
@@ -100,7 +103,7 @@ const extraWardrobe: StylistWardrobeItem[] = [
 ]
 
 describe('stylist provider behavior', () => {
-  it('uses the mock provider in development', async () => {
+  it('allows the mock provider only when explicitly selected in development', async () => {
     vi.stubEnv('NODE_ENV', 'development')
     vi.stubEnv('STYLIST_AI_PROVIDER', 'mock')
 
@@ -137,6 +140,49 @@ describe('stylist provider behavior', () => {
 
     expect(() => getStylistProvider()).toThrow(
       'Mock stylist provider is not allowed in production',
+    )
+  })
+
+  it('selects the real provider in production from shared AI credentials', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('STYLIST_AI_PROVIDER', undefined)
+    vi.stubEnv('AI_API_KEY', 'test-key')
+    vi.stubEnv('AI_API_BASE_URL', 'https://openrouter.ai/api/v1')
+    vi.stubEnv('AI_MODEL_ID', 'openrouter/test-model')
+
+    expect(getStylistProvider().constructor.name).toBe('ApiStylistProvider')
+    expect(getStylistProviderDiagnostics()).toMatchObject({
+      resolvedProvider: 'api',
+      configuredProvider: null,
+      hasApiKey: true,
+      hasBaseUrl: true,
+      hasModelId: true,
+      modelId: 'openrouter/test-model',
+      requestUrlHost: 'openrouter.ai',
+    })
+  })
+
+  it('returns a clear configuration error when real credentials are missing', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('STYLIST_AI_PROVIDER', 'api')
+    vi.stubEnv('AI_API_KEY', '')
+    vi.stubEnv('AI_API_BASE_URL', 'https://openrouter.ai/api/v1')
+    vi.stubEnv('AI_MODEL_ID', '')
+
+    expect(() => getStylistProvider()).toThrow(
+      'Real stylist provider is missing required environment variables',
+    )
+  })
+
+  it('does not silently fall back to mock when no provider is configured', () => {
+    vi.stubEnv('NODE_ENV', 'development')
+    vi.stubEnv('STYLIST_AI_PROVIDER', undefined)
+    vi.stubEnv('AI_API_KEY', '')
+    vi.stubEnv('AI_API_BASE_URL', '')
+    vi.stubEnv('AI_MODEL_ID', '')
+
+    expect(() => getStylistProvider()).toThrow(
+      'For local mock mode, set STYLIST_AI_PROVIDER=mock explicitly',
     )
   })
 })

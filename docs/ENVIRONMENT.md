@@ -25,6 +25,15 @@
 - `AI_MODEL_ID` - required model identifier for analysis.
 - `OPENROUTER_HTTP_REFERER` - optional OpenRouter referer override. Defaults to
   `http://localhost:3000`.
+- `STYLIST_AI_PROVIDER` - stylist provider selector. Use `api` or
+  `openai-compatible` for production. Use `mock` only for explicit local
+  development.
+- `STYLIST_AI_API_KEY` - optional stylist-specific API key override. When empty,
+  Vestra reuses `AI_API_KEY`.
+- `STYLIST_AI_API_URL` - optional stylist-specific OpenAI-compatible base URL
+  override. When empty, Vestra reuses `AI_API_BASE_URL`.
+- `STYLIST_AI_MODEL_ID` - optional stylist-specific model override. When empty,
+  Vestra reuses `AI_MODEL_ID`.
 - `BACKGROUND_REMOVAL_PROVIDER` - `mock` for development or `api` for production.
 - `BACKGROUND_REMOVAL_API_KEY` - required when `BACKGROUND_REMOVAL_PROVIDER=api`.
 - `BACKGROUND_REMOVAL_API_URL` - required production background-removal endpoint.
@@ -110,6 +119,31 @@ Run a server-only sanitized connectivity check with:
 pnpm ai:diagnose:openrouter
 ```
 
+## AI Stylist Credentials
+
+Production stylist generation uses `STYLIST_AI_PROVIDER`.
+
+Recommended Vercel configuration when using the same OpenRouter credentials as
+clothing analysis:
+
+```env
+STYLIST_AI_PROVIDER="api"
+AI_API_KEY="<your-openrouter-key>"
+AI_API_BASE_URL="https://openrouter.ai/api/v1"
+AI_MODEL_ID="<text-capable-openrouter-model>"
+OPENROUTER_HTTP_REFERER="https://your-production-domain"
+```
+
+`STYLIST_AI_API_KEY`, `STYLIST_AI_API_URL`, and `STYLIST_AI_MODEL_ID` are
+optional overrides only. Leave them empty unless stylist generation should use a
+different key, base URL, or model from clothing analysis.
+
+Vestra never silently falls back to the mock stylist in production. If
+`STYLIST_AI_PROVIDER=mock` is set in production, generation fails with a clear
+configuration error. If real credentials are missing, generation fails before
+the external request and logs only safe diagnostics: resolved provider,
+credential presence, model id, and request URL host.
+
 ## Background Removal Credentials
 
 Real background removal requires:
@@ -162,6 +196,10 @@ Before public deployment, manually configure and verify:
 - `NEXT_PUBLIC_APP_URL` is the canonical production URL.
 - `AI_PROVIDER=openai-compatible` with valid `AI_API_KEY`, `AI_API_BASE_URL`,
   `AI_MODEL_ID`, and OpenRouter referer/title settings when applicable.
+- `STYLIST_AI_PROVIDER=api` or `STYLIST_AI_PROVIDER=openai-compatible`. The
+  stylist can reuse valid `AI_API_KEY`, `AI_API_BASE_URL`, and `AI_MODEL_ID`;
+  set `STYLIST_AI_API_KEY`, `STYLIST_AI_API_URL`, and `STYLIST_AI_MODEL_ID` only
+  when stylist generation needs separate credentials.
 - `WEATHER_PROVIDER=api` with valid `WEATHER_API_KEY`,
   `WEATHER_API_BASE_URL`, and timeout/cache values.
 - `BACKGROUND_REMOVAL_PROVIDER=api` with valid background-removal credentials.
