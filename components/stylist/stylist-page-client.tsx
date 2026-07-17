@@ -76,6 +76,31 @@ function makeWearIdempotencyKey(scope: string) {
   return `${scope}:${Date.now()}:${crypto.randomUUID()}`
 }
 
+function getStylistGenerateErrorMessage(
+  errors: Dictionary['stylist']['errors'],
+  code: string,
+) {
+  switch (code) {
+    case 'invalid_stylist_request':
+      return errors.invalidRequest
+    case 'locked_item_unavailable':
+      return errors.lockedItemUnavailable
+    case 'stylist_provider_timeout':
+      return errors.timeout
+    case 'stylist_generation_in_progress':
+      return errors.inProgress
+    case 'invalid_stylist_batch_result':
+    case 'invalid_provider_output':
+      return errors.providerFormat
+    case 'stylist_generation_failed':
+      return errors.generationFailed
+    case 'insufficient_wardrobe':
+      return errors.insufficientWardrobe
+    default:
+      return errors.generate
+  }
+}
+
 export function StylistPageClient({
   dictionary,
   locale,
@@ -251,15 +276,7 @@ export function StylistPageClient({
     } catch (generateError) {
       const errorCode =
         generateError instanceof Error ? generateError.message : ''
-      setError(
-        errorCode === 'stylist_provider_timeout'
-          ? t.errors.timeout
-          : errorCode === 'stylist_generation_in_progress'
-            ? t.errors.inProgress
-            : errorCode === 'invalid_stylist_batch_result'
-              ? t.errors.providerFormat
-              : t.errors.generate,
-      )
+      setError(getStylistGenerateErrorMessage(t.errors, errorCode))
     } finally {
       generationInFlightRef.current = false
       setIsLoading(false)

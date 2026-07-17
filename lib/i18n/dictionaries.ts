@@ -606,6 +606,13 @@ export const dictionaries = {
       },
       errors: {
         generate: 'Kombin yaratmaq olmadı.',
+        generationFailed:
+          'Stilist hazırda bu sorğu üçün etibarlı kombin yarada bilmədi. Sorğunu dəyişib yenidən cəhd edin.',
+        invalidRequest: 'Stilist sorğusu düzgün deyil.',
+        lockedItemUnavailable:
+          'Seçilmiş sabit geyimlərdən biri əlçatan deyil. Geyimi yoxlayıb yenidən cəhd edin.',
+        insufficientWardrobe:
+          'Bu kombin üçün qarderobda kifayət qədər uyğun geyim yoxdur.',
         providerFormat:
           'Stilist provayderi cavabı düzgün formatda qaytarmadı. Zəhmət olmasa bir az sonra yenidən cəhd edin.',
         timeout:
@@ -1227,6 +1234,13 @@ export const dictionaries = {
       },
       errors: {
         generate: 'Unable to generate an outfit.',
+        generationFailed:
+          'The stylist could not create a valid outfit for this request. Adjust the request and try again.',
+        invalidRequest: 'The stylist request is invalid.',
+        lockedItemUnavailable:
+          'One of the locked wardrobe items is unavailable. Check the item and try again.',
+        insufficientWardrobe:
+          'Your wardrobe does not have enough suitable items for this outfit.',
         providerFormat:
           'The stylist provider returned an unexpected format. Please try again shortly.',
         timeout:
@@ -1701,6 +1715,13 @@ export const dictionaries = {
       },
       errors: {
         generate: 'Не удалось создать образ.',
+        generationFailed:
+          'Стилист не смог создать корректный образ для этого запроса. Измените запрос и попробуйте снова.',
+        invalidRequest: 'Запрос к стилисту некорректен.',
+        lockedItemUnavailable:
+          'Одна из закрепленных вещей недоступна. Проверьте вещь и попробуйте снова.',
+        insufficientWardrobe:
+          'В гардеробе недостаточно подходящих вещей для этого образа.',
         providerFormat:
           'Провайдер стилиста вернул неожиданный формат. Попробуйте еще раз чуть позже.',
         timeout:

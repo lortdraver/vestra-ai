@@ -28,6 +28,12 @@ import {
   tryStartStylistGeneration,
 } from '@/lib/stylist/concurrency'
 import {
+  buildStylistGenerateFailureDetails,
+  createStylistGenerateFailurePayload,
+  getStylistRequestType,
+  type StylistGenerateFailureDetails,
+} from '@/lib/stylist/generate-diagnostics'
+import {
   getProviderCandidateCount,
   getProviderTopLevelKeys,
   getSanitizedProviderPreview,
@@ -135,6 +141,61 @@ function getValidationIssueDiagnostics(error: unknown) {
     path: issue.path.join('.'),
     code: issue.code,
   }))
+}
+
+function logStylistUnprocessable(input: {
+  code: string
+  failingValidation: string
+  details: StylistGenerateFailureDetails
+  duplicateRequestState: string
+  lockedItemCount: number
+  requestType: string
+}) {
+  console.warn('[stylist-generate] 422 response', {
+    code: input.code,
+    failingValidation: input.failingValidation,
+    eligibleItemCount: input.details.eligibleItemCount,
+    requiredCategories: input.details.requiredCategories,
+    availableCategories: input.details.availableCategories,
+    missingCategories: input.details.missingCategories,
+    duplicateRequestState: input.duplicateRequestState,
+    lockedItemCount: input.lockedItemCount,
+    requestType: input.requestType,
+  })
+}
+
+function stylistStructuredErrorResponse(input: {
+  httpStatus: number
+  status: 'generation_failed' | 'insufficient_wardrobe'
+  code: string
+  message: string
+  details: StylistGenerateFailureDetails
+  retryable?: boolean
+  failingValidation: string
+  duplicateRequestState: string
+  requestType: string
+}) {
+  if (input.httpStatus === 422) {
+    logStylistUnprocessable({
+      code: input.code,
+      failingValidation: input.failingValidation,
+      details: input.details,
+      duplicateRequestState: input.duplicateRequestState,
+      lockedItemCount: input.details.lockedItemIds.length,
+      requestType: input.requestType,
+    })
+  }
+
+  return NextResponse.json(
+    createStylistGenerateFailurePayload({
+      status: input.status,
+      code: input.code,
+      message: input.message,
+      details: input.details,
+      retryable: input.retryable,
+    }),
+    { status: input.httpStatus },
+  )
 }
 
 function logProviderValidationFailure(input: {
@@ -336,6 +397,12 @@ async function generateAndValidateStylistBatch(input: {
 export async function POST(request: Request) {
   let stage: StylistGenerateStage = 'REQUEST_STARTED'
   let activeGenerationKey: string | null = null
+  let currentRequest: StylistRequest | null = null
+  let duplicateRequestState = 'not_checked'
+  let failureDetails = buildStylistGenerateFailureDetails()
+
+  const getRequestTypeForDiagnostics = () =>
+    getStylistRequestType(currentRequest)
 
   try {
     logStylistStage(stage)
@@ -354,8 +421,21 @@ export async function POST(request: Request) {
       !parsed.success ||
       (!parsed.data.message && !parsed.data.quickRequest)
     ) {
-      return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
+      return stylistStructuredErrorResponse({
+        httpStatus: 400,
+        status: 'generation_failed',
+        code: 'invalid_stylist_request',
+        message: 'The stylist request payload is invalid.',
+        details: failureDetails,
+        retryable: false,
+        failingValidation: parsed.success
+          ? 'missing_message_or_quick_request'
+          : 'request_schema',
+        duplicateRequestState,
+        requestType: getRequestTypeForDiagnostics(),
+      })
     }
+    currentRequest = parsed.data
 
     stage = 'REQUEST_PARSED'
     logStylistStage(stage, {
@@ -365,12 +445,15 @@ export async function POST(request: Request) {
     })
 
     activeGenerationKey = getStylistGenerationKey(userId, parsed.data)
+    duplicateRequestState = 'started'
     if (!tryStartStylistGeneration(activeGenerationKey)) {
+      duplicateRequestState = 'duplicate'
       return NextResponse.json(
         {
           status: 'generation_failed',
           code: 'stylist_generation_in_progress',
           message: 'A stylist generation request is already in progress.',
+          details: failureDetails,
           retryable: true,
         },
         { status: 409 },
@@ -413,12 +496,32 @@ export async function POST(request: Request) {
         (!dislikedWardrobeItemIds.has(item.id) || lockedItemIdSet.has(item.id)),
     )
     const wardrobe = wardrobeRows.map(toStylistWardrobeItem)
+    const requiredCategories = getRequiredCategoriesForStylistRequest(
+      parsed.data,
+    )
+    const prefilteredAvailableCategories = Array.from(
+      new Set(wardrobe.map((item) => item.category)),
+    )
+    failureDetails = buildStylistGenerateFailureDetails({
+      requiredCategories,
+      availableCategories: prefilteredAvailableCategories,
+      missingCategories: [],
+      lockedItemIds: parsed.data.lockedItemIds,
+      eligibleItemCount: wardrobeRows.length,
+    })
     const lockedItems = wardrobe.filter((item) => lockedItemIdSet.has(item.id))
     if (lockedItems.length !== parsed.data.lockedItemIds.length) {
-      return NextResponse.json(
-        { error: 'locked_item_unavailable' },
-        { status: 400 },
-      )
+      return stylistStructuredErrorResponse({
+        httpStatus: 422,
+        status: 'generation_failed',
+        code: 'locked_item_unavailable',
+        message: 'One or more locked wardrobe items are unavailable.',
+        details: failureDetails,
+        retryable: false,
+        failingValidation: 'locked_item_ownership_or_availability',
+        duplicateRequestState,
+        requestType: getRequestTypeForDiagnostics(),
+      })
     }
     const rankedWardrobe = [
       ...lockedItems,
@@ -426,9 +529,6 @@ export async function POST(request: Request) {
         (item) => !lockedItemIdSet.has(item.id),
       ),
     ].slice(0, 24)
-    const requiredCategories = getRequiredCategoriesForStylistRequest(
-      parsed.data,
-    )
     const weatherSuitability = parsed.data.weatherContext
       ? applyWeatherSuitability(
           rankedWardrobe,
@@ -500,6 +600,13 @@ export async function POST(request: Request) {
     const availableCategories = Array.from(
       new Set(weatherRankedWardrobe.map((item) => item.category)),
     )
+    failureDetails = buildStylistGenerateFailureDetails({
+      requiredCategories,
+      availableCategories,
+      missingCategories: allMissingItems,
+      lockedItemIds: parsed.data.lockedItemIds,
+      eligibleItemCount: weatherRankedWardrobe.length,
+    })
 
     stage = 'WARDROBE_FILTERED'
     logStylistStage(stage, {
@@ -525,7 +632,13 @@ export async function POST(request: Request) {
         result: insufficient,
       })
 
-      return NextResponse.json({ result: insufficient })
+      return NextResponse.json({
+        result: insufficient,
+        status: 'insufficient_wardrobe',
+        code: 'insufficient_wardrobe',
+        message: insufficient.message,
+        details: failureDetails,
+      })
     }
 
     let result
@@ -547,33 +660,37 @@ export async function POST(request: Request) {
     } catch (error) {
       logStylistStageFailure(stage, error)
       if (error instanceof StylistProviderRequestError) {
-        return NextResponse.json(
-          {
-            status: 'generation_failed',
-            code: error.code,
-            message: error.message,
-            retryable: error.retryable,
-          },
-          { status: error.status },
-        )
+        return stylistStructuredErrorResponse({
+          httpStatus: error.status,
+          status: 'generation_failed',
+          code: error.code,
+          message: error.message,
+          details: failureDetails,
+          retryable: error.retryable,
+          failingValidation: 'provider_request_error',
+          duplicateRequestState,
+          requestType: getRequestTypeForDiagnostics(),
+        })
       }
 
       const message =
         error instanceof Error
           ? error.message
           : 'The stylist provider returned an invalid outfit format.'
-      return NextResponse.json(
-        {
-          status: 'generation_failed',
-          code:
-            message === 'invalid_stylist_batch_result'
-              ? 'invalid_stylist_batch_result'
-              : 'invalid_provider_output',
-          message,
-          retryable: true,
-        },
-        { status: 502 },
-      )
+      return stylistStructuredErrorResponse({
+        httpStatus: 502,
+        status: 'generation_failed',
+        code:
+          message === 'invalid_stylist_batch_result'
+            ? 'invalid_stylist_batch_result'
+            : 'invalid_provider_output',
+        message,
+        details: failureDetails,
+        retryable: true,
+        failingValidation: 'provider_output_validation',
+        duplicateRequestState,
+        requestType: getRequestTypeForDiagnostics(),
+      })
     }
 
     if (result.status === 'insufficient_wardrobe') {
@@ -584,11 +701,31 @@ export async function POST(request: Request) {
         result,
       })
 
-      return NextResponse.json({ result })
+      return NextResponse.json({
+        result,
+        status: 'insufficient_wardrobe',
+        code: 'insufficient_wardrobe',
+        message: result.message,
+        details: buildStylistGenerateFailureDetails({
+          ...failureDetails,
+          missingCategories: result.missingCategories,
+          availableCategories: result.availableCategories,
+        }),
+      })
     }
 
     if (result.status === 'generation_failed') {
-      return NextResponse.json({ result }, { status: 422 })
+      return stylistStructuredErrorResponse({
+        httpStatus: 422,
+        status: 'generation_failed',
+        code: 'stylist_generation_failed',
+        message: result.message,
+        details: failureDetails,
+        retryable: result.retryable,
+        failingValidation: 'provider_returned_generation_failed_result',
+        duplicateRequestState,
+        requestType: getRequestTypeForDiagnostics(),
+      })
     }
 
     const [requestRow] = await db

@@ -12,6 +12,11 @@ import {
   tryStartStylistGeneration,
 } from '@/lib/stylist/concurrency'
 import {
+  buildStylistGenerateFailureDetails,
+  createStylistGenerateFailurePayload,
+  getStylistRequestType,
+} from '@/lib/stylist/generate-diagnostics'
+import {
   normalizeStylistProviderOutput,
   parseProviderJson,
 } from '@/lib/stylist/provider-output'
@@ -1117,5 +1122,110 @@ describe('batch outfit validation', () => {
 
   it('measures excessive overlap', () => {
     expect(getCandidateOverlap(batchCandidate, batchCandidate)).toBe(1)
+  })
+})
+
+describe('stylist generation diagnostics', () => {
+  const details = {
+    requiredCategories: ['tops', 'bottoms', 'shoes', 'tops'],
+    availableCategories: ['tops', 'bottoms', 'shoes'],
+    missingCategories: ['shoes'],
+    lockedItemIds: [wardrobe[0].id],
+    eligibleItemCount: 3,
+  }
+
+  it('builds the required diagnostics shape for generation_failed 422 branches', () => {
+    const payload = createStylistGenerateFailurePayload({
+      status: 'generation_failed',
+      code: 'stylist_generation_failed',
+      message: 'Provider could not create a valid outfit.',
+      details,
+      retryable: true,
+    })
+
+    expect(payload).toEqual({
+      status: 'generation_failed',
+      code: 'stylist_generation_failed',
+      message: 'Provider could not create a valid outfit.',
+      retryable: true,
+      details: {
+        requiredCategories: ['tops', 'bottoms', 'shoes'],
+        availableCategories: ['tops', 'bottoms', 'shoes'],
+        missingCategories: ['shoes'],
+        lockedItemIds: [wardrobe[0].id],
+        eligibleItemCount: 3,
+      },
+    })
+  })
+
+  it('builds the required diagnostics shape for insufficient_wardrobe 422 branches', () => {
+    const payload = createStylistGenerateFailurePayload({
+      status: 'insufficient_wardrobe',
+      code: 'insufficient_wardrobe',
+      message: 'Missing shoes.',
+      details,
+    })
+
+    expect(payload.status).toBe('insufficient_wardrobe')
+    expect(payload.code).toBe('insufficient_wardrobe')
+    expect(payload.details.missingCategories).toEqual(['shoes'])
+    expect(payload.details.eligibleItemCount).toBe(3)
+  })
+
+  it('keeps all unprocessable stylist branches structured with diagnostics', () => {
+    const unprocessableCodes = [
+      'locked_item_unavailable',
+      'stylist_generation_failed',
+      'stylist_model_json_unsupported',
+    ]
+
+    for (const code of unprocessableCodes) {
+      expect(
+        createStylistGenerateFailurePayload({
+          status: 'generation_failed',
+          code,
+          message: 'Unprocessable stylist generation.',
+          details,
+          retryable: code !== 'locked_item_unavailable',
+        }),
+      ).toMatchObject({
+        status: 'generation_failed',
+        code,
+        message: 'Unprocessable stylist generation.',
+        details: {
+          requiredCategories: ['tops', 'bottoms', 'shoes'],
+          availableCategories: ['tops', 'bottoms', 'shoes'],
+          missingCategories: ['shoes'],
+          lockedItemIds: [wardrobe[0].id],
+          eligibleItemCount: 3,
+        },
+      })
+    }
+  })
+
+  it('normalizes empty or invalid diagnostic detail values safely', () => {
+    expect(
+      buildStylistGenerateFailureDetails({
+        requiredCategories: ['tops', '', 'tops'],
+        availableCategories: ['bottoms'],
+        missingCategories: [],
+        lockedItemIds: ['  ', wardrobe[1].id],
+        eligibleItemCount: Number.NaN,
+      }),
+    ).toEqual({
+      requiredCategories: ['tops'],
+      availableCategories: ['bottoms'],
+      missingCategories: [],
+      lockedItemIds: [wardrobe[1].id],
+      eligibleItemCount: 0,
+    })
+  })
+
+  it('labels duplicate and custom request diagnostics without private prompt text', () => {
+    expect(
+      getStylistRequestType({ quickRequest: 'work', message: 'private' }),
+    ).toBe('work')
+    expect(getStylistRequestType({ message: 'private request' })).toBe('custom')
+    expect(getStylistRequestType(null)).toBe('unknown')
   })
 })
