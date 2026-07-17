@@ -13,6 +13,7 @@ import {
   findMissingRequiredCategories,
   normalizeStylistCategory,
   requiredCoreCategories,
+  resolveStylistOutfitRole,
 } from './wardrobe'
 
 export type StylistValidationIssue = {
@@ -45,6 +46,20 @@ function logValidationIssues(message: string, issues: unknown) {
   if (process.env.NODE_ENV !== 'development') return
 
   console.warn(message, { issues })
+}
+
+function logRoleResolutionDiagnostics(
+  diagnostics: Array<{
+    providerRole: string
+    normalizedProviderRole: string
+    wardrobeCategory: string | null
+    wardrobeSubcategory: string | null
+    resolvedRole: string
+    resolutionSource: string
+  }>,
+) {
+  if (process.env.NODE_ENV === 'test' || process.env.VITEST) return
+  console.warn('[stylist-generate] role resolution', { items: diagnostics })
 }
 
 function itemSet(candidate: StylistCandidate) {
@@ -103,24 +118,13 @@ export function validateStylistOutfit(
   }
 
   const outfit = parsed.data
-  const allowedIds = new Set(wardrobeItems.map((item) => item.id))
+  const wardrobeById = new Map(wardrobeItems.map((item) => [item.id, item]))
+  const allowedIds = new Set(wardrobeById.keys())
   const selectedIds = outfit.items.map((item) => item.wardrobeItemId)
-  const unsupportedRoles = outfit.items
-    .map((item) => item.role)
-    .filter((role) => normalizeStylistCategory(role) === 'other')
   const hallucinatedIds = selectedIds.filter((id) => !allowedIds.has(id))
   const duplicateIds = selectedIds.filter(
     (id, index) => selectedIds.indexOf(id) !== index,
   )
-  const selectedItems = wardrobeItems.filter((item) =>
-    selectedIds.includes(item.id),
-  )
-
-  if (unsupportedRoles.length > 0) {
-    throw new StylistValidationError(
-      `unsupported_roles:${unsupportedRoles.join(',')}`,
-    )
-  }
 
   if (hallucinatedIds.length > 0) {
     throw new StylistValidationError(
@@ -133,6 +137,60 @@ export function validateStylistOutfit(
       `duplicate_items:${duplicateIds.join(',')}`,
     )
   }
+
+  const roleDiagnostics = outfit.items.map((item) => {
+    const wardrobeItem = wardrobeById.get(item.wardrobeItemId)
+    const resolution = resolveStylistOutfitRole({
+      providerRole: item.role,
+      wardrobeCategory: wardrobeItem?.category,
+      wardrobeSubcategory: wardrobeItem?.clothingType,
+    })
+
+    return {
+      item,
+      wardrobeItem,
+      resolution,
+      diagnostics: {
+        providerRole: item.role,
+        normalizedProviderRole: normalizeStylistCategory(item.role),
+        wardrobeCategory: wardrobeItem?.category ?? null,
+        wardrobeSubcategory: wardrobeItem?.clothingType ?? null,
+        resolvedRole: resolution.role,
+        resolutionSource: resolution.source,
+      },
+    }
+  })
+  logRoleResolutionDiagnostics(
+    roleDiagnostics.map((entry) => entry.diagnostics),
+  )
+
+  const unsupportedRoles = roleDiagnostics
+    .filter((entry) => entry.resolution.role === 'other')
+    .map((entry) => entry.item.role)
+
+  if (unsupportedRoles.length > 0) {
+    throw new StylistValidationError(
+      `unsupported_roles:${unsupportedRoles.join(',')}`,
+    )
+  }
+
+  const resolvedOutfit: StylistOutfit = {
+    ...outfit,
+    items: outfit.items.map((item, index) => ({
+      ...item,
+      role: roleDiagnostics[index]?.resolution.role ?? item.role,
+    })),
+  }
+  const selectedItems = roleDiagnostics
+    .map((entry) =>
+      entry.wardrobeItem
+        ? {
+            ...entry.wardrobeItem,
+            category: entry.resolution.role,
+          }
+        : null,
+    )
+    .filter((item): item is StylistWardrobeItem => Boolean(item))
 
   const missingLockedIds = (options?.lockedItemIds ?? []).filter(
     (id) => !selectedIds.includes(id),
@@ -168,7 +226,7 @@ export function validateStylistOutfit(
     }
   }
 
-  return outfit satisfies StylistOutfit
+  return resolvedOutfit satisfies StylistOutfit
 }
 
 export function validateStylistResult(

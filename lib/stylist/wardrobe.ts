@@ -36,10 +36,17 @@ const categoryAliases: Record<string, string> = {
   't-shirt': 'tops',
   tshirt: 'tops',
   tee: 'tops',
-  polo: 'tops',
   blouse: 'tops',
   sweater: 'tops',
+  sweatshirt: 'tops',
   hoodie: 'tops',
+  polo: 'tops',
+  'tank-top': 'tops',
+  köynək: 'tops',
+  koynek: 'tops',
+  футболка: 'tops',
+  рубашка: 'tops',
+  верх: 'tops',
   bottom: 'bottoms',
   bottoms: 'bottoms',
   pants: 'bottoms',
@@ -47,22 +54,51 @@ const categoryAliases: Record<string, string> = {
   jeans: 'bottoms',
   shorts: 'bottoms',
   skirt: 'bottoms',
+  leggings: 'bottoms',
+  şalvar: 'bottoms',
+  salvar: 'bottoms',
+  брюки: 'bottoms',
+  джинсы: 'bottoms',
+  низ: 'bottoms',
   shoe: 'shoes',
   shoes: 'shoes',
+  footwear: 'shoes',
   sneaker: 'shoes',
   sneakers: 'shoes',
+  trainers: 'shoes',
   boots: 'shoes',
   loafers: 'shoes',
   heels: 'shoes',
+  sandals: 'shoes',
+  ayaqqabı: 'shoes',
+  ayaqqabi: 'shoes',
+  обувь: 'shoes',
   dress: 'dresses',
   dresses: 'dresses',
+  jumpsuit: 'dresses',
+  suit: 'dresses',
+  'one-piece': 'dresses',
+  платье: 'dresses',
   jacket: 'outerwear',
   coat: 'outerwear',
+  blazer: 'outerwear',
+  cardigan: 'outerwear',
+  vest: 'outerwear',
   outerwear: 'outerwear',
+  'верхняя-одежда': 'outerwear',
   bag: 'bags',
   bags: 'bags',
   accessory: 'accessories',
   accessories: 'accessories',
+  belt: 'accessories',
+  hat: 'accessories',
+  cap: 'accessories',
+  scarf: 'accessories',
+  jewelry: 'accessories',
+  watch: 'accessories',
+  glasses: 'accessories',
+  аксессуар: 'accessories',
+  аксессуары: 'accessories',
 }
 
 function normalizeToken(value: string) {
@@ -80,6 +116,43 @@ export function normalizeStylistCategory(category: string, clothingType = '') {
 
   const normalizedType = normalizeToken(clothingType)
   return categoryAliases[normalizedType] ?? normalizedCategory ?? 'other'
+}
+
+export type StylistRoleResolutionSource =
+  | 'wardrobe_category'
+  | 'wardrobe_clothing_type'
+  | 'provider_role'
+  | 'unresolved'
+
+export type StylistRoleResolution = {
+  role: string
+  source: StylistRoleResolutionSource
+}
+
+export function resolveStylistOutfitRole(input: {
+  providerRole?: string
+  wardrobeCategory?: string
+  wardrobeSubcategory?: string
+}): StylistRoleResolution {
+  const categoryRole = normalizeStylistCategory(input.wardrobeCategory ?? '')
+  if (categoryRole !== 'other') {
+    return { role: categoryRole, source: 'wardrobe_category' }
+  }
+
+  const clothingTypeRole = normalizeStylistCategory(
+    '',
+    input.wardrobeSubcategory ?? '',
+  )
+  if (clothingTypeRole !== 'other') {
+    return { role: clothingTypeRole, source: 'wardrobe_clothing_type' }
+  }
+
+  const providerRole = normalizeStylistCategory(input.providerRole ?? '')
+  if (providerRole !== 'other') {
+    return { role: providerRole, source: 'provider_role' }
+  }
+
+  return { role: 'other', source: 'unresolved' }
 }
 
 export function toStylistWardrobeItem(row: WardrobeRow): StylistWardrobeItem {

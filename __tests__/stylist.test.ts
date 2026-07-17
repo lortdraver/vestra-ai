@@ -35,6 +35,7 @@ import {
   hasCompleteOutfit,
   isSingleItemStylistRequest,
   normalizeStylistCategory,
+  resolveStylistOutfitRole,
 } from '@/lib/stylist/wardrobe'
 import type { StylistWardrobeItem } from '@/lib/stylist'
 
@@ -1240,7 +1241,136 @@ describe('batch outfit validation', () => {
     ).toThrow('invalid_stylist_batch_result')
   })
 
-  it('rejects unsupported roles', () => {
+  it('resolves provider role "other" from trusted wardrobe t-shirt category', () => {
+    expect(
+      resolveStylistOutfitRole({
+        providerRole: 'other',
+        wardrobeCategory: 't-shirt',
+      }),
+    ).toEqual({ role: 'tops', source: 'wardrobe_category' })
+  })
+
+  it('resolves missing provider roles from trusted wardrobe jeans category', () => {
+    expect(
+      resolveStylistOutfitRole({
+        wardrobeCategory: 'jeans',
+      }),
+    ).toEqual({ role: 'bottoms', source: 'wardrobe_category' })
+  })
+
+  it('resolves localized Russian and Azerbaijani wardrobe categories', () => {
+    expect(
+      resolveStylistOutfitRole({
+        providerRole: 'other',
+        wardrobeCategory: 'верх',
+      }),
+    ).toEqual({ role: 'tops', source: 'wardrobe_category' })
+    expect(
+      resolveStylistOutfitRole({
+        providerRole: 'other',
+        wardrobeCategory: 'şalvar',
+      }),
+    ).toEqual({ role: 'bottoms', source: 'wardrobe_category' })
+    expect(
+      resolveStylistOutfitRole({
+        providerRole: 'other',
+        wardrobeCategory: 'ayaqqabı',
+      }),
+    ).toEqual({ role: 'shoes', source: 'wardrobe_category' })
+  })
+
+  it('uses provider aliases only after trusted wardrobe metadata is unresolved', () => {
+    expect(
+      resolveStylistOutfitRole({
+        providerRole: 'footwear',
+        wardrobeCategory: 'unknown',
+      }),
+    ).toEqual({ role: 'shoes', source: 'provider_role' })
+  })
+
+  it('gives a valid stored wardrobe role priority over provider role', () => {
+    expect(
+      resolveStylistOutfitRole({
+        providerRole: 'shoes',
+        wardrobeCategory: 'tops',
+      }),
+    ).toEqual({ role: 'tops', source: 'wardrobe_category' })
+  })
+
+  it('leaves genuinely unknown categories unresolved', () => {
+    expect(
+      resolveStylistOutfitRole({
+        providerRole: 'other',
+        wardrobeCategory: 'mystery',
+        wardrobeSubcategory: 'unknown',
+      }),
+    ).toEqual({ role: 'other', source: 'unresolved' })
+  })
+
+  it('resolves four provider "other" roles from known wardrobe categories', () => {
+    const fourItemWardrobe: StylistWardrobeItem[] = [
+      {
+        ...wardrobe[0],
+        category: 't-shirt',
+        clothingType: 't-shirt',
+      },
+      {
+        ...wardrobe[1],
+        category: 'jeans',
+        clothingType: 'jeans',
+      },
+      {
+        ...wardrobe[2],
+        category: 'sneakers',
+        clothingType: 'sneakers',
+      },
+      {
+        ...wardrobe[0],
+        id: '77777777-7777-4777-8777-777777777777',
+        name: 'Black blazer',
+        category: 'blazer',
+        clothingType: 'blazer',
+      },
+    ]
+
+    const result = validateStylistBatchResult(
+      {
+        status: 'success',
+        candidates: [
+          {
+            ...batchCandidate,
+            items: fourItemWardrobe.map((item) => ({
+              wardrobeItemId: item.id,
+              role: 'other',
+              explanation: `Uses ${item.name}.`,
+            })),
+          },
+        ],
+      },
+      fourItemWardrobe,
+    )
+
+    expect(result.status).toBe('success')
+    if (result.status !== 'success') throw new Error('expected success')
+    expect(result.candidates[0].items.map((item) => item.role)).toEqual([
+      'tops',
+      'bottoms',
+      'shoes',
+      'outerwear',
+    ])
+  })
+
+  it('rejects unsupported roles only when selected wardrobe metadata is unresolved', () => {
+    const unresolvedWardrobe: StylistWardrobeItem[] = [
+      {
+        ...wardrobe[0],
+        category: 'mystery',
+        clothingType: 'unknown',
+      },
+      wardrobe[1],
+      wardrobe[2],
+    ]
+
     expect(() =>
       validateStylistBatchResult(
         normalizeStylistProviderOutput({
@@ -1255,14 +1385,14 @@ describe('batch outfit validation', () => {
               formality: null,
               confidence: 0.5,
               items: [
-                { wardrobeItemId: wardrobe[0].id, role: 'hat' },
+                { wardrobeItemId: wardrobe[0].id, role: 'other' },
                 { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
                 { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
               ],
             },
           ],
         }),
-        wardrobe,
+        unresolvedWardrobe,
       ),
     ).toThrow('unsupported_roles')
   })
