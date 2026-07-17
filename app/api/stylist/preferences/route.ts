@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { apiError } from '@/lib/api/errors'
 import { auth } from '@/lib/auth'
+import { requireVerifiedEmailSession } from '@/lib/auth-email-verification'
 import { db } from '@/lib/db'
 import { stylistPreferenceProfile } from '@/lib/db/schema'
 import {
@@ -49,8 +50,9 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const userId = await getCurrentUserId()
-  if (!userId) return apiError('unauthorized', 401)
+  const verifiedSession = await requireVerifiedEmailSession()
+  if (!verifiedSession.ok) return verifiedSession.response
+  const userId = verifiedSession.userId
 
   const body = await request.json().catch(() => null)
   const parsed = stylistPreferencePatchSchema.safeParse(body)

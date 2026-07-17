@@ -1,7 +1,15 @@
 import { betterAuth } from 'better-auth'
 import { networkInterfaces } from 'node:os'
+import { buildAccountEmailTemplate } from '@/lib/account/email-templates'
+import { getAccountEmailProvider } from '@/lib/account/email-provider'
 import { pool } from '@/lib/db'
 import { getAppUrl, getBetterAuthSecret } from '@/lib/env'
+import { sanitizeBetterAuthVerificationUrl } from '@/lib/email-verification-links'
+import {
+  localeCookieName,
+  normalizeLocale,
+  type Locale,
+} from '@/lib/i18n/config'
 
 const appUrl = getAppUrl()
 
@@ -87,6 +95,29 @@ const trustedOrigins = Array.from(
   ),
 )
 
+function getRequestLocale(request?: Request | null): Locale {
+  const cookieHeader = request?.headers.get('cookie')
+  const cookieLocale = cookieHeader
+    ?.split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${localeCookieName}=`))
+    ?.split('=')[1]
+
+  return normalizeLocale(
+    cookieLocale ??
+      request?.headers.get('accept-language')?.split(',')[0] ??
+      undefined,
+  )
+}
+
+function getEmailVerificationExpiresIn() {
+  const parsed = Number(
+    process.env.EMAIL_VERIFICATION_EXPIRES_SECONDS ?? 86_400,
+  )
+  if (!Number.isFinite(parsed)) return 86_400
+  return Math.min(Math.max(parsed, 900), 60 * 60 * 24 * 7)
+}
+
 export const auth = betterAuth({
   database: pool,
   secret: getBetterAuthSecret(),
@@ -94,6 +125,28 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,
+  },
+  emailVerification: {
+    sendOnSignUp: true,
+    sendOnSignIn: true,
+    autoSignInAfterVerification: true,
+    expiresIn: getEmailVerificationExpiresIn(),
+    sendVerificationEmail: async ({ user, url }, request) => {
+      const safeUrl = sanitizeBetterAuthVerificationUrl(url)
+      const locale = getRequestLocale(request)
+      const template = buildAccountEmailTemplate({
+        kind: 'email_verification',
+        locale,
+        actionUrl: safeUrl,
+      })
+      await getAccountEmailProvider().send({
+        to: user.email,
+        kind: 'email_verification',
+        locale,
+        actionUrl: safeUrl,
+        ...template,
+      })
+    },
   },
   trustedOrigins,
   session: {

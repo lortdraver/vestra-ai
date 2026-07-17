@@ -80,6 +80,9 @@
 - Added account actions, logout, account deletion placeholder, and security section.
 - Added forgot password and reset password foundation.
 - Added email verification and account recovery database architecture.
+- Implemented production-ready Better Auth email verification with localized
+  verification emails, resend throttling, a dashboard warning banner, result
+  states, and server-side verified-email guards for sensitive writes.
 - Added audit log and security event schema.
 - Added development-safe request rate limiting for auth, AI, upload, and admin traffic.
 - Added admin dashboard for users, subscriptions, system status, logs, and future store architecture.
@@ -182,18 +185,27 @@
 ## Authentication
 
 - Better Auth handles email/password authentication.
+- Better Auth native email verification is enabled for new email/password
+  accounts, while unverified sessions can still reach the dashboard and resend
+  prompt.
 - Dashboard routes are protected through the dashboard layout.
 - API routes check the authenticated session before accessing user-owned data.
+- Sensitive write routes also require `user.emailVerified=true` and return
+  stable `email_not_verified` responses for unverified sessions.
 - Better Auth trusted origins support localhost and local network testing while keeping production security separated.
 - Auth-owned tables include `user`, `session`, `account`, and `verification`.
 - The `user` table now includes a database-backed role field.
-- Account recovery and email verification token tables are prepared for future email-provider integration.
+- Email delivery is abstracted through local manual mode and a production Resend
+  adapter. Verification tokens and complete verification URLs are never logged.
+- Account recovery tables remain prepared for future recovery workflows.
 
 ## Database
 
 - Runtime database is Neon PostgreSQL through `DATABASE_URL`.
 - Drizzle ORM defines the schema in `lib/db/schema.ts`.
 - Migrations are committed as SQL files and applied with `pnpm db:apply`.
+- `0011_email_verification_legacy_policy.sql` safely marks existing credential
+  users verified before enforcement to avoid locking out legacy accounts.
 - User-owned tables are scoped by `userId`.
 - Implemented domain tables include:
   - `wardrobe_item`

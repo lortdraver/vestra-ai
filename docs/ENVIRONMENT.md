@@ -54,6 +54,52 @@
 - `NEXT_PUBLIC_DEFAULT_LOCALE` - default locale, currently `az`.
 - `LOCAL_STORAGE_PUBLIC_BASE_URL` - reserved for local storage URL customization.
 
+## Email Verification
+
+Vestra uses Better Auth's native email verification flow for email/password
+accounts. Better Auth generates secure, expiring verification links and marks
+`user.emailVerified` after a valid verification. Vestra is responsible for safe
+email delivery, localized copy, resend throttling, and server-side guards for
+sensitive actions.
+
+Local development may use the manual provider:
+
+```env
+EMAIL_PROVIDER="manual"
+```
+
+Manual mode never sends real email and is blocked in production. It also avoids
+logging full verification URLs or tokens.
+
+Production should use a transactional email provider. The built-in production
+adapter is Resend:
+
+```env
+EMAIL_PROVIDER="resend"
+EMAIL_FROM="Vestra <noreply@your-domain.com>"
+EMAIL_REPLY_TO="support@your-domain.com"
+RESEND_API_KEY="<server-only-resend-api-key>"
+EMAIL_REQUEST_TIMEOUT_MS="10000"
+EMAIL_VERIFICATION_EXPIRES_SECONDS="86400"
+EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS="60"
+```
+
+Keep all email provider secrets server-only. Verification links are generated
+from `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL`; Vestra does not trust request
+host headers when rebuilding token links.
+
+Before enabling verification in production, apply the safe legacy-user policy:
+
+```bash
+pnpm db:apply
+```
+
+The migration `0011_email_verification_legacy_policy.sql` marks existing
+credential users verified so accounts created before verification enforcement
+are not accidentally blocked from sensitive actions. New users created after the
+rollout must verify their email before wardrobe uploads, stylist generation, or
+account-sensitive writes are allowed.
+
 ## Local Setup
 
 Copy `.env.example` to `.env`, then replace all placeholder values.
@@ -202,6 +248,8 @@ Before public deployment, manually configure and verify:
 - `BETTER_AUTH_URL` is the canonical production URL.
 - `BETTER_AUTH_TRUSTED_ORIGINS` contains only approved production origins.
 - `NEXT_PUBLIC_APP_URL` is the canonical production URL.
+- `EMAIL_PROVIDER=resend` with `EMAIL_FROM`, optional `EMAIL_REPLY_TO`,
+  `RESEND_API_KEY`, request timeout, verification expiry, and resend cooldown.
 - `AI_PROVIDER=openai-compatible` with valid `AI_API_KEY`, `AI_API_BASE_URL`,
   `AI_MODEL_ID`, and OpenRouter referer/title settings when applicable.
 - `STYLIST_AI_PROVIDER=api` or `STYLIST_AI_PROVIDER=openai-compatible`. The

@@ -8,6 +8,7 @@ import {
   type ApiErrorCode,
 } from '@/lib/api/errors'
 import { auth } from '@/lib/auth'
+import { requireVerifiedEmailSession } from '@/lib/auth-email-verification'
 import { getBackgroundRemovalProvider } from '@/lib/background-removal'
 import {
   BackgroundRemovalProviderError,
@@ -152,17 +153,13 @@ export async function POST(request: Request) {
   try {
     logUploadStage(stage)
 
-    userId = await getCurrentUserId()
-    if (!userId) {
+    const verifiedSession = await requireVerifiedEmailSession()
+    if (!verifiedSession.ok) {
       logDev('Wardrobe create blocked: unauthenticated request')
-      return uploadJsonError(
-        'unauthorized',
-        401,
-        stage,
-        'Authentication is required.',
-      )
+      return verifiedSession.response
     }
 
+    userId = verifiedSession.userId
     stage = 'AUTHENTICATED'
     logUploadStage(stage, { userId })
 

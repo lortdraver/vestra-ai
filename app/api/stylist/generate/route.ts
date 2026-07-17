@@ -1,7 +1,6 @@
 import { desc, eq } from 'drizzle-orm'
-import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
+import { requireVerifiedEmailSession } from '@/lib/auth-email-verification'
 import { db } from '@/lib/db'
 import {
   outfit,
@@ -61,11 +60,6 @@ import type {
   StylistRequest,
   StylistWardrobeItem,
 } from '@/lib/stylist'
-
-async function getCurrentUserId() {
-  const session = await auth.api.getSession({ headers: await headers() })
-  return session?.user?.id ?? null
-}
 
 type StylistGenerateStage =
   | 'REQUEST_STARTED'
@@ -423,10 +417,11 @@ export async function POST(request: Request) {
   try {
     logStylistStage(stage)
 
-    const userId = await getCurrentUserId()
-    if (!userId) {
-      return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    const verifiedSession = await requireVerifiedEmailSession()
+    if (!verifiedSession.ok) {
+      return verifiedSession.response
     }
+    const userId = verifiedSession.userId
 
     stage = 'AUTHENTICATED'
     logStylistStage(stage)

@@ -49,6 +49,13 @@ export function AuthForm({
     if (normalized.includes('rate') || normalized.includes('too many')) {
       return dictionary.auth.tooManyAttempts
     }
+    if (
+      normalized.includes('email_not_verified') ||
+      normalized.includes('not verified') ||
+      normalized.includes('verify your email')
+    ) {
+      return dictionary.auth.emailNotVerified
+    }
 
     return dictionary.auth.genericError
   }
@@ -66,7 +73,12 @@ export function AuthForm({
 
     try {
       const { error } = isSignUp
-        ? await authClient.signUp.email({ email, password, name })
+        ? await authClient.signUp.email({
+            email,
+            password,
+            name,
+            callbackURL: '/verify-email?status=success',
+          })
         : await authClient.signIn.email({ email, password })
 
       if (error) {
@@ -74,7 +86,7 @@ export function AuthForm({
         return
       }
 
-      router.push('/dashboard')
+      router.push(isSignUp ? '/verify-email?status=sent' : '/dashboard')
       router.refresh()
     } catch {
       setError(dictionary.auth.networkError)

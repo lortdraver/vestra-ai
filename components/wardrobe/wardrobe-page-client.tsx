@@ -42,6 +42,7 @@ import { cn } from '@/lib/utils'
 
 type WardrobeSaveErrorCode =
   | 'unauthorized'
+  | 'email_not_verified'
   | 'missing_required_fields'
   | 'invalid_category'
   | 'missing_image'
@@ -166,6 +167,7 @@ function isWardrobeSaveErrorCode(
     error &&
     [
       'unauthorized',
+      'email_not_verified',
       'missing_required_fields',
       'invalid_category',
       'missing_image',

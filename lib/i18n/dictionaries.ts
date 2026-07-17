@@ -60,6 +60,9 @@ export const dictionaries = {
       genericError: 'Əməliyyat alınmadı. Zəhmət olmasa yenidən cəhd edin.',
       networkError:
         'Serverə qoşulmaq olmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.',
+      emailNotVerified:
+        'Davam etmək üçün e-poçtunuzu təsdiqləyin. Sizə təsdiq linki göndərdik.',
+      verificationSent: 'Təsdiq linki göndərildi. E-poçtunuzu yoxlayın.',
     },
     dashboard: {
       home: 'Ana səhifə',
@@ -105,6 +108,31 @@ export const dictionaries = {
       admin: 'Admin paneli',
       emailVerified: 'E-poçt təsdiqlənib',
       emailUnverified: 'E-poçt təsdiqlənməyib',
+    },
+    emailVerification: {
+      bannerTitle: 'E-poçtunuzu təsdiqləyin',
+      bannerBody:
+        '{email} ünvanına göndərilən linki açın. Qarderob yükləmələri, AI stilist və hesab dəyişiklikləri təsdiqdən sonra aktiv olacaq.',
+      resend: 'Linki yenidən göndər',
+      resendCooldown: '{seconds}s sonra yenidən göndərin',
+      resendSuccess: 'Təsdiq linki yenidən göndərildi.',
+      resendAlreadyVerified: 'E-poçt artıq təsdiqlənib.',
+      resendError: 'Təsdiq linkini göndərmək olmadı.',
+      rateLimited: 'Çox sorğu edildi. Bir az sonra yenidən cəhd edin.',
+      pageTitle: 'E-poçt təsdiqi',
+      sentTitle: 'E-poçtunuzu yoxlayın',
+      sentBody:
+        'Vestra hesabınızı aktivləşdirmək üçün sizə təhlükəsiz təsdiq linki göndərdik.',
+      successTitle: 'E-poçt təsdiqləndi',
+      successBody: 'Hesabınız hazırdır. Vestra-ya davam edə bilərsiniz.',
+      expiredTitle: 'Linkin vaxtı bitib',
+      expiredBody: 'Yeni təsdiq linki tələb edin və yenidən cəhd edin.',
+      invalidTitle: 'Link düzgün deyil',
+      invalidBody: 'Təsdiq linki etibarsızdır və ya artıq istifadə olunub.',
+      alreadyVerifiedTitle: 'E-poçt artıq təsdiqlənib',
+      alreadyVerifiedBody: 'Hesabınız artıq təsdiqlənmiş vəziyyətdədir.',
+      openDashboard: 'Dashboard-a keç',
+      signIn: 'Daxil ol',
     },
     subscription: {
       plans: {
@@ -243,6 +271,8 @@ export const dictionaries = {
         compress: 'Şəkli sıxmaq olmadı. Başqa şəkil seçin.',
         imageRequired: 'Yeni geyim üçün şəkil seçin.',
         unauthorized: 'Sessiyanız bitib. Zəhmət olmasa yenidən daxil olun.',
+        email_not_verified:
+          'Geyim əlavə etmək üçün əvvəlcə e-poçtunuzu təsdiqləyin.',
         missing_required_fields: 'Ad, kateqoriya və geyim növü mütləqdir.',
         invalid_category: 'Seçilmiş kateqoriya düzgün deyil.',
         missing_image: 'Yeni geyim üçün şəkil seçin.',
@@ -618,6 +648,8 @@ export const dictionaries = {
         timeout:
           'Stilist provayderi vaxtında cavab vermədi. Bir az sonra yenidən cəhd edin.',
         inProgress: 'Kombin yaradılması artıq davam edir.',
+        emailNotVerified:
+          'AI stilistdən istifadə etmək üçün əvvəlcə e-poçtunuzu təsdiqləyin.',
         save: 'Kombini yeniləmək olmadı.',
         feedback: 'Rəyi saxlamaq olmadı.',
         insufficientAlternatives: 'Uyğun əvəzləmə tapılmadı.',
@@ -683,6 +715,9 @@ export const dictionaries = {
       genericError: 'Something went wrong. Please try again.',
       networkError:
         'Unable to reach the server. Check your connection and try again.',
+      emailNotVerified:
+        'Verify your email to continue. We sent you a verification link.',
+      verificationSent: 'Verification link sent. Check your email.',
     },
     dashboard: {
       home: 'Home',
@@ -728,6 +763,32 @@ export const dictionaries = {
       admin: 'Admin dashboard',
       emailVerified: 'Email verified',
       emailUnverified: 'Email not verified',
+    },
+    emailVerification: {
+      bannerTitle: 'Verify your email',
+      bannerBody:
+        'Open the link sent to {email}. Wardrobe uploads, the AI stylist, and account changes unlock after verification.',
+      resend: 'Resend link',
+      resendCooldown: 'Resend in {seconds}s',
+      resendSuccess: 'Verification link sent again.',
+      resendAlreadyVerified: 'Your email is already verified.',
+      resendError: 'Unable to send the verification link.',
+      rateLimited: 'Too many requests. Try again shortly.',
+      pageTitle: 'Email verification',
+      sentTitle: 'Check your email',
+      sentBody:
+        'We sent you a secure verification link to activate your Vestra account.',
+      successTitle: 'Email verified',
+      successBody: 'Your account is ready. You can continue to Vestra.',
+      expiredTitle: 'Link expired',
+      expiredBody: 'Request a new verification link and try again.',
+      invalidTitle: 'Invalid link',
+      invalidBody:
+        'This verification link is invalid or has already been used.',
+      alreadyVerifiedTitle: 'Email already verified',
+      alreadyVerifiedBody: 'Your account is already verified.',
+      openDashboard: 'Open dashboard',
+      signIn: 'Sign in',
     },
     subscription: {
       plans: {
@@ -868,6 +929,7 @@ export const dictionaries = {
         compress: 'Unable to compress this image. Choose another image.',
         imageRequired: 'Choose an image for a new clothing item.',
         unauthorized: 'Your session expired. Please sign in again.',
+        email_not_verified: 'Verify your email before adding clothing items.',
         missing_required_fields:
           'Name, category, and clothing type are required.',
         invalid_category: 'The selected category is not valid.',
@@ -1246,6 +1308,7 @@ export const dictionaries = {
         timeout:
           'The stylist provider took too long to respond. Please try again shortly.',
         inProgress: 'An outfit generation request is already in progress.',
+        emailNotVerified: 'Verify your email before using the AI stylist.',
         save: 'Unable to update this outfit.',
         feedback: 'Unable to save feedback.',
         insufficientAlternatives: 'No suitable replacement was found.',
@@ -1262,6 +1325,32 @@ export const dictionaries = {
       admin: 'Админ-панель',
       emailVerified: 'Email подтвержден',
       emailUnverified: 'Email не подтвержден',
+    },
+    emailVerification: {
+      bannerTitle: 'Подтвердите e-mail',
+      bannerBody:
+        'Откройте ссылку, отправленную на {email}. Загрузка гардероба, AI-стилист и изменения аккаунта будут доступны после подтверждения.',
+      resend: 'Отправить ссылку еще раз',
+      resendCooldown: 'Повтор через {seconds}с',
+      resendSuccess: 'Ссылка подтверждения отправлена повторно.',
+      resendAlreadyVerified: 'E-mail уже подтвержден.',
+      resendError: 'Не удалось отправить ссылку подтверждения.',
+      rateLimited: 'Слишком много запросов. Попробуйте немного позже.',
+      pageTitle: 'Подтверждение e-mail',
+      sentTitle: 'Проверьте почту',
+      sentBody:
+        'Мы отправили безопасную ссылку подтверждения для активации аккаунта Vestra.',
+      successTitle: 'E-mail подтвержден',
+      successBody: 'Аккаунт готов. Можно продолжить работу с Vestra.',
+      expiredTitle: 'Срок действия ссылки истек',
+      expiredBody: 'Запросите новую ссылку подтверждения и попробуйте снова.',
+      invalidTitle: 'Недействительная ссылка',
+      invalidBody:
+        'Эта ссылка подтверждения недействительна или уже была использована.',
+      alreadyVerifiedTitle: 'E-mail уже подтвержден',
+      alreadyVerifiedBody: 'Ваш аккаунт уже подтвержден.',
+      openDashboard: 'Открыть dashboard',
+      signIn: 'Войти',
     },
     common: {
       brand: 'Vestra',
@@ -1321,6 +1410,9 @@ export const dictionaries = {
       genericError: 'Что-то пошло не так. Попробуйте еще раз.',
       networkError:
         'Не удалось подключиться к серверу. Проверьте соединение и попробуйте еще раз.',
+      emailNotVerified:
+        'Подтвердите e-mail, чтобы продолжить. Мы отправили вам ссылку подтверждения.',
+      verificationSent: 'Ссылка подтверждения отправлена. Проверьте почту.',
     },
     dashboard: {
       home: 'Главная',
@@ -1494,6 +1586,7 @@ export const dictionaries = {
         compress: 'Не удалось сжать изображение. Выберите другое.',
         imageRequired: 'Выберите изображение для новой вещи.',
         unauthorized: 'Сессия истекла. Войдите снова.',
+        email_not_verified: 'Подтвердите e-mail перед добавлением вещей.',
         missing_required_fields:
           'Название, категория и тип одежды обязательны.',
         invalid_category: 'Выбранная категория недействительна.',
@@ -1727,6 +1820,8 @@ export const dictionaries = {
         timeout:
           'Провайдер стилиста не ответил вовремя. Попробуйте еще раз чуть позже.',
         inProgress: 'Создание образа уже выполняется.',
+        emailNotVerified:
+          'Подтвердите e-mail перед использованием AI-стилиста.',
         save: 'Не удалось обновить этот образ.',
         feedback: 'Не удалось сохранить отзыв.',
         insufficientAlternatives: 'Подходящая замена не найдена.',

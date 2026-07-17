@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { user } from '@/lib/db/schema'
 import { AppHeader } from '@/components/app-header'
+import { EmailVerificationBanner } from '@/components/account/email-verification-banner'
 import { getDictionary, getLocale } from '@/lib/i18n/server'
 import { eq } from 'drizzle-orm'
 import { SubscriptionOverview } from '@/components/subscription/subscription-overview'
@@ -43,6 +44,12 @@ export default async function DashboardLayout({
         dictionary={dictionary}
         locale={locale}
       />
+      {!currentUser?.emailVerified && (
+        <EmailVerificationBanner
+          email={session.user.email}
+          dictionary={dictionary}
+        />
+      )}
       <SubscriptionOverview
         dictionary={dictionary}
         subscription={subscription}

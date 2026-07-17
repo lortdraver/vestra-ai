@@ -89,6 +89,8 @@ function getStylistGenerateErrorMessage(
       return errors.timeout
     case 'stylist_generation_in_progress':
       return errors.inProgress
+    case 'email_not_verified':
+      return errors.emailNotVerified
     case 'invalid_stylist_batch_result':
     case 'invalid_provider_output':
       return errors.providerFormat
