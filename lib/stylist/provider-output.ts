@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { normalizeStylistCategory } from './wardrobe'
+import type { Locale } from '@/lib/i18n/config'
+import type { StylistProviderInput, StylistWardrobeItem } from './types'
 
 export type StylistProviderResponseMetadata = {
   httpStatus: number
@@ -16,6 +18,21 @@ export type StylistProviderResponseMetadata = {
 export type StylistProviderEnvelope = {
   output: unknown
   metadata: StylistProviderResponseMetadata
+}
+
+export type StylistProviderNormalizationContext = {
+  locale?: Locale
+  request?: Pick<StylistProviderInput['request'], 'message' | 'quickRequest'>
+  wardrobeItems?: StylistWardrobeItem[]
+}
+
+export type StylistProviderCandidateNormalizationDiagnostic = {
+  candidateIndex: number
+  candidateKeys: string[]
+  titleOriginalType: string
+  titleNormalizedLength: number
+  explanationOriginalType: string
+  explanationNormalizedLength: number
 }
 
 const providerItemSchema = z.object({
@@ -56,6 +73,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value))
 }
 
+function getValueType(value: unknown) {
+  if (Array.isArray(value)) return 'array'
+  if (value === null) return 'null'
+  return typeof value
+}
+
 function parseFiniteConfidence(value: unknown) {
   const numberValue = typeof value === 'string' ? Number(value) : value
   return typeof numberValue === 'number' && Number.isFinite(numberValue)
@@ -87,18 +110,136 @@ function normalizeProviderItem(value: unknown) {
   }
 }
 
-function normalizeProviderCandidate(value: unknown) {
+const titleFallbacks: Record<Locale, string> = {
+  az: 'Tövsiyə olunan obraz',
+  en: 'Recommended outfit',
+  ru: 'Рекомендованный образ',
+}
+
+const explanationFallbacks: Record<Locale, string> = {
+  az: 'Bu obraz qarderobunuzdakı seçilmiş geyimləri birlikdə istifadə edir və sorğunuza uyğun balanslı kombin yaradır.',
+  en: 'This outfit uses the selected items from your wardrobe together to create a balanced look for your request.',
+  ru: 'Этот образ сочетает выбранные вещи из вашего гардероба и подходит под ваш запрос.',
+}
+
+function firstNonEmptyString(values: unknown[], locale: Locale): string | null {
+  for (const value of values) {
+    const result = recoverString(value, locale)
+    if (result) return result
+  }
+  return null
+}
+
+function recoverString(value: unknown, locale: Locale): string | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed || null
+  }
+
+  if (Array.isArray(value)) {
+    return firstNonEmptyString(value, locale)
+  }
+
+  if (isRecord(value)) {
+    const localized = recoverString(value[locale], locale)
+    if (localized) return localized
+    return firstNonEmptyString(Object.values(value), locale)
+  }
+
+  return null
+}
+
+function getFirstExistingValue(value: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    if (key in value) return value[key]
+  }
+  return undefined
+}
+
+function getSelectedItemNames(
+  items: unknown,
+  wardrobeItems: StylistWardrobeItem[] | undefined,
+) {
+  if (!Array.isArray(items) || !wardrobeItems?.length) return []
+
+  const wardrobeById = new Map(wardrobeItems.map((item) => [item.id, item]))
+  return items
+    .map((item) =>
+      isRecord(item) && typeof item.wardrobeItemId === 'string'
+        ? wardrobeById.get(item.wardrobeItemId)?.name
+        : null,
+    )
+    .filter((name): name is string => Boolean(name?.trim()))
+}
+
+function buildFallbackExplanation(
+  value: Record<string, unknown>,
+  context: StylistProviderNormalizationContext | undefined,
+) {
+  const locale = context?.locale ?? 'en'
+  const itemNames = getSelectedItemNames(value.items, context?.wardrobeItems)
+  const requestLabel =
+    context?.request?.quickRequest ?? context?.request?.message ?? ''
+
+  if (itemNames.length > 0) {
+    const itemList = itemNames.slice(0, 4).join(', ')
+    return {
+      az: `${itemList} birlikdə seçildi, çünki bu geyimlər qarderobunuzdan uyğun və tamamlanmış kombin yaradır.${requestLabel ? ' Sorğunuz nəzərə alındı.' : ''}`,
+      en: `${itemList} were selected together because these wardrobe items create a complete and suitable outfit.${requestLabel ? ' The request context was considered.' : ''}`,
+      ru: `${itemList} выбраны вместе, потому что эти вещи из гардероба создают завершенный и подходящий образ.${requestLabel ? ' Контекст запроса учтен.' : ''}`,
+    }[locale]
+  }
+
+  return explanationFallbacks[locale]
+}
+
+function recoverTitle(value: Record<string, unknown>, locale: Locale) {
+  const source = getFirstExistingValue(value, [
+    'title',
+    'name',
+    'outfitTitle',
+    'outfit_name',
+    'heading',
+  ])
+  return recoverString(source, locale) ?? titleFallbacks[locale]
+}
+
+function recoverExplanation(
+  value: Record<string, unknown>,
+  context: StylistProviderNormalizationContext | undefined,
+) {
+  const locale = context?.locale ?? 'en'
+  const source = getFirstExistingValue(value, [
+    'overallExplanation',
+    'description',
+    'explanation',
+    'reasoning',
+    'rationale',
+    'summary',
+    'outfitExplanation',
+    'overall_explanation',
+  ])
+  const recovered = recoverString(source, locale)
+  return recovered && recovered.length >= 1
+    ? recovered
+    : buildFallbackExplanation(value, context)
+}
+
+function normalizeProviderCandidate(
+  value: unknown,
+  context?: StylistProviderNormalizationContext,
+) {
   if (!isRecord(value)) return value
 
-  const description =
-    typeof value.description === 'string' && value.description.trim()
-      ? value.description
-      : typeof value.overallExplanation === 'string'
-        ? value.overallExplanation
-        : ''
+  const locale = context?.locale ?? 'en'
+  const title = recoverTitle(value, locale)
+  let description = recoverExplanation(value, context)
+  if (description.trim().length < 1) {
+    description = buildFallbackExplanation(value, context)
+  }
 
   return {
-    title: value.title,
+    title,
     occasion:
       typeof value.occasion === 'string'
         ? value.occasion
@@ -117,21 +258,27 @@ function normalizeProviderCandidate(value: unknown) {
   }
 }
 
-function normalizeLegacySingleOutfit(value: Record<string, unknown>) {
+function normalizeLegacySingleOutfit(
+  value: Record<string, unknown>,
+  context?: StylistProviderNormalizationContext,
+) {
   if (value.status !== 'success' || !isRecord(value.outfit)) return value
 
   return {
     status: 'success',
-    candidates: [normalizeProviderCandidate(value.outfit)],
+    candidates: [normalizeProviderCandidate(value.outfit, context)],
   }
 }
 
-export function normalizeStylistProviderOutput(value: unknown) {
+export function normalizeStylistProviderOutput(
+  value: unknown,
+  context?: StylistProviderNormalizationContext,
+) {
   const parsed = parseProviderJson(value)
   if (!isRecord(parsed)) return parsed
 
   if (parsed.status === 'success' && isRecord(parsed.outfit)) {
-    return normalizeLegacySingleOutfit(parsed)
+    return normalizeLegacySingleOutfit(parsed, context)
   }
 
   if (
@@ -141,14 +288,16 @@ export function normalizeStylistProviderOutput(value: unknown) {
   ) {
     return {
       status: 'success',
-      candidates: [normalizeProviderCandidate(parsed.candidate)],
+      candidates: [normalizeProviderCandidate(parsed.candidate, context)],
     }
   }
 
   if (parsed.status === 'success' && Array.isArray(parsed.candidates)) {
     return {
       ...parsed,
-      candidates: parsed.candidates.map(normalizeProviderCandidate),
+      candidates: parsed.candidates.map((candidate) =>
+        normalizeProviderCandidate(candidate, context),
+      ),
     }
   }
 
@@ -170,6 +319,69 @@ export function normalizeStylistProviderOutput(value: unknown) {
   }
 
   return parsed
+}
+
+export function getProviderCandidateNormalizationDiagnostics(
+  value: unknown,
+  context?: StylistProviderNormalizationContext,
+): StylistProviderCandidateNormalizationDiagnostic[] {
+  const parsed = parseProviderJson(value)
+  if (!isRecord(parsed) || parsed.status !== 'success') return []
+
+  const candidates = Array.isArray(parsed.candidates)
+    ? parsed.candidates
+    : isRecord(parsed.candidate)
+      ? [parsed.candidate]
+      : isRecord(parsed.outfit)
+        ? [parsed.outfit]
+        : []
+
+  const normalized = normalizeStylistProviderOutput(value, context)
+  const normalizedCandidates =
+    isRecord(normalized) &&
+    normalized.status === 'success' &&
+    Array.isArray(normalized.candidates)
+      ? normalized.candidates
+      : []
+
+  return candidates.map((candidate, candidateIndex) => {
+    const candidateRecord = isRecord(candidate) ? candidate : {}
+    const normalizedCandidate = normalizedCandidates[candidateIndex]
+    const titleSource = getFirstExistingValue(candidateRecord, [
+      'title',
+      'name',
+      'outfitTitle',
+      'outfit_name',
+      'heading',
+    ])
+    const explanationSource = getFirstExistingValue(candidateRecord, [
+      'overallExplanation',
+      'description',
+      'explanation',
+      'reasoning',
+      'rationale',
+      'summary',
+      'outfitExplanation',
+      'overall_explanation',
+    ])
+
+    return {
+      candidateIndex,
+      candidateKeys: Object.keys(candidateRecord).sort(),
+      titleOriginalType: getValueType(titleSource),
+      titleNormalizedLength:
+        isRecord(normalizedCandidate) &&
+        typeof normalizedCandidate.title === 'string'
+          ? normalizedCandidate.title.length
+          : 0,
+      explanationOriginalType: getValueType(explanationSource),
+      explanationNormalizedLength:
+        isRecord(normalizedCandidate) &&
+        typeof normalizedCandidate.overallExplanation === 'string'
+          ? normalizedCandidate.overallExplanation.length
+          : 0,
+    }
+  })
 }
 
 export function getProviderTopLevelKeys(value: unknown) {

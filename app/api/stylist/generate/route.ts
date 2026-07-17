@@ -34,6 +34,7 @@ import {
   type StylistGenerateFailureDetails,
 } from '@/lib/stylist/generate-diagnostics'
 import {
+  getProviderCandidateNormalizationDiagnostics,
   getProviderCandidateCount,
   getProviderTopLevelKeys,
   getSanitizedProviderPreview,
@@ -332,9 +333,24 @@ async function generateAndValidateStylistBatch(input: {
   const envelope = isStylistProviderEnvelope(providerOutput)
     ? providerOutput
     : undefined
+  const normalizationContext = {
+    locale: input.request.locale,
+    request: {
+      message: input.request.message,
+      quickRequest: input.request.quickRequest,
+    },
+    wardrobeItems: input.rankedWardrobe,
+  }
   const output = normalizeStylistProviderOutput(
     envelope?.output ?? providerOutput,
+    normalizationContext,
   )
+  console.info('[stylist-generate] provider output normalization', {
+    candidateDiagnostics: getProviderCandidateNormalizationDiagnostics(
+      envelope?.output ?? providerOutput,
+      normalizationContext,
+    ),
+  })
   const providerMetadata = envelope?.metadata
 
   try {

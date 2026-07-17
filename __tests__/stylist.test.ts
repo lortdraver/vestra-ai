@@ -17,6 +17,7 @@ import {
   getStylistRequestType,
 } from '@/lib/stylist/generate-diagnostics'
 import {
+  getProviderCandidateNormalizationDiagnostics,
   normalizeStylistProviderOutput,
   parseProviderJson,
 } from '@/lib/stylist/provider-output'
@@ -835,6 +836,15 @@ describe('outfit validation', () => {
 })
 
 describe('batch outfit validation', () => {
+  const providerContext = {
+    locale: 'ru' as const,
+    request: {
+      message: 'restaurant outfit',
+      quickRequest: 'restaurant' as const,
+    },
+    wardrobeItems: wardrobe,
+  }
+
   it('normalizes a production provider batch success shape', () => {
     const normalized = normalizeStylistProviderOutput({
       status: 'success',
@@ -859,6 +869,224 @@ describe('batch outfit validation', () => {
     const result = validateStylistBatchResult(normalized, wardrobe)
 
     expect(result.status).toBe('success')
+  })
+
+  it('normalizes localized object titles using the requested locale', () => {
+    const normalized = normalizeStylistProviderOutput(
+      {
+        status: 'success',
+        candidates: [
+          {
+            title: {
+              az: 'Tövsiyə',
+              en: 'Recommended look',
+              ru: 'Образ для ресторана',
+            },
+            description: 'Подходит для ресторана и использует ваши вещи.',
+            confidence: 0.82,
+            items: [
+              { wardrobeItemId: wardrobe[0].id, role: 'tops' },
+              { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+              { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
+            ],
+          },
+        ],
+      },
+      providerContext,
+    )
+
+    const result = validateStylistBatchResult(normalized, wardrobe)
+    if (result.status !== 'success') throw new Error('expected success')
+
+    expect(result.candidates[0].title).toBe('Образ для ресторана')
+  })
+
+  it('falls back when the provider title is missing', () => {
+    const normalized = normalizeStylistProviderOutput(
+      {
+        status: 'success',
+        candidates: [
+          {
+            description: 'A practical complete outfit using owned clothes.',
+            confidence: 0.74,
+            items: [
+              { wardrobeItemId: wardrobe[0].id, role: 'tops' },
+              { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+              { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
+            ],
+          },
+        ],
+      },
+      { ...providerContext, locale: 'en' },
+    )
+
+    const result = validateStylistBatchResult(normalized, wardrobe)
+    if (result.status !== 'success') throw new Error('expected success')
+
+    expect(result.candidates[0].title).toBe('Recommended outfit')
+  })
+
+  it('falls back when the provider title is null', () => {
+    const normalized = normalizeStylistProviderOutput(
+      {
+        status: 'success',
+        candidates: [
+          {
+            title: null,
+            description: 'Qarderobdan uyğun tam kombin seçildi.',
+            confidence: 0.74,
+            items: [
+              { wardrobeItemId: wardrobe[0].id, role: 'tops' },
+              { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+              { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
+            ],
+          },
+        ],
+      },
+      { ...providerContext, locale: 'az' },
+    )
+
+    const result = validateStylistBatchResult(normalized, wardrobe)
+    if (result.status !== 'success') throw new Error('expected success')
+
+    expect(result.candidates[0].title).toBe('Tövsiyə olunan obraz')
+  })
+
+  it('normalizes title aliases such as name and outfitTitle', () => {
+    const byName = normalizeStylistProviderOutput({
+      status: 'success',
+      candidates: [
+        {
+          name: 'Named outfit',
+          description: 'A complete outfit from a name alias.',
+          confidence: 0.74,
+          items: [
+            { wardrobeItemId: wardrobe[0].id, role: 'tops' },
+            { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+            { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
+          ],
+        },
+      ],
+    })
+    const byOutfitTitle = normalizeStylistProviderOutput({
+      status: 'success',
+      candidates: [
+        {
+          outfitTitle: 'Outfit title alias',
+          description: 'A complete outfit from an outfitTitle alias.',
+          confidence: 0.74,
+          items: [
+            { wardrobeItemId: wardrobe[0].id, role: 'tops' },
+            { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+            { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
+          ],
+        },
+      ],
+    })
+
+    const first = validateStylistBatchResult(byName, wardrobe)
+    const second = validateStylistBatchResult(byOutfitTitle, wardrobe)
+    if (first.status !== 'success' || second.status !== 'success') {
+      throw new Error('expected success')
+    }
+
+    expect(first.candidates[0].title).toBe('Named outfit')
+    expect(second.candidates[0].title).toBe('Outfit title alias')
+  })
+
+  it('normalizes explanations from description and localized objects', () => {
+    const normalized = normalizeStylistProviderOutput(
+      {
+        status: 'success',
+        candidates: [
+          {
+            title: 'Localized explanation',
+            explanation: {
+              en: 'Uses your wardrobe in a balanced way.',
+              ru: 'Использует вещи из гардероба сбалансированно.',
+            },
+            confidence: 0.76,
+            items: [
+              { wardrobeItemId: wardrobe[0].id, role: 'tops' },
+              { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+              { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
+            ],
+          },
+        ],
+      },
+      providerContext,
+    )
+
+    const result = validateStylistBatchResult(normalized, wardrobe)
+    if (result.status !== 'success') throw new Error('expected success')
+
+    expect(result.candidates[0].overallExplanation).toBe(
+      'Использует вещи из гардероба сбалансированно.',
+    )
+  })
+
+  it('replaces too-short explanations with a localized wardrobe-aware fallback', () => {
+    const normalized = normalizeStylistProviderOutput(
+      {
+        status: 'success',
+        candidates: [
+          {
+            title: 'Short explanation',
+            description: '',
+            confidence: 0.76,
+            items: [
+              { wardrobeItemId: wardrobe[0].id, role: 'tops' },
+              { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+              { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
+            ],
+          },
+        ],
+      },
+      { ...providerContext, locale: 'en' },
+    )
+
+    const result = validateStylistBatchResult(normalized, wardrobe)
+    if (result.status !== 'success') throw new Error('expected success')
+
+    expect(result.candidates[0].overallExplanation).toContain('White shirt')
+    expect(result.candidates[0].overallExplanation).toContain('complete')
+  })
+
+  it('reports safe normalization diagnostics before validation', () => {
+    const diagnostics = getProviderCandidateNormalizationDiagnostics(
+      {
+        status: 'success',
+        candidates: [
+          {
+            title: { en: 'Diagnostic outfit' },
+            description: ['A diagnostic complete outfit.'],
+            confidence: 0.76,
+            items: [
+              { wardrobeItemId: wardrobe[0].id, role: 'tops' },
+              { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+              { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
+            ],
+          },
+        ],
+      },
+      { ...providerContext, locale: 'en' },
+    )
+
+    expect(diagnostics).toEqual([
+      expect.objectContaining({
+        candidateIndex: 0,
+        titleOriginalType: 'object',
+        titleNormalizedLength: 'Diagnostic outfit'.length,
+        explanationOriginalType: 'array',
+        explanationNormalizedLength: 'A diagnostic complete outfit.'.length,
+      }),
+    ])
+    expect(diagnostics[0].candidateKeys).toEqual([
+      'confidence',
+      'description',
+      'items',
+      'title',
+    ])
   })
 
   it('wraps a single unambiguous candidate object', () => {
@@ -985,6 +1213,28 @@ describe('batch outfit validation', () => {
             },
           ],
         }),
+        wardrobe,
+      ),
+    ).toThrow('invalid_stylist_batch_result')
+  })
+
+  it('still rejects fully malformed candidates after normalization', () => {
+    expect(() =>
+      validateStylistBatchResult(
+        normalizeStylistProviderOutput(
+          {
+            status: 'success',
+            candidates: [
+              {
+                title: null,
+                explanation: null,
+                confidence: 0.5,
+                items: [{ role: 'tops' }],
+              },
+            ],
+          },
+          providerContext,
+        ),
         wardrobe,
       ),
     ).toThrow('invalid_stylist_batch_result')
