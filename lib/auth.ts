@@ -1,7 +1,10 @@
 import { betterAuth } from 'better-auth'
 import { networkInterfaces } from 'node:os'
 import { buildAccountEmailTemplate } from '@/lib/account/email-templates'
-import { getAccountEmailProvider } from '@/lib/account/email-provider'
+import {
+  getAccountEmailProvider,
+  getAccountEmailProviderDiagnostics,
+} from '@/lib/account/email-provider'
 import { pool } from '@/lib/db'
 import { getAppUrl, getBetterAuthSecret } from '@/lib/env'
 import { sanitizeBetterAuthVerificationUrl } from '@/lib/email-verification-links'
@@ -139,7 +142,16 @@ export const auth = betterAuth({
         locale,
         actionUrl: safeUrl,
       })
-      await getAccountEmailProvider().send({
+      const providerDiagnostics = getAccountEmailProviderDiagnostics()
+      console.info('[email-verification] EMAIL_PROVIDER_SELECTED', {
+        provider: providerDiagnostics.provider,
+        fromConfigured: providerDiagnostics.fromConfigured,
+        replyToConfigured: providerDiagnostics.replyToConfigured,
+        resendApiKeyConfigured: providerDiagnostics.resendApiKeyConfigured,
+        senderDomain: providerDiagnostics.senderDomain,
+      })
+      const provider = getAccountEmailProvider()
+      await provider.send({
         to: user.email,
         kind: 'email_verification',
         locale,

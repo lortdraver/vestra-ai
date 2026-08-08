@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildAccountEmailTemplate } from '@/lib/account/email-templates'
 import {
+  AccountEmailProviderError,
   ManualAccountEmailProvider,
   ResendAccountEmailProvider,
 } from '@/lib/account/email-provider'
@@ -90,6 +91,15 @@ describe('email verification copy', () => {
 })
 
 describe('email delivery provider behavior', () => {
+  const resendInput = {
+    to: 'user@example.com',
+    kind: 'email_verification' as const,
+    locale: 'en',
+    subject: 'Verify',
+    text: 'Verify',
+    html: '<p>Verify</p>',
+  }
+
   it('manual provider does not log full token-bearing URLs', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
     await new ManualAccountEmailProvider().send({
@@ -118,14 +128,7 @@ describe('email delivery provider behavior', () => {
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response('{}', { status: 200 }))
 
-    await new ResendAccountEmailProvider().send({
-      to: 'user@example.com',
-      kind: 'email_verification',
-      locale: 'en',
-      subject: 'Verify',
-      text: 'Verify',
-      html: '<p>Verify</p>',
-    })
+    await new ResendAccountEmailProvider().send(resendInput)
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.resend.com/emails',
@@ -137,6 +140,94 @@ describe('email delivery provider behavior', () => {
         }),
       }),
     )
+  })
+
+  it('maps missing RESEND_API_KEY to not configured', async () => {
+    process.env.EMAIL_FROM = 'Vestra <noreply@vestra.test>'
+    await expect(
+      new ResendAccountEmailProvider().send(resendInput),
+    ).rejects.toMatchObject({
+      code: 'email_provider_not_configured',
+    })
+  })
+
+  it.each([
+    [401, 'invalid_api_key', 'Invalid API key', 'email_provider_unauthorized'],
+    [
+      403,
+      'validation_error',
+      'The sender domain is not verified.',
+      'email_sender_not_verified',
+    ],
+    [
+      422,
+      'validation_error',
+      'Invalid from address.',
+      'email_provider_rejected',
+    ],
+    [
+      429,
+      'rate_limit_exceeded',
+      'Too many requests.',
+      'email_provider_rate_limited',
+    ],
+  ] as const)(
+    'maps Resend %s %s to %s',
+    async (status, providerCode, message, expectedCode) => {
+      process.env.RESEND_API_KEY = 'resend-secret'
+      process.env.EMAIL_FROM = 'Vestra <noreply@vestra.test>'
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        Response.json(
+          {
+            name: providerCode,
+            message,
+          },
+          { status },
+        ),
+      )
+
+      await expect(
+        new ResendAccountEmailProvider().send(resendInput),
+      ).rejects.toMatchObject({
+        code: expectedCode,
+        diagnostics: expect.objectContaining({
+          httpStatus: status,
+          providerErrorCode: providerCode,
+          senderDomain: 'vestra.test',
+        }),
+      })
+    },
+  )
+
+  it('maps provider timeout to email_provider_timeout', async () => {
+    process.env.RESEND_API_KEY = 'resend-secret'
+    process.env.EMAIL_FROM = 'Vestra <noreply@vestra.test>'
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+      new DOMException('Aborted', 'AbortError'),
+    )
+
+    await expect(
+      new ResendAccountEmailProvider().send(resendInput),
+    ).rejects.toMatchObject({
+      code: 'email_provider_timeout',
+      diagnostics: expect.objectContaining({
+        providerErrorCode: 'timeout',
+      }),
+    })
+  })
+
+  it('exposes typed delivery failures for network errors', async () => {
+    process.env.RESEND_API_KEY = 'resend-secret'
+    process.env.EMAIL_FROM = 'Vestra <noreply@vestra.test>'
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network down'))
+
+    try {
+      await new ResendAccountEmailProvider().send(resendInput)
+      throw new Error('expected send to fail')
+    } catch (error) {
+      expect(error).toBeInstanceOf(AccountEmailProviderError)
+      expect(error).toMatchObject({ code: 'email_delivery_failed' })
+    }
   })
 })
 
