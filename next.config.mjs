@@ -3,6 +3,7 @@ const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   reactStrictMode: true,
+  serverExternalPackages: ['sharp'],
   images: {
     remotePatterns: [],
   },

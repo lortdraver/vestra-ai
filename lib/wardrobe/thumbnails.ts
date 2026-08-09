@@ -1,5 +1,6 @@
-import sharp from 'sharp'
 import type { StoredObject } from '@/lib/storage/types'
+
+type SharpModule = typeof import('sharp')
 
 export const WARDROBE_THUMBNAIL_MAX_DIMENSION = 480
 export const WARDROBE_THUMBNAIL_QUALITY = 82
@@ -75,6 +76,7 @@ export function selectThumbnailSource(input: {
 export async function generateWardrobeThumbnail(
   file: File,
 ): Promise<WardrobeThumbnail> {
+  const sharp = await loadSharpRuntime()
   const input = new Uint8Array(await file.arrayBuffer())
   const output = await sharp(input)
     .rotate()
@@ -111,6 +113,37 @@ export async function generateWardrobeThumbnail(
     contentType: WARDROBE_THUMBNAIL_CONTENT_TYPE,
     size: output.byteLength,
   }
+}
+
+async function loadSharpRuntime() {
+  try {
+    const sharpModule: SharpModule = await import('sharp')
+    console.info('[thumbnail] THUMBNAIL_RUNTIME_LOADED', {
+      runtime: 'sharp',
+      platform: process.platform,
+      arch: process.arch,
+    })
+    return sharpModule.default
+  } catch (error) {
+    console.warn('[thumbnail] THUMBNAIL_RUNTIME_UNAVAILABLE', {
+      runtime: 'sharp',
+      platform: process.platform,
+      arch: process.arch,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage:
+        error instanceof Error
+          ? sanitizeThumbnailRuntimeError(error.message)
+          : String(error),
+    })
+    throw new Error('thumbnail_runtime_unavailable')
+  }
+}
+
+function sanitizeThumbnailRuntimeError(message: string) {
+  return message
+    .replace(/[A-Z]:\\[^:\n]+/g, '<path>')
+    .replace(/\/[^\s:]+/g, '<path>')
+    .slice(0, 240)
 }
 
 export function serializeThumbnailObject(

@@ -1,5 +1,6 @@
-import sharp from 'sharp'
 import type { Sharp } from 'sharp'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   generateWardrobeThumbnail,
@@ -11,12 +12,26 @@ import {
   WARDROBE_THUMBNAIL_QUALITY,
 } from '@/lib/wardrobe/thumbnails'
 
+const thumbnailsSource = readFileSync(
+  join(process.cwd(), 'lib/wardrobe/thumbnails.ts'),
+  'utf8',
+)
+const serializeSource = readFileSync(
+  join(process.cwd(), 'lib/wardrobe/serialize.ts'),
+  'utf8',
+)
+const wardrobeRouteSource = readFileSync(
+  join(process.cwd(), 'app/api/wardrobe/items/route.ts'),
+  'utf8',
+)
+
 async function fileFromSharp(image: Sharp, name: string, type: string) {
   return new File([await image.toBuffer()], name, { type })
 }
 
 describe('wardrobe thumbnails', () => {
   it('creates a bounded JPEG thumbnail without touching the source file', async () => {
+    const { default: sharp } = await import('sharp')
     const file = await fileFromSharp(
       sharp({
         create: {
@@ -44,6 +59,7 @@ describe('wardrobe thumbnails', () => {
   })
 
   it('preserves alpha for transparent PNG input', async () => {
+    const { default: sharp } = await import('sharp')
     const file = await fileFromSharp(
       sharp({
         create: {
@@ -139,5 +155,22 @@ describe('wardrobe thumbnails', () => {
   it('documents the configured thumbnail quality', () => {
     expect(WARDROBE_THUMBNAIL_QUALITY).toBeGreaterThanOrEqual(75)
     expect(WARDROBE_THUMBNAIL_QUALITY).toBeLessThanOrEqual(85)
+  })
+
+  it('does not statically import sharp from read-only wardrobe modules', () => {
+    expect(thumbnailsSource).not.toContain("import sharp from 'sharp'")
+    expect(thumbnailsSource).toContain("await import('sharp')")
+    expect(serializeSource).not.toContain("from 'sharp'")
+    expect(wardrobeRouteSource).not.toContain("from 'sharp'")
+  })
+
+  it('keeps serialization helpers usable when sharp is not loaded', () => {
+    expect(
+      selectThumbnailUrl({
+        thumbnailImageUrl: null,
+        processedImageUrl: '/api/wardrobe/images/processed.webp',
+        imageUrl: '/api/wardrobe/images/original.webp',
+      }),
+    ).toBe('/api/wardrobe/images/processed.webp')
   })
 })

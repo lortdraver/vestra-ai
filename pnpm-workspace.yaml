@@ -1,5 +1,16 @@
 packages: []
 
+supportedArchitectures:
+  os:
+    - current
+    - linux
+  cpu:
+    - current
+    - x64
+  libc:
+    - current
+    - glibc
+
 overrides:
   hono: 4.12.25
 
