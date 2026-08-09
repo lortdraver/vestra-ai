@@ -116,7 +116,7 @@ export class ResendAccountEmailProvider implements AccountEmailProvider {
     const timeout = setTimeout(() => controller.abort(), timeoutMs)
     const startedAt = performance.now()
 
-    console.info('[email-verification] EMAIL_PROVIDER_REQUEST_STARTED', {
+    console.info('[account-email] EMAIL_PROVIDER_REQUEST_STARTED', {
       provider,
       senderDomain: getSenderDomain(from),
       timeoutMs,
@@ -146,7 +146,7 @@ export class ResendAccountEmailProvider implements AccountEmailProvider {
         const body = await readResendErrorBody(response)
         const code = mapResendError(status, body)
 
-        console.warn('[email-verification] EMAIL_PROVIDER_REQUEST_FAILED', {
+        console.warn('[account-email] EMAIL_PROVIDER_REQUEST_FAILED', {
           provider,
           httpStatus: status,
           providerErrorCode: body.providerErrorCode,
@@ -164,7 +164,7 @@ export class ResendAccountEmailProvider implements AccountEmailProvider {
         })
       }
 
-      console.info('[email-verification] EMAIL_PROVIDER_REQUEST_COMPLETED', {
+      console.info('[account-email] EMAIL_PROVIDER_REQUEST_COMPLETED', {
         provider,
         httpStatus: response.status,
         senderDomain: getSenderDomain(from),
@@ -173,7 +173,7 @@ export class ResendAccountEmailProvider implements AccountEmailProvider {
     } catch (error) {
       const durationMs = Math.round(performance.now() - startedAt)
       if (error instanceof DOMException && error.name === 'AbortError') {
-        console.warn('[email-verification] EMAIL_PROVIDER_REQUEST_FAILED', {
+        console.warn('[account-email] EMAIL_PROVIDER_REQUEST_FAILED', {
           provider,
           httpStatus: null,
           providerErrorCode: 'timeout',
@@ -193,7 +193,7 @@ export class ResendAccountEmailProvider implements AccountEmailProvider {
         throw error
       }
 
-      console.warn('[email-verification] EMAIL_PROVIDER_REQUEST_FAILED', {
+      console.warn('[account-email] EMAIL_PROVIDER_REQUEST_FAILED', {
         provider,
         httpStatus: null,
         providerErrorCode: 'network_error',

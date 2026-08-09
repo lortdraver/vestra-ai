@@ -13,6 +13,10 @@ import {
   normalizeLocale,
   type Locale,
 } from '@/lib/i18n/config'
+import {
+  buildPasswordResetUrl,
+  passwordResetConfig,
+} from '@/lib/password-reset'
 
 const appUrl = getAppUrl()
 
@@ -74,7 +78,10 @@ function getProductionAppOrigins() {
     (origin): origin is string => {
       if (!origin) return false
       try {
-        return new URL(origin).protocol === 'https:'
+        const url = new URL(origin)
+        return (
+          url.protocol === 'https:' && url.origin === 'https://vestraapp.uk'
+        )
       } catch {
         return false
       }
@@ -128,6 +135,38 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,
+    resetPasswordTokenExpiresIn: passwordResetConfig.tokenExpiresInSeconds,
+    revokeSessionsOnPasswordReset: true,
+    sendResetPassword: async ({ user, token }, request) => {
+      const resetUrl = buildPasswordResetUrl(token)
+      const locale = getRequestLocale(request)
+      const template = buildAccountEmailTemplate({
+        kind: 'password_reset',
+        locale,
+        actionUrl: resetUrl,
+      })
+      const providerDiagnostics = getAccountEmailProviderDiagnostics()
+      console.info('[password-reset] EMAIL_PROVIDER_SELECTED', {
+        provider: providerDiagnostics.provider,
+        fromConfigured: providerDiagnostics.fromConfigured,
+        replyToConfigured: providerDiagnostics.replyToConfigured,
+        resendApiKeyConfigured: providerDiagnostics.resendApiKeyConfigured,
+        senderDomain: providerDiagnostics.senderDomain,
+      })
+      const provider = getAccountEmailProvider()
+      await provider.send({
+        to: user.email,
+        kind: 'password_reset',
+        locale,
+        actionUrl: resetUrl,
+        ...template,
+      })
+    },
+    onPasswordReset: async ({ user }) => {
+      console.info('[password-reset] PASSWORD_RESET_COMPLETED', {
+        userId: user.id,
+      })
+    },
   },
   emailVerification: {
     sendOnSignUp: true,

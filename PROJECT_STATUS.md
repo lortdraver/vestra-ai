@@ -83,6 +83,10 @@
 - Implemented production-ready Better Auth email verification with localized
   verification emails, resend throttling, a dashboard warning banner, result
   states, and server-side verified-email guards for sensitive writes.
+- Implemented production-ready Better Auth password reset with localized Resend
+  emails, neutral forgot-password responses, request rate limiting, canonical
+  reset links, token/password validation UI, session revocation after reset, and
+  structured diagnostics.
 - Added audit log and security event schema.
 - Added development-safe request rate limiting for auth, AI, upload, and admin traffic.
 - Added admin dashboard for users, subscriptions, system status, logs, and future store architecture.
@@ -188,6 +192,9 @@
 - Better Auth native email verification is enabled for new email/password
   accounts, while unverified sessions can still reach the dashboard and resend
   prompt.
+- Better Auth native password reset is enabled through
+  `requestPasswordReset` and `resetPassword`; tokens are stored in the Better
+  Auth `verification` table and consumed on successful reset.
 - Dashboard routes are protected through the dashboard layout.
 - API routes check the authenticated session before accessing user-owned data.
 - Sensitive write routes also require `user.emailVerified=true` and return

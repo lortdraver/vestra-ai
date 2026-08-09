@@ -88,6 +88,11 @@ Keep all email provider secrets server-only. Verification links are generated
 from `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL`; Vestra does not trust request
 host headers when rebuilding token links.
 
+Password reset uses the same Better Auth + Resend provider configuration.
+Production reset links are always built on the canonical origin
+`https://vestraapp.uk`; set both `BETTER_AUTH_URL` and `NEXT_PUBLIC_APP_URL` to
+that URL in Vercel.
+
 Before enabling verification in production, apply the safe legacy-user policy:
 
 ```bash
@@ -250,6 +255,9 @@ Before public deployment, manually configure and verify:
 - `NEXT_PUBLIC_APP_URL` is the canonical production URL.
 - `EMAIL_PROVIDER=resend` with `EMAIL_FROM`, optional `EMAIL_REPLY_TO`,
   `RESEND_API_KEY`, request timeout, verification expiry, and resend cooldown.
+- Password reset uses the same email variables. For production, reset links
+  require `BETTER_AUTH_URL=https://vestraapp.uk` and
+  `NEXT_PUBLIC_APP_URL=https://vestraapp.uk`.
 - `AI_PROVIDER=openai-compatible` with valid `AI_API_KEY`, `AI_API_BASE_URL`,
   `AI_MODEL_ID`, and OpenRouter referer/title settings when applicable.
 - `STYLIST_AI_PROVIDER=api` or `STYLIST_AI_PROVIDER=openai-compatible`. The

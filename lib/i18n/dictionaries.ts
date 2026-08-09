@@ -41,13 +41,29 @@ export const dictionaries = {
       forgotPassword: 'Şifrəni unutmusunuz?',
       forgotPasswordTitle: 'Şifrəni bərpa et',
       forgotPasswordIntro:
-        'E-poçtunuzu daxil edin. E-poçt provayderi qoşulduqda bərpa linki göndəriləcək.',
+        'E-poçtunuzu daxil edin. Hesab mövcuddursa, təhlükəsiz bərpa linki göndəriləcək.',
       resetPasswordTitle: 'Yeni şifrə təyin et',
-      resetPasswordIntro:
-        'Bərpa tokeni yoxlanıldıqdan sonra yeni şifrə tətbiq olunacaq.',
-      sendResetLink: 'Bərpa linki hazırla',
+      resetPasswordIntro: 'Vestra hesabınız üçün yeni şifrə daxil edin.',
+      sendResetLink: 'Bərpa linkini göndər',
       resetPasswordSubmit: 'Şifrəni yenilə',
-      resetQueued: 'Bərpa sorğusu təhlükəsiz növbəyə əlavə edildi.',
+      resetQueued:
+        'Əgər bu e-poçtla hesab mövcuddursa, bərpa linki göndərildi.',
+      passwordResetSuccess:
+        'Şifrəniz yeniləndi. Yeni şifrə ilə daxil ola bilərsiniz.',
+      confirmPassword: 'Şifrəni təsdiqləyin',
+      confirmPasswordPlaceholder: 'Şifrəni yenidən daxil edin',
+      passwordRequirements: 'Şifrə 8-128 simvol uzunluğunda olmalıdır.',
+      passwordResetErrors: {
+        rateLimited: 'Çox bərpa sorğusu edildi. Bir az sonra yenidən yoxlayın.',
+        emailDeliveryFailed:
+          'Bərpa e-poçtunu göndərmək olmadı. Bir az sonra yenidən cəhd edin.',
+        invalidToken: 'Bərpa linki etibarsızdır.',
+        expiredToken: 'Bərpa linkinin vaxtı bitib.',
+        tokenUsed: 'Bu bərpa linki artıq istifadə olunub.',
+        invalidPassword: 'Şifrə 8-128 simvol uzunluğunda olmalıdır.',
+        passwordMismatch: 'Şifrələr uyğun gəlmir.',
+        failed: 'Şifrəni bərpa etmək olmadı.',
+      },
       submitSignUp: 'Hesab yarat',
       submitSignIn: 'Daxil ol',
       alreadyHaveAccount: 'Artıq hesabınız var?',
@@ -698,11 +714,27 @@ export const dictionaries = {
       forgotPasswordIntro:
         'Enter your email. A reset link will be sent once an email provider is connected.',
       resetPasswordTitle: 'Set a new password',
-      resetPasswordIntro:
-        'After the recovery token is verified, the new password will be applied.',
-      sendResetLink: 'Prepare reset link',
+      resetPasswordIntro: 'Enter a new password for your Vestra account.',
+      sendResetLink: 'Send reset link',
       resetPasswordSubmit: 'Update password',
-      resetQueued: 'The recovery request was safely queued.',
+      resetQueued:
+        "If an account exists for this email, we've sent a reset link.",
+      passwordResetSuccess:
+        'Your password has been updated. You can sign in with the new password.',
+      confirmPassword: 'Confirm password',
+      confirmPasswordPlaceholder: 'Enter the password again',
+      passwordRequirements: 'Password must be 8-128 characters long.',
+      passwordResetErrors: {
+        rateLimited: 'Too many reset requests. Try again shortly.',
+        emailDeliveryFailed:
+          'Unable to send the reset email. Try again shortly.',
+        invalidToken: 'This reset link is invalid.',
+        expiredToken: 'This reset link has expired.',
+        tokenUsed: 'This reset link has already been used.',
+        invalidPassword: 'Password must be 8-128 characters long.',
+        passwordMismatch: 'Passwords do not match.',
+        failed: 'Unable to reset the password.',
+      },
       submitSignUp: 'Create account',
       submitSignIn: 'Sign in',
       alreadyHaveAccount: 'Already have an account?',
@@ -1393,11 +1425,28 @@ export const dictionaries = {
       forgotPasswordIntro:
         'Введите эл. почту. Ссылка для сброса будет отправлена после подключения почтового провайдера.',
       resetPasswordTitle: 'Задайте новый пароль',
-      resetPasswordIntro:
-        'После проверки токена восстановления новый пароль будет применен.',
-      sendResetLink: 'Подготовить ссылку',
+      resetPasswordIntro: 'Введите новый пароль для аккаунта Vestra.',
+      sendResetLink: 'Отправить ссылку',
       resetPasswordSubmit: 'Обновить пароль',
-      resetQueued: 'Запрос восстановления безопасно поставлен в очередь.',
+      resetQueued:
+        'Если аккаунт с этой почтой существует, мы отправили ссылку для сброса.',
+      passwordResetSuccess:
+        'Пароль обновлен. Теперь можно войти с новым паролем.',
+      confirmPassword: 'Подтвердите пароль',
+      confirmPasswordPlaceholder: 'Введите пароль еще раз',
+      passwordRequirements: 'Пароль должен содержать от 8 до 128 символов.',
+      passwordResetErrors: {
+        rateLimited:
+          'Слишком много запросов восстановления. Попробуйте немного позже.',
+        emailDeliveryFailed:
+          'Не удалось отправить письмо для сброса. Попробуйте немного позже.',
+        invalidToken: 'Эта ссылка для сброса недействительна.',
+        expiredToken: 'Срок действия ссылки для сброса истек.',
+        tokenUsed: 'Эта ссылка для сброса уже была использована.',
+        invalidPassword: 'Пароль должен содержать от 8 до 128 символов.',
+        passwordMismatch: 'Пароли не совпадают.',
+        failed: 'Не удалось сбросить пароль.',
+      },
       submitSignUp: 'Создать аккаунт',
       submitSignIn: 'Войти',
       alreadyHaveAccount: 'Уже есть аккаунт?',
