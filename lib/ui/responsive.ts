@@ -1,3 +1,6 @@
+export const DASHBOARD_CONTENT_CLASS =
+  'mx-auto w-full max-w-[1680px] flex-1 px-3 pb-24 pt-6 min-[390px]:px-4 md:px-6 md:py-8 xl:px-8'
+
 export const WARDROBE_LAYOUT_CLASS =
   'grid gap-5 lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]'
 
@@ -8,7 +11,7 @@ export const WARDROBE_FILTER_BAR_CLASS =
   'flex flex-col gap-3 rounded-lg border border-border bg-card p-3 sm:p-4 xl:flex-row xl:items-center'
 
 export const WARDROBE_GRID_CLASS =
-  'grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4'
+  'grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 md:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]'
 
 export const WARDROBE_CARD_IMAGE_CLASS =
   'h-[210px] min-[390px]:h-[220px] md:h-[240px] xl:h-[260px]'

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  DASHBOARD_CONTENT_CLASS,
   DESKTOP_NAV_CLASS,
   MOBILE_BOTTOM_NAV_CLASS,
   WARDROBE_CARD_ACTION_CLASS,
@@ -19,14 +20,27 @@ const wardrobeImageRouteSource = readFileSync(
   join(process.cwd(), 'app/api/wardrobe/images/[...key]/route.ts'),
   'utf8',
 )
+const dashboardLayoutSource = readFileSync(
+  join(process.cwd(), 'app/dashboard/layout.tsx'),
+  'utf8',
+)
 
 describe('responsive UI contracts', () => {
+  it('lets desktop dashboard content use the available viewport width', () => {
+    expect(DASHBOARD_CONTENT_CLASS).toContain('w-full')
+    expect(DASHBOARD_CONTENT_CLASS).toContain('max-w-[1680px]')
+    expect(DASHBOARD_CONTENT_CLASS).toContain('xl:px-8')
+    expect(dashboardLayoutSource).toContain('DASHBOARD_CONTENT_CLASS')
+    expect(dashboardLayoutSource).not.toContain('max-w-6xl flex-1')
+  })
+
   it('keeps wardrobe cards compact across mobile, tablet, and desktop', () => {
     expect(WARDROBE_LAYOUT_CLASS).toContain('minmax(300px,340px)')
     expect(WARDROBE_GRID_CLASS).toContain('grid-cols-1')
     expect(WARDROBE_GRID_CLASS).toContain('min-[360px]:grid-cols-2')
-    expect(WARDROBE_GRID_CLASS).toContain('md:grid-cols-3')
-    expect(WARDROBE_GRID_CLASS).toContain('xl:grid-cols-4')
+    expect(WARDROBE_GRID_CLASS).toContain(
+      'md:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]',
+    )
     expect(WARDROBE_CARD_IMAGE_CLASS).toContain('h-[210px]')
     expect(WARDROBE_CARD_IMAGE_CLASS).toContain('xl:h-[260px]')
   })
@@ -49,6 +63,9 @@ describe('responsive UI contracts', () => {
     expect(wardrobeClientSource).toContain('loading="lazy"')
     expect(wardrobeClientSource).toContain('decoding="async"')
     expect(wardrobeClientSource).toContain('object-contain')
+    expect(wardrobeClientSource).toContain('object-center')
+    expect(wardrobeClientSource).toContain('sm:p-6')
+    expect(wardrobeClientSource).not.toContain('object-cover')
   })
 
   it('keeps existing wardrobe item actions wired', () => {

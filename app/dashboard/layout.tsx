@@ -12,6 +12,7 @@ import {
   getFallbackSubscriptionSnapshot,
   getSubscriptionSnapshot,
 } from '@/lib/subscription/server'
+import { DASHBOARD_CONTENT_CLASS } from '@/lib/ui/responsive'
 
 export default async function DashboardLayout({
   children,
@@ -54,9 +55,7 @@ export default async function DashboardLayout({
         dictionary={dictionary}
         subscription={subscription}
       />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-3 pb-24 pt-6 min-[390px]:px-4 md:px-6 md:py-8">
-        {children}
-      </main>
+      <main className={DASHBOARD_CONTENT_CLASS}>{children}</main>
     </div>
   )
 }

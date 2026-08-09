@@ -1219,7 +1219,7 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
                     height={item.thumbnailImageHeight ?? 480}
                     loading="lazy"
                     decoding="async"
-                    className="size-full object-contain p-3 transition duration-500 group-hover:scale-[1.03] sm:p-4"
+                    className="size-full object-contain object-center p-5 transition duration-500 group-hover:scale-[1.02] sm:p-6"
                   />
                 </button>
                 <button
