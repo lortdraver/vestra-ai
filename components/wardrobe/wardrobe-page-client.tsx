@@ -982,7 +982,7 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
                 }))
               }
               placeholder={t.upload.optionalNotesPlaceholder}
-              className="min-h-20 rounded-lg border border-input bg-background px-2.5 py-2 text-sm"
+              className="min-h-20 rounded-lg border border-input bg-background px-2.5 py-2 text-base md:text-sm"
             />
           </div>
 
@@ -1014,7 +1014,7 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
                         category: event.target.value,
                       }))
                     }
-                    className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm"
+                    className="h-10 rounded-lg border border-input bg-background px-2.5 text-base md:h-8 md:text-sm"
                   >
                     {wardrobeCategories.map((category) => (
                       <option key={category} value={category}>
@@ -1217,9 +1217,29 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
                     alt={item.name}
                     width={item.thumbnailImageWidth ?? 480}
                     height={item.thumbnailImageHeight ?? 480}
+                    data-fallback-step="thumb"
                     loading="lazy"
                     decoding="async"
-                    className="size-full object-contain object-center p-5 transition duration-500 group-hover:scale-[1.02] sm:p-6"
+                    onError={(event) => {
+                      const image = event.currentTarget
+                      const fallbackStep = image.dataset.fallbackStep ?? 'thumb'
+                      if (
+                        fallbackStep === 'thumb' &&
+                        image.src !== item.processedImageUrl
+                      ) {
+                        image.dataset.fallbackStep = 'processed'
+                        image.src = item.processedImageUrl
+                        return
+                      }
+                      if (
+                        fallbackStep !== 'original' &&
+                        image.src !== item.originalImageUrl
+                      ) {
+                        image.dataset.fallbackStep = 'original'
+                        image.src = item.originalImageUrl
+                      }
+                    }}
+                    className="size-full object-contain object-center p-3 transition duration-500 group-hover:scale-[1.02] sm:p-4 md:p-5"
                   />
                 </button>
                 <button
@@ -1927,7 +1947,7 @@ function AnalysisPanel({
                       detectedCategory: event.target.value,
                     }))
                   }
-                  className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm"
+                  className="h-10 rounded-lg border border-input bg-background px-2.5 text-base md:h-8 md:text-sm"
                 >
                   {wardrobeCategories.map((category) => (
                     <option key={category} value={category}>
@@ -2035,7 +2055,7 @@ function AnalysisPanel({
                     visualDescription: event.target.value,
                   }))
                 }
-                className="min-h-20 rounded-lg border border-input bg-background px-2.5 py-2 text-sm"
+                className="min-h-20 rounded-lg border border-input bg-background px-2.5 py-2 text-base md:text-sm"
               />
             </div>
             <Button
@@ -2272,7 +2292,7 @@ function InsightsPanel({
             onChange={(event) =>
               onRangeChange(event.target.value as WardrobeInsightsDto['range'])
             }
-            className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm"
+            className="h-10 rounded-lg border border-input bg-background px-2.5 text-base md:h-8 md:text-sm"
           >
             {(['30', '60', '90', 'all'] as const).map((value) => (
               <option key={value} value={value}>
@@ -2287,7 +2307,78 @@ function InsightsPanel({
         <div className="mt-4 h-32 animate-pulse rounded-lg bg-muted" />
       ) : (
         <div className="mt-4 grid gap-4">
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:hidden">
+            <div className="grid grid-cols-3 gap-2">
+              <InsightMetric
+                compact
+                label={t.utilization}
+                value={`${insights.utilizationPercentage}%`}
+              />
+              <InsightMetric
+                compact
+                label={t.usedVsUnused
+                  .replace('{used}', String(insights.uniqueItemsWorn))
+                  .replace(
+                    '{unused}',
+                    String(
+                      insights.totalActiveItems - insights.uniqueItemsWorn,
+                    ),
+                  )}
+                value={`${insights.uniqueItemsWorn}/${insights.totalActiveItems}`}
+              />
+              <InsightMetric
+                compact
+                label={t.totalWears}
+                value={String(insights.totalRecordedWears)}
+              />
+            </div>
+            {insights.mostWornItems[0] && (
+              <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={insights.mostWornItems[0].imageUrl}
+                  alt={insights.mostWornItems[0].name}
+                  loading="lazy"
+                  decoding="async"
+                  className="size-12 rounded-md object-contain"
+                />
+                <div className="min-w-0 text-sm">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {t.mostWorn}
+                  </p>
+                  <p className="truncate font-medium">
+                    {insights.mostWornItems[0].name}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <details className="rounded-lg border border-border p-3 md:hidden">
+            <summary className="cursor-pointer text-sm font-medium">
+              {t.title}
+            </summary>
+            <div className="mt-4 grid gap-4">
+              <InsightList
+                title={t.mostWorn}
+                empty={t.empty}
+                items={insights.mostWornItems}
+              />
+              <InsightList
+                title={t.neverWorn}
+                empty={t.empty}
+                items={insights.neverWornItems}
+              />
+              <InsightsDetails
+                dictionary={dictionary}
+                insights={insights}
+                visibleLongUnused={visibleLongUnused}
+                onDismissItem={onDismissItem}
+              />
+            </div>
+          </details>
+
+          <div className="hidden gap-3 md:grid md:grid-cols-3">
             <InsightMetric
               label={t.utilization}
               value={`${insights.utilizationPercentage}%`}
@@ -2307,7 +2398,7 @@ function InsightsPanel({
             />
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="hidden gap-4 md:grid lg:grid-cols-2">
             <InsightList
               title={t.mostWorn}
               empty={t.empty}
@@ -2320,92 +2411,13 @@ function InsightsPanel({
             />
           </div>
 
-          {visibleLongUnused.length > 0 && (
-            <div className="rounded-lg border border-border bg-muted/30 p-3">
-              <h3 className="font-medium">{t.longUnused}</h3>
-              <div className="mt-3 flex gap-3 overflow-x-auto pb-1">
-                {visibleLongUnused.slice(0, 8).map((item) => (
-                  <div
-                    key={item.id}
-                    className="min-w-44 rounded-lg border border-border bg-background p-2"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={item.imageUrl}
-                      alt={item.name}
-                      className="h-28 w-full object-contain"
-                    />
-                    <p className="mt-2 truncate text-sm font-medium">
-                      {item.name}
-                    </p>
-                    <div className="mt-2 flex gap-1">
-                      <a
-                        href="/dashboard/stylist"
-                        className="rounded-md bg-foreground px-2 py-1 text-xs text-background"
-                      >
-                        {dictionary.wear.actions.createOutfit}
-                      </a>
-                      <button
-                        type="button"
-                        className="rounded-md border border-border px-2 py-1 text-xs"
-                        onClick={() => onDismissItem(item.id)}
-                      >
-                        {dictionary.wear.actions.undo}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-lg border border-border p-3">
-              <h3 className="font-medium">{t.recentActivity}</h3>
-              <div className="mt-3 grid gap-2 text-sm">
-                {insights.recentActivity.length === 0 ? (
-                  <p className="text-muted-foreground">{t.empty}</p>
-                ) : (
-                  insights.recentActivity.map((log) => (
-                    <div
-                      key={log.id}
-                      className="flex items-center justify-between gap-3"
-                    >
-                      <span className="truncate">
-                        {log.items.map((item) => item.name).join(', ')}
-                      </span>
-                      <span className="shrink-0 text-muted-foreground">
-                        {formatLocalDate(log.wornAt)}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-border p-3">
-              <h3 className="font-medium">{t.categoryUsage}</h3>
-              <div className="mt-3 grid gap-2 text-sm">
-                {insights.categoryUsage.map((category) => (
-                  <div key={category.category}>
-                    <div className="flex justify-between gap-3">
-                      <span>
-                        {dictionary.wardrobe.options.categories[
-                          category.category as keyof typeof dictionary.wardrobe.options.categories
-                        ] ?? category.category}
-                      </span>
-                      <span>{category.utilizationPercentage}%</span>
-                    </div>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-foreground"
-                        style={{ width: `${category.utilizationPercentage}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+          <div className="hidden md:block">
+            <InsightsDetails
+              dictionary={dictionary}
+              insights={insights}
+              visibleLongUnused={visibleLongUnused}
+              onDismissItem={onDismissItem}
+            />
           </div>
         </div>
       )}
@@ -2413,11 +2425,134 @@ function InsightsPanel({
   )
 }
 
-function InsightMetric({ label, value }: { label: string; value: string }) {
+function InsightsDetails({
+  dictionary,
+  insights,
+  visibleLongUnused,
+  onDismissItem,
+}: {
+  dictionary: Dictionary
+  insights: WardrobeInsightsDto
+  visibleLongUnused: WardrobeInsightsDto['longUnused']['30']
+  onDismissItem: (itemId: string) => void
+}) {
+  const t = dictionary.wear.insights
+
   return (
-    <div className="rounded-lg border border-border bg-muted/30 p-3">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-2 font-serif text-3xl font-medium">{value}</p>
+    <div className="grid gap-4 lg:grid-cols-2">
+      {visibleLongUnused.length > 0 && (
+        <div className="rounded-lg border border-border bg-muted/30 p-3 lg:col-span-2">
+          <h3 className="font-medium">{t.longUnused}</h3>
+          <div className="mt-3 flex gap-3 overflow-x-auto pb-1">
+            {visibleLongUnused.slice(0, 8).map((item) => (
+              <div
+                key={item.id}
+                className="min-w-40 rounded-lg border border-border bg-background p-2 sm:min-w-44"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={item.imageUrl}
+                  alt={item.name}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-24 w-full object-contain sm:h-28"
+                />
+                <p className="mt-2 truncate text-sm font-medium">{item.name}</p>
+                <div className="mt-2 flex gap-1">
+                  <a
+                    href="/dashboard/stylist"
+                    className="rounded-md bg-foreground px-2 py-1 text-xs text-background"
+                  >
+                    {dictionary.wear.actions.createOutfit}
+                  </a>
+                  <button
+                    type="button"
+                    className="rounded-md border border-border px-2 py-1 text-xs"
+                    onClick={() => onDismissItem(item.id)}
+                  >
+                    {dictionary.wear.actions.undo}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-lg border border-border p-3">
+        <h3 className="font-medium">{t.recentActivity}</h3>
+        <div className="mt-3 grid gap-2 text-sm">
+          {insights.recentActivity.length === 0 ? (
+            <p className="text-muted-foreground">{t.empty}</p>
+          ) : (
+            insights.recentActivity.map((log) => (
+              <div key={log.id} className="flex justify-between gap-3">
+                <span className="min-w-0 truncate">
+                  {log.items.map((item) => item.name).join(', ')}
+                </span>
+                <span className="shrink-0 text-muted-foreground">
+                  {formatLocalDate(log.wornAt)}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-border p-3">
+        <h3 className="font-medium">{t.categoryUsage}</h3>
+        <div className="mt-3 grid gap-2 text-sm">
+          {insights.categoryUsage.map((category) => (
+            <div key={category.category}>
+              <div className="flex justify-between gap-3">
+                <span>
+                  {dictionary.wardrobe.options.categories[
+                    category.category as keyof typeof dictionary.wardrobe.options.categories
+                  ] ?? category.category}
+                </span>
+                <span>{category.utilizationPercentage}%</span>
+              </div>
+              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-foreground"
+                  style={{ width: `${category.utilizationPercentage}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function InsightMetric({
+  label,
+  value,
+  compact = false,
+}: {
+  label: string
+  value: string
+  compact?: boolean
+}) {
+  return (
+    <div className={cn('rounded-lg border border-border bg-muted/30 p-3')}>
+      <p
+        className={cn(
+          'text-muted-foreground',
+          compact ? 'line-clamp-2 text-[0.68rem] leading-tight' : 'text-sm',
+        )}
+      >
+        {label}
+      </p>
+      <p
+        className={cn(
+          'font-serif font-medium',
+          compact ? 'mt-1 text-xl' : 'mt-2 text-3xl',
+        )}
+      >
+        {value}
+      </p>
     </div>
   )
 }

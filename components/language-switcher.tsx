@@ -28,13 +28,13 @@ export function LanguageSwitcher({
   }
 
   return (
-    <div className="flex items-center gap-1" aria-label={label}>
+    <div className="flex items-center gap-0.5 sm:gap-1" aria-label={label}>
       {locales.map((locale) => (
         <button
           key={locale}
           type="button"
           onClick={() => handleChange(locale)}
-          className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+          className="grid min-h-9 min-w-9 place-items-center rounded-md px-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground sm:min-h-8 sm:min-w-8 sm:px-2"
           aria-pressed={locale === currentLocale}
         >
           {languageNames[locale] ?? languageNames[defaultLocale]}

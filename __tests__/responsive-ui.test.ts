@@ -16,6 +16,18 @@ const wardrobeClientSource = readFileSync(
   join(process.cwd(), 'components/wardrobe/wardrobe-page-client.tsx'),
   'utf8',
 )
+const rootLayoutSource = readFileSync(
+  join(process.cwd(), 'app/layout.tsx'),
+  'utf8',
+)
+const globalsSource = readFileSync(
+  join(process.cwd(), 'app/globals.css'),
+  'utf8',
+)
+const appHeaderSource = readFileSync(
+  join(process.cwd(), 'components/app-header.tsx'),
+  'utf8',
+)
 const wardrobeImageRouteSource = readFileSync(
   join(process.cwd(), 'app/api/wardrobe/images/[...key]/route.ts'),
   'utf8',
@@ -26,6 +38,20 @@ const dashboardLayoutSource = readFileSync(
 )
 
 describe('responsive UI contracts', () => {
+  it('exports a Safari-safe mobile viewport', () => {
+    expect(rootLayoutSource).toContain("width: 'device-width'")
+    expect(rootLayoutSource).toContain('initialScale: 1')
+    expect(rootLayoutSource).toContain("viewportFit: 'cover'")
+  })
+
+  it('does not create a fixed desktop canvas at the document root', () => {
+    expect(globalsSource).toContain('min-w-0 max-w-full')
+    expect(globalsSource).toContain('overflow-x-hidden')
+    expect(globalsSource).not.toContain('min-width: 1024px')
+    expect(globalsSource).not.toContain('width: 1440px')
+    expect(globalsSource).not.toContain('transform: scale')
+  })
+
   it('lets desktop dashboard content use the available viewport width', () => {
     expect(DASHBOARD_CONTENT_CLASS).toContain('w-full')
     expect(DASHBOARD_CONTENT_CLASS).toContain('max-w-[1680px]')
@@ -39,18 +65,22 @@ describe('responsive UI contracts', () => {
     expect(WARDROBE_GRID_CLASS).toContain('grid-cols-1')
     expect(WARDROBE_GRID_CLASS).toContain('min-[360px]:grid-cols-2')
     expect(WARDROBE_GRID_CLASS).toContain(
-      'md:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]',
+      'lg:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]',
     )
-    expect(WARDROBE_CARD_IMAGE_CLASS).toContain('h-[210px]')
-    expect(WARDROBE_CARD_IMAGE_CLASS).toContain('xl:h-[260px]')
+    expect(WARDROBE_CARD_IMAGE_CLASS).toContain('h-[170px]')
+    expect(WARDROBE_CARD_IMAGE_CLASS).toContain('xl:h-[250px]')
   })
 
   it('keeps mobile and desktop navigation mutually exclusive', () => {
     expect(DESKTOP_NAV_CLASS).toContain('hidden')
     expect(DESKTOP_NAV_CLASS).toContain('md:flex')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('fixed')
+    expect(MOBILE_BOTTOM_NAV_CLASS).toContain('w-screen')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('grid-cols-5')
+    expect(MOBILE_BOTTOM_NAV_CLASS).toContain('env(safe-area-inset-bottom)')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('md:hidden')
+    expect(appHeaderSource).toContain('h-14')
+    expect(appHeaderSource).toContain('md:h-16')
   })
 
   it('keeps wardrobe card actions touch friendly', () => {
@@ -60,12 +90,27 @@ describe('responsive UI contracts', () => {
 
   it('lazy loads wardrobe card images without stretching them', () => {
     expect(wardrobeClientSource).toContain('src={item.thumbnailImageUrl}')
+    expect(wardrobeClientSource).toContain('data-fallback-step')
+    expect(wardrobeClientSource).toContain('item.processedImageUrl')
+    expect(wardrobeClientSource).toContain('item.originalImageUrl')
     expect(wardrobeClientSource).toContain('loading="lazy"')
     expect(wardrobeClientSource).toContain('decoding="async"')
     expect(wardrobeClientSource).toContain('object-contain')
     expect(wardrobeClientSource).toContain('object-center')
-    expect(wardrobeClientSource).toContain('sm:p-6')
+    expect(wardrobeClientSource).toContain('sm:p-4')
     expect(wardrobeClientSource).not.toContain('object-cover')
+  })
+
+  it('collapses detailed wardrobe analytics on mobile', () => {
+    expect(wardrobeClientSource).toContain('<details')
+    expect(wardrobeClientSource).toContain('md:hidden')
+    expect(wardrobeClientSource).toContain('hidden md:block')
+    expect(wardrobeClientSource).toContain('compact')
+  })
+
+  it('keeps mobile wardrobe form controls at iOS-safe text size', () => {
+    expect(wardrobeClientSource).toContain('text-base md:text-sm')
+    expect(wardrobeClientSource).toContain('h-10')
   })
 
   it('keeps existing wardrobe item actions wired', () => {

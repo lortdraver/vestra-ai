@@ -123,6 +123,10 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
+  body {
+    @apply min-w-0 max-w-full;
+  }
   body {
     @apply overflow-x-hidden bg-background text-foreground;
   }

@@ -132,11 +132,11 @@ export function AppHeader({
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 md:px-6">
-        <div className="flex items-center gap-8">
+      <div className="mx-auto flex h-14 max-w-[1680px] items-center justify-between gap-3 px-3 min-[390px]:px-4 md:h-16 md:px-6 xl:px-8">
+        <div className="flex min-w-0 items-center gap-8">
           <Link
             href="/dashboard"
-            className="font-serif text-lg font-semibold tracking-tight text-foreground"
+            className="truncate font-serif text-lg font-semibold tracking-tight text-foreground"
           >
             {dictionary.common.brand}
           </Link>
@@ -168,7 +168,7 @@ export function AppHeader({
           </nav>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <LanguageSwitcher
             currentLocale={locale}
             label={dictionary.common.language}
@@ -185,7 +185,7 @@ export function AppHeader({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="rounded-full border border-transparent hover:border-border aria-expanded:border-border aria-expanded:bg-muted"
+                    className="size-11 rounded-full border border-transparent hover:border-border aria-expanded:border-border aria-expanded:bg-muted"
                     aria-label={dictionary.common.accountMenu}
                   />
                 }
