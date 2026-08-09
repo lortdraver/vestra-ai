@@ -57,9 +57,10 @@ export async function GET(
   const object = await getObjectStorage().getObject(storageKey)
   return new NextResponse(object.body, {
     headers: {
-      'Cache-Control': 'private, max-age=300',
+      'Cache-Control': 'private, max-age=900, stale-while-revalidate=3600',
       'Content-Length': String(object.size),
       'Content-Type': object.contentType,
+      Vary: 'Cookie',
     },
   })
 }

@@ -4,11 +4,16 @@ import type { ComponentType } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
+  CalendarDays,
   CreditCard,
   HeartHandshake,
+  Home,
+  Images,
   LogOut,
   Shield,
+  Shirt,
   SlidersHorizontal,
+  Sparkles,
   UserCog,
 } from 'lucide-react'
 import { authClient, useSession } from '@/lib/auth-client'
@@ -30,6 +35,7 @@ import {
 } from '@/lib/account-menu'
 import type { Locale } from '@/lib/i18n/config'
 import type { Dictionary } from '@/lib/i18n/dictionaries'
+import { DESKTOP_NAV_CLASS, MOBILE_BOTTOM_NAV_CLASS } from '@/lib/ui/responsive'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -58,6 +64,17 @@ const menuIcons: Record<
   stylistPreferences: SlidersHorizontal,
   privacy: Shield,
   admin: HeartHandshake,
+}
+
+const mobileNavIcons: Record<
+  (typeof navItems)[number]['key'],
+  ComponentType<{ className?: string }>
+> = {
+  home: Home,
+  wardrobe: Shirt,
+  stylist: Sparkles,
+  planner: CalendarDays,
+  outfits: Images,
 }
 
 function getNavLabel(
@@ -125,7 +142,7 @@ export function AppHeader({
           </Link>
           <nav
             aria-label={dictionary.common.mainNavigation}
-            className="hidden items-center gap-1 md:flex"
+            className={DESKTOP_NAV_CLASS}
           >
             {navItems.map((item) => {
               const isActive =
@@ -273,32 +290,39 @@ export function AppHeader({
         </div>
       </div>
 
-      <nav
-        aria-label={dictionary.common.mobileNavigation}
-        className="flex items-center gap-1 overflow-x-auto border-t border-border px-4 py-2 md:hidden"
-      >
-        {navItems.map((item) => {
-          const isActive =
-            item.href === '/dashboard'
-              ? pathname === '/dashboard'
-              : pathname.startsWith(item.href)
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={isActive ? 'page' : undefined}
-              className={cn(
-                'whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-secondary text-foreground'
-                  : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-              )}
-            >
-              {getNavLabel(dictionary, locale, item.key)}
-            </Link>
-          )
-        })}
-      </nav>
+      {activeUser && (
+        <nav
+          aria-label={dictionary.common.mobileNavigation}
+          className={MOBILE_BOTTOM_NAV_CLASS}
+        >
+          {navItems.map((item) => {
+            const isActive =
+              item.href === '/dashboard'
+                ? pathname === '/dashboard'
+                : pathname.startsWith(item.href)
+            const Icon = mobileNavIcons[item.key]
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={isActive ? 'page' : undefined}
+                className={cn(
+                  'grid min-h-12 min-w-0 place-items-center gap-0.5 rounded-lg px-1 py-1 text-[0.68rem] font-medium leading-none transition-colors',
+                  isActive
+                    ? 'bg-secondary text-foreground'
+                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                )}
+              >
+                <Icon className="size-4" aria-hidden="true" />
+                <span className="max-w-full truncate">
+                  {getNavLabel(dictionary, locale, item.key)}
+                </span>
+              </Link>
+            )
+          })}
+        </nav>
+      )}
     </header>
   )
 }

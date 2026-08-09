@@ -39,6 +39,14 @@ import {
 import { isWardrobeDeleteSuccessResponse } from '@/lib/wardrobe/delete'
 import type { WardrobeItemDto } from '@/lib/wardrobe/types'
 import { cn } from '@/lib/utils'
+import {
+  WARDROBE_CARD_ACTION_CLASS,
+  WARDROBE_CARD_IMAGE_CLASS,
+  WARDROBE_FILTER_BAR_CLASS,
+  WARDROBE_GRID_CLASS,
+  WARDROBE_LAYOUT_CLASS,
+  WARDROBE_UPLOAD_PANEL_CLASS,
+} from '@/lib/ui/responsive'
 
 type WardrobeSaveErrorCode =
   | 'unauthorized'
@@ -858,8 +866,8 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
-      <section className="rounded-xl border border-foreground/10 bg-card/95 p-4 shadow-sm lg:sticky lg:top-24 lg:self-start">
+    <div className={WARDROBE_LAYOUT_CLASS}>
+      <section className={WARDROBE_UPLOAD_PANEL_CLASS}>
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
@@ -1113,7 +1121,7 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
           }
         />
 
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 xl:flex-row xl:items-center">
+        <div className={WARDROBE_FILTER_BAR_CLASS}>
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-2 top-2 size-4 text-muted-foreground" />
             <Input
@@ -1126,7 +1134,7 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
           <select
             value={categoryFilter}
             onChange={(event) => setCategoryFilter(event.target.value)}
-            className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm"
+            className="h-10 rounded-lg border border-input bg-background px-2.5 text-base sm:h-8 sm:text-sm"
             aria-label={t.filters.category}
           >
             <option value="">{t.filters.allCategories}</option>
@@ -1139,7 +1147,7 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
           <select
             value={seasonFilter}
             onChange={(event) => setSeasonFilter(event.target.value)}
-            className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm"
+            className="h-10 rounded-lg border border-input bg-background px-2.5 text-base sm:h-8 sm:text-sm"
             aria-label={t.filters.season}
           >
             <option value="">{t.filters.allSeasons}</option>
@@ -1152,7 +1160,7 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
           <select
             value={styleFilter}
             onChange={(event) => setStyleFilter(event.target.value)}
-            className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm"
+            className="h-10 rounded-lg border border-input bg-background px-2.5 text-base sm:h-8 sm:text-sm"
             aria-label={t.filters.style}
           >
             <option value="">{t.filters.allStyles}</option>
@@ -1170,11 +1178,11 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
         )}
 
         {isLoading ? (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className={WARDROBE_GRID_CLASS}>
             {Array.from({ length: 6 }).map((_, index) => (
               <div
                 key={index}
-                className="h-72 animate-pulse rounded-lg bg-muted"
+                className="h-[320px] animate-pulse rounded-lg bg-muted md:h-[360px]"
                 aria-label={t.states.loading}
               />
             ))}
@@ -1188,22 +1196,28 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
             </p>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className={WARDROBE_GRID_CLASS}>
             {items.map((item) => (
               <Card
                 key={item.id}
-                className="group relative rounded-xl border-foreground/10 bg-card/95 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+                className="group relative gap-0 rounded-xl border-foreground/10 bg-card/95 py-0 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-lg"
               >
                 <button
                   type="button"
                   onClick={() => selectItem(item)}
-                  className="aspect-[4/5] overflow-hidden bg-[linear-gradient(135deg,_var(--muted),_var(--background))] text-left"
+                  className={cn(
+                    WARDROBE_CARD_ACTION_CLASS,
+                    WARDROBE_CARD_IMAGE_CLASS,
+                    'w-full overflow-hidden rounded-t-xl bg-[linear-gradient(135deg,_var(--muted),_var(--background))] text-left',
+                  )}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={item.processedImageUrl}
                     alt={item.name}
-                    className="size-full object-contain p-4 transition duration-500 group-hover:scale-105"
+                    loading="lazy"
+                    decoding="async"
+                    className="size-full object-contain p-3 transition duration-500 group-hover:scale-[1.03] sm:p-4"
                   />
                 </button>
                 <button
@@ -1226,7 +1240,7 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
                       return next
                     })
                   }
-                  className="absolute right-3 top-3 grid size-9 place-items-center rounded-full border border-foreground/10 bg-background/85 text-foreground shadow-sm backdrop-blur transition hover:scale-105"
+                  className="absolute right-2.5 top-2.5 grid size-11 place-items-center rounded-full border border-foreground/10 bg-background/90 text-foreground shadow-sm backdrop-blur transition hover:scale-105 sm:size-10"
                 >
                   <Heart
                     className={cn(
@@ -1236,15 +1250,17 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
                     )}
                   />
                 </button>
-                <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+                <div className="absolute left-2.5 top-2.5 flex max-w-[calc(100%-4rem)] flex-wrap gap-1.5">
                   <span className="rounded-full bg-background/85 px-2 py-1 text-xs font-medium shadow-sm backdrop-blur">
                     {t.card.status[getDisplayStatus(item)]}
                   </span>
                 </div>
-                <CardContent className="grid gap-3">
-                  <div>
-                    <h2 className="font-medium">{item.name}</h2>
-                    <p className="text-sm text-muted-foreground">
+                <CardContent className="grid gap-2 p-3 sm:p-3.5">
+                  <div className="min-w-0">
+                    <h2 className="truncate font-medium leading-snug">
+                      {item.name}
+                    </h2>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
                       {getOptionLabel(
                         t.options.categories,
                         item.effectiveAnalysis?.detectedCategory ??
@@ -1255,48 +1271,58 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
                         item.clothingType}
                     </p>
                   </div>
-                  {item.effectiveAnalysis?.confidenceScore !== undefined && (
-                    <ConfidenceMeter
-                      label={t.card.confidence}
-                      value={item.effectiveAnalysis.confidenceScore}
-                    />
-                  )}
                   <TagList
                     values={[
-                      ...(item.effectiveAnalysis?.dominantHexColors ?? []),
                       ...(item.effectiveAnalysis?.colors ?? item.colors),
                       ...(item.effectiveAnalysis?.season ?? item.seasons),
                       ...(item.effectiveAnalysis?.style ?? item.styles),
                     ]}
                   />
-                  <AnalysisStatusBadge
-                    label={t.analysis.status[item.analysisStatus]}
-                    status={item.analysisStatus}
-                  />
-                  <WearSummary dictionary={dictionary} item={item} />
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <AnalysisStatusBadge
+                      label={t.analysis.status[item.analysisStatus]}
+                      status={item.analysisStatus}
+                    />
+                    {item.effectiveAnalysis?.confidenceScore !== undefined && (
+                      <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
+                        {t.card.confidence}{' '}
+                        {Math.round(
+                          item.effectiveAnalysis.confidenceScore * 100,
+                        )}
+                        %
+                      </span>
+                    )}
+                  </div>
+                  <WearSummary dictionary={dictionary} item={item} compact />
+                  <div className="grid grid-cols-3 gap-1.5">
                     <Button
                       type="button"
                       variant="outline"
+                      size="icon"
+                      aria-label={dictionary.wear.actions.woreThis}
                       disabled={wearSubmittingIds.has(item.id)}
                       onClick={() => void recordWear(item)}
                     >
-                      <Check />
-                      {wearSubmittingIds.has(item.id)
-                        ? dictionary.common.loading
-                        : dictionary.wear.actions.woreThis}
+                      {wearSubmittingIds.has(item.id) ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <Check />
+                      )}
                     </Button>
                     <Button
                       type="button"
                       variant="outline"
+                      size="icon"
+                      aria-label={t.actions.edit}
                       onClick={() => startEdit(item)}
                     >
                       <Edit />
-                      {t.actions.edit}
                     </Button>
                     <Button
                       type="button"
                       variant="destructive"
+                      size="icon"
+                      aria-label={t.actions.delete}
                       disabled={deletingItemIds.has(item.id)}
                       onClick={() => void handleDelete(item)}
                     >
@@ -1305,9 +1331,6 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
                       ) : (
                         <Trash2 />
                       )}
-                      {deletingItemIds.has(item.id)
-                        ? dictionary.common.loading
-                        : t.actions.delete}
                     </Button>
                   </div>
                 </CardContent>
@@ -2178,9 +2201,11 @@ function TagList({ values }: { values: string[] }) {
 function WearSummary({
   dictionary,
   item,
+  compact = false,
 }: {
   dictionary: Dictionary
   item: WardrobeItemDto
+  compact?: boolean
 }) {
   const t = dictionary.wear.card
   const lastWornLabel = item.lastWornAt
@@ -2188,13 +2213,13 @@ function WearSummary({
     : t.neverWorn
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+    <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
       <span className="rounded-md bg-muted px-2 py-1">
         {item.neverWorn
           ? t.neverWorn
           : t.wearCount.replace('{count}', String(item.wearCount))}
       </span>
-      {!item.neverWorn && (
+      {!compact && !item.neverWorn && (
         <span className="rounded-md bg-muted px-2 py-1">{lastWornLabel}</span>
       )}
       {item.longUnusedStatus && (
