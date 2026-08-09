@@ -45,6 +45,7 @@ describe('responsive UI contracts', () => {
   })
 
   it('lazy loads wardrobe card images without stretching them', () => {
+    expect(wardrobeClientSource).toContain('src={item.thumbnailImageUrl}')
     expect(wardrobeClientSource).toContain('loading="lazy"')
     expect(wardrobeClientSource).toContain('decoding="async"')
     expect(wardrobeClientSource).toContain('object-contain')
@@ -58,12 +59,15 @@ describe('responsive UI contracts', () => {
   })
 
   it('keeps private wardrobe image responses cacheable per user session', () => {
+    expect(wardrobeImageRouteSource).toContain(
+      'wardrobeItem.thumbnailImageStorageKey',
+    )
     expect(wardrobeImageRouteSource).toContain('private, max-age=900')
     expect(wardrobeImageRouteSource).toContain('stale-while-revalidate=3600')
     expect(wardrobeImageRouteSource).toContain("Vary: 'Cookie'")
   })
 
-  it('prefers processed wardrobe images while preserving originals', () => {
+  it('prefers thumbnail wardrobe images for cards while preserving originals', () => {
     const now = new Date('2026-01-01T00:00:00.000Z')
     const dto = toWardrobeItemDto({
       id: 'item_1',
@@ -89,6 +93,12 @@ describe('responsive UI contracts', () => {
       processedImageStorageKey: 'processed.png',
       processedImageContentType: 'image/png',
       processedImageSize: '420000',
+      thumbnailImageUrl: '/api/wardrobe/images/thumb.webp',
+      thumbnailImageStorageKey: 'thumb.webp',
+      thumbnailImageContentType: 'image/webp',
+      thumbnailImageSize: '32000',
+      thumbnailImageWidth: 360,
+      thumbnailImageHeight: 480,
       backgroundRemovalStatus: 'done',
       backgroundRemovalProvider: 'removebg',
       backgroundRemovalModelId: 'removebg-v1',
@@ -106,6 +116,7 @@ describe('responsive UI contracts', () => {
     } as never)
 
     expect(dto.imageUrl).toBe('/api/wardrobe/images/processed.png')
+    expect(dto.thumbnailImageUrl).toBe('/api/wardrobe/images/thumb.webp')
     expect(dto.processedImageUrl).toBe('/api/wardrobe/images/processed.png')
     expect(dto.originalImageUrl).toBe('/api/wardrobe/images/original.webp')
     expect(dto.originalImageSize).toBe(1200000)

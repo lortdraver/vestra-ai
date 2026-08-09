@@ -24,7 +24,7 @@ serves wardrobe images through authenticated application routes.
 
 - Local storage remains available for explicit local development only.
 - Production must use `STORAGE_DRIVER=r2`.
-- Original and processed wardrobe images keep separate storage keys.
+- Original, processed, and thumbnail wardrobe images keep separate storage keys.
 - R2 credentials are server-only and must never be exposed to the browser.
 - Database rows store stable storage keys and app proxy URLs, not expiring signed
   URLs.
@@ -32,6 +32,12 @@ serves wardrobe images through authenticated application routes.
 - Admin image access follows the existing admin permission helper.
 - The app safely falls back to the original-compatible display URL when a
   processed image field is unavailable.
+- Wardrobe grids request `thumbnailImageUrl`; item detail and AI/editing flows
+  keep using master original/processed objects.
+- Thumbnail objects use the existing private key layout:
+  `wardrobe/{userId}/thumb/{uuid}.webp`.
+- Image proxy responses are private and vary by session cookie:
+  `Cache-Control: private, max-age=900, stale-while-revalidate=3600`.
 
 ## Diagnostics
 
@@ -69,3 +75,18 @@ The migration:
 - updates database rows to use authenticated image proxy URLs;
 - never deletes local files automatically;
 - can be resumed because storage keys are stable.
+
+## Thumbnail Backfill
+
+Generate thumbnails for existing wardrobe items after applying
+`drizzle/0012_wardrobe_thumbnails.sql`:
+
+```bash
+pnpm wardrobe:thumbnails:backfill
+pnpm wardrobe:thumbnails:backfill -- --limit=100
+pnpm wardrobe:thumbnails:backfill -- --apply --limit=100
+```
+
+The thumbnail backfill is dry-run by default, idempotent, and skips rows whose
+thumbnail object already exists. It never deletes or rewrites original and
+processed master objects.

@@ -2,6 +2,7 @@ type WardrobeImageRecord = {
   imageStorageKey?: string | null
   originalImageStorageKey?: string | null
   processedImageStorageKey?: string | null
+  thumbnailImageStorageKey?: string | null
 }
 
 export type WardrobeStorageCleanupStatus = 'completed' | 'queued'
@@ -15,6 +16,7 @@ export function getWardrobeImageStorageKeys(
     item.imageStorageKey,
     item.originalImageStorageKey,
     item.processedImageStorageKey,
+    item.thumbnailImageStorageKey,
   ].filter((key, index, keys): key is string =>
     Boolean(key && keys.indexOf(key) === index),
   )

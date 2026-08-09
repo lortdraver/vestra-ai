@@ -7,6 +7,7 @@ import {
   type AnalysisStatus,
 } from '@/lib/ai/analysis-schema'
 import type { WardrobeItemDto } from './types'
+import { selectThumbnailUrl } from './thumbnails'
 
 type WardrobeItemRow = typeof wardrobeItem.$inferSelect
 type WearStats = { totalWearCount: number; lastWornAt: string | null }
@@ -72,6 +73,20 @@ export function toWardrobeItemDto(
     processedImageContentType:
       item.processedImageContentType ?? item.imageContentType,
     processedImageSize: Number(item.processedImageSize ?? item.imageSize),
+    thumbnailImageUrl: selectThumbnailUrl({
+      thumbnailImageUrl: item.thumbnailImageUrl,
+      processedImageUrl: item.processedImageUrl,
+      imageUrl: item.imageUrl,
+    }),
+    thumbnailImageContentType:
+      item.thumbnailImageContentType ??
+      item.processedImageContentType ??
+      item.imageContentType,
+    thumbnailImageSize: Number(
+      item.thumbnailImageSize ?? item.processedImageSize ?? item.imageSize,
+    ),
+    thumbnailImageWidth: item.thumbnailImageWidth,
+    thumbnailImageHeight: item.thumbnailImageHeight,
     backgroundRemovalStatus: item.backgroundRemovalStatus,
     backgroundRemovalProvider: item.backgroundRemovalProvider,
     backgroundRemovalModelId: item.backgroundRemovalModelId,

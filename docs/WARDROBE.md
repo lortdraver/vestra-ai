@@ -2,9 +2,9 @@
 
 ## Scope
 
-Milestone 2 implements the virtual wardrobe core only. It supports authenticated CRUD for clothing items, browser-side image compression, secure upload validation, gallery display, search, filters, empty/loading/error states, and image deletion queue preparation.
+The wardrobe module supports authenticated CRUD for clothing items, browser-side image compression, secure upload validation, gallery display, search, filters, empty/loading/error states, wear tracking, AI analysis integration, and image deletion queue preparation.
 
-Outfit generation, subscriptions, and cloud storage provider integration are intentionally excluded.
+Stylist, planner, subscription, and account systems are separate modules and should not change wardrobe ownership rules.
 
 ## Data Model
 
@@ -30,6 +30,7 @@ Important fields:
 - `imageUrl`, `imageStorageKey`, `imageContentType`, `imageSize` - compatibility display metadata pointing at the processed image.
 - `originalImageUrl`, `originalImageStorageKey`, `originalImageContentType`, `originalImageSize` - uploaded source image metadata.
 - `processedImageUrl`, `processedImageStorageKey`, `processedImageContentType`, `processedImageSize` - background-removed clothing image metadata.
+- `thumbnailImageUrl`, `thumbnailImageStorageKey`, `thumbnailImageContentType`, `thumbnailImageSize`, `thumbnailImageWidth`, `thumbnailImageHeight` - lightweight grid thumbnail metadata.
 - `backgroundRemovalStatus`, `backgroundRemovalProvider`, `backgroundRemovalModelId` - image processing metadata.
 - `imageDeletionStatus`, `imageDeleteRequestedAt` - preparation for async image cleanup.
 - `analysisStatus`, `aiAnalysis`, `userCorrections` - AI analysis state and review data.
@@ -52,11 +53,12 @@ All endpoints require Better Auth session cookies and scope database access by `
 
 The app uses `ObjectStorage` from `lib/storage`.
 
-Current driver:
+Current drivers:
 
 - `local` - development-only storage under `public/uploads`. It throws in production.
+- `r2` - production storage through private Cloudflare R2 objects served by authenticated application routes.
 
-Production deployment must provide a real storage adapter before uploads are enabled. Vercel Blob can be added by implementing the same interface without changing wardrobe UI or API contracts.
+Production deployment should use Cloudflare R2. Other providers can be added by implementing the same `ObjectStorage` interface without changing wardrobe UI or API contracts.
 
 ## Image Handling
 
@@ -74,3 +76,32 @@ Accepted server types:
 Maximum uploaded size:
 
 - 2.5 MB after client compression.
+
+## Thumbnails
+
+Wardrobe cards request `thumbnailImageUrl` so grid views do not download full
+master images. Original and processed master objects remain untouched for AI,
+editing, item detail views, and future high-resolution experiences.
+
+Thumbnail generation:
+
+- runs after the processed image is available;
+- falls back to the original display image when background removal fails;
+- stores thumbnails under the existing storage variant layout:
+  `wardrobe/{userId}/thumb/{uuid}.webp`;
+- uses WebP, max dimension `480px`, quality `82`;
+- preserves aspect ratio and alpha transparency;
+- logs `THUMBNAIL_GENERATION_STARTED`, `THUMBNAIL_GENERATION_COMPLETED`, and
+  `THUMBNAIL_GENERATION_FAILED` without image bytes, signed URLs, or secrets;
+- never fails item creation by itself.
+
+Backfill existing items:
+
+```bash
+pnpm wardrobe:thumbnails:backfill
+pnpm wardrobe:thumbnails:backfill -- --limit=100
+pnpm wardrobe:thumbnails:backfill -- --apply --limit=100
+```
+
+The command is dry-run by default, loads `.env.local`, skips existing reachable
+thumbnails, never deletes master images, and is idempotent.

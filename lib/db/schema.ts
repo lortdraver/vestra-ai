@@ -161,6 +161,12 @@ export const wardrobeItem = pgTable(
     processedImageStorageKey: text('processedImageStorageKey'),
     processedImageContentType: text('processedImageContentType'),
     processedImageSize: text('processedImageSize'),
+    thumbnailImageUrl: text('thumbnailImageUrl'),
+    thumbnailImageStorageKey: text('thumbnailImageStorageKey'),
+    thumbnailImageContentType: text('thumbnailImageContentType'),
+    thumbnailImageSize: text('thumbnailImageSize'),
+    thumbnailImageWidth: integer('thumbnailImageWidth'),
+    thumbnailImageHeight: integer('thumbnailImageHeight'),
     backgroundRemovalStatus: text('backgroundRemovalStatus')
       .notNull()
       .default('pending'),

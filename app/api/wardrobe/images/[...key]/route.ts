@@ -29,6 +29,7 @@ async function canAccessImage(storageKey: string) {
     eq(wardrobeItem.imageStorageKey, storageKey),
     eq(wardrobeItem.originalImageStorageKey, storageKey),
     eq(wardrobeItem.processedImageStorageKey, storageKey),
+    eq(wardrobeItem.thumbnailImageStorageKey, storageKey),
   ]
   const filters = canAccessAdmin(currentUser.role)
     ? [or(...ownershipFilters)]

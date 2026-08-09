@@ -16,6 +16,7 @@ Real payment processing remains out of scope.
 - Azerbaijani default locale, English and Russian supported
 - Vitest, ESLint, and Prettier
 - Storage abstraction with guarded local development storage
+- Wardrobe thumbnail generation with private original/processed master images
 - AI provider abstraction with Zod-validated clothing analysis
 - Background-removal provider abstraction with guarded production credentials
 - Stylist provider abstraction with hallucination prevention and outfit validation
@@ -52,7 +53,15 @@ applies the checked-in SQL migrations without prompting to alter auth data.
 `pnpm db:push` remains available for schema prototyping, but review its prompts
 carefully before using it against a database with real users.
 
-4. Start development:
+4. Backfill wardrobe thumbnails for existing items when needed. Dry-run is the
+   default:
+
+```bash
+pnpm wardrobe:thumbnails:backfill
+pnpm wardrobe:thumbnails:backfill -- --apply --limit=100
+```
+
+5. Start development:
 
 ```bash
 pnpm dev

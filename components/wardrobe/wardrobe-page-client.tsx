@@ -1213,8 +1213,10 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={item.processedImageUrl}
+                    src={item.thumbnailImageUrl}
                     alt={item.name}
+                    width={item.thumbnailImageWidth ?? 480}
+                    height={item.thumbnailImageHeight ?? 480}
                     loading="lazy"
                     decoding="async"
                     className="size-full object-contain p-3 transition duration-500 group-hover:scale-[1.03] sm:p-4"

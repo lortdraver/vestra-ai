@@ -14,7 +14,7 @@ export type StorageObject = {
 export type StoreObjectInput = {
   userId: string
   file: File
-  variant?: 'original' | 'processed'
+  variant?: 'original' | 'processed' | 'thumb'
 }
 
 export type StorageHealth = {

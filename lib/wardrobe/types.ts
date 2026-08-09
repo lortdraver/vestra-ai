@@ -24,6 +24,11 @@ export type WardrobeItemDto = {
   processedImageUrl: string
   processedImageContentType: string
   processedImageSize: number
+  thumbnailImageUrl: string
+  thumbnailImageContentType: string
+  thumbnailImageSize: number
+  thumbnailImageWidth: number | null
+  thumbnailImageHeight: number | null
   backgroundRemovalStatus: string
   backgroundRemovalProvider: string | null
   backgroundRemovalModelId: string | null

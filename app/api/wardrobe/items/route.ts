@@ -21,6 +21,12 @@ import type { ObjectStorage, StoredObject } from '@/lib/storage/types'
 import { getWearStatsForItems } from '@/lib/wear/server'
 import { toWardrobeItemDto } from '@/lib/wardrobe/serialize'
 import {
+  generateWardrobeThumbnail,
+  logThumbnailStage,
+  selectThumbnailSource,
+  serializeThumbnailObject,
+} from '@/lib/wardrobe/thumbnails'
+import {
   parseWardrobePayload,
   validateImageFile,
 } from '@/lib/wardrobe/validation'
@@ -266,6 +272,7 @@ export async function POST(request: Request) {
     })
 
     let processedImage: StoredObject = originalImage
+    let processedFile: File | null = null
     let backgroundRemoval: BackgroundRemovalResult | null = null
     let backgroundRemovalStatus = 'failed'
     let backgroundRemovalError: string | null = null
@@ -283,6 +290,7 @@ export async function POST(request: Request) {
         file: imageResult.data,
         mode: 'single_item',
       })
+      processedFile = backgroundRemoval.file
       backgroundRemovalStatus = 'done'
       stage = 'BACKGROUND_REMOVAL_COMPLETED'
       logUploadStage(stage, {
@@ -347,6 +355,49 @@ export async function POST(request: Request) {
       totalImageProcessingMs: Math.round(performance.now() - storageStartedAt),
     })
 
+    const thumbnailSource = selectThumbnailSource({
+      original: imageResult.data,
+      originalStorageKey: originalImage.storageKey,
+      processed: processedFile,
+      processedStorageKey:
+        backgroundRemovalStatus === 'done' ? processedImage.storageKey : null,
+    })
+    let thumbnailUpdate = {}
+
+    try {
+      logThumbnailStage('THUMBNAIL_GENERATION_STARTED', {
+        userId,
+        itemId: null,
+        source: thumbnailSource.source,
+        storageDriver,
+      })
+      const thumbnail = await generateWardrobeThumbnail(thumbnailSource.file)
+      const thumbnailObject = await storage.putWardrobeImage({
+        userId,
+        file: thumbnail.file,
+        variant: 'thumb',
+      })
+      thumbnailUpdate = serializeThumbnailObject(thumbnailObject, thumbnail)
+      logThumbnailStage('THUMBNAIL_GENERATION_COMPLETED', {
+        userId,
+        itemId: null,
+        source: thumbnailSource.source,
+        storageDriver,
+        width: thumbnail.width,
+        height: thumbnail.height,
+        size: thumbnail.size,
+      })
+    } catch (error) {
+      logThumbnailStage('THUMBNAIL_GENERATION_FAILED', {
+        userId,
+        itemId: null,
+        source: thumbnailSource.source,
+        storageDriver,
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+        errorMessage: error instanceof Error ? error.message : String(error),
+      })
+    }
+
     const databaseStartedAt = performance.now()
     logDev('Wardrobe create inserting database row', {
       userId,
@@ -386,6 +437,7 @@ export async function POST(request: Request) {
           backgroundRemovalStatus === 'done'
             ? String(processedImage.size)
             : null,
+        ...thumbnailUpdate,
         backgroundRemovalStatus,
         backgroundRemovalProvider:
           backgroundRemoval?.provider ?? backgroundProvider,

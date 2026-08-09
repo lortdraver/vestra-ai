@@ -25,6 +25,11 @@ import {
   parseWardrobePayload,
   validateImageFile,
 } from '@/lib/wardrobe/validation'
+import {
+  generateWardrobeThumbnail,
+  logThumbnailStage,
+  serializeThumbnailObject,
+} from '@/lib/wardrobe/thumbnails'
 
 async function getCurrentUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -250,6 +255,57 @@ export async function PATCH(
         variant: 'processed',
       })
 
+      let thumbnailUpdate: {
+        thumbnailImageUrl: string | null
+        thumbnailImageStorageKey: string | null
+        thumbnailImageContentType: string | null
+        thumbnailImageSize: string | null
+        thumbnailImageWidth: number | null
+        thumbnailImageHeight: number | null
+      } = {
+        thumbnailImageUrl: null,
+        thumbnailImageStorageKey: null,
+        thumbnailImageContentType: null,
+        thumbnailImageSize: null,
+        thumbnailImageWidth: null,
+        thumbnailImageHeight: null,
+      }
+      try {
+        logThumbnailStage('THUMBNAIL_GENERATION_STARTED', {
+          userId,
+          itemId: existingItem.id,
+          source: 'processed',
+          storageDriver: process.env.STORAGE_DRIVER ?? 'local',
+        })
+        const thumbnail = await generateWardrobeThumbnail(
+          backgroundRemoval.file,
+        )
+        const thumbnailObject = await getObjectStorage().putWardrobeImage({
+          userId,
+          file: thumbnail.file,
+          variant: 'thumb',
+        })
+        thumbnailUpdate = serializeThumbnailObject(thumbnailObject, thumbnail)
+        logThumbnailStage('THUMBNAIL_GENERATION_COMPLETED', {
+          userId,
+          itemId: existingItem.id,
+          source: 'processed',
+          storageDriver: process.env.STORAGE_DRIVER ?? 'local',
+          width: thumbnail.width,
+          height: thumbnail.height,
+          size: thumbnail.size,
+        })
+      } catch (error) {
+        logThumbnailStage('THUMBNAIL_GENERATION_FAILED', {
+          userId,
+          itemId: existingItem.id,
+          source: 'processed',
+          storageDriver: process.env.STORAGE_DRIVER ?? 'local',
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+          errorMessage: error instanceof Error ? error.message : String(error),
+        })
+      }
+
       const replacedKeys = getWardrobeImageStorageKeys(existingItem)
       if (replacedKeys.length > 0) {
         await db.insert(wardrobeImageDeletionQueue).values(
@@ -275,6 +331,7 @@ export async function PATCH(
         processedImageStorageKey: processedImage.storageKey,
         processedImageContentType: processedImage.contentType,
         processedImageSize: String(processedImage.size),
+        ...thumbnailUpdate,
         backgroundRemovalStatus: 'done',
         backgroundRemovalProvider: backgroundRemoval.provider,
         backgroundRemovalModelId: backgroundRemoval.modelId,
