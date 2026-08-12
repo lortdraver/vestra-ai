@@ -55,6 +55,7 @@ import {
   getStylistWardrobeDiagnostics,
   toStylistWardrobeItem,
 } from '@/lib/stylist/wardrobe'
+import { getWardrobeRoleLabel } from '@/lib/wardrobe/taxonomy'
 import { applyWeatherSuitability, type WeatherForecast } from '@/lib/weather'
 import type {
   StylistInsufficientWardrobeResult,
@@ -241,7 +242,8 @@ function logStylistDev(message: string, details: Record<string, unknown>) {
 function formatList(values: string[], locale: StylistRequest['locale']) {
   const labels = values.map(
     (value) =>
-      categoryLabels[locale][value as keyof (typeof categoryLabels)['en']] ??
+      getWardrobeRoleLabel(locale, value) ||
+      categoryLabels[locale][value as keyof (typeof categoryLabels)['en']] ||
       value,
   )
 
@@ -255,7 +257,31 @@ function buildInsufficientWardrobeResult(input: {
   quickRequest?: string
 }): StylistInsufficientWardrobeResult {
   const missing = formatList(input.missingCategories, input.locale)
-  const message = {
+  if (input.locale === 'az') {
+    return {
+      status: 'insufficient_wardrobe',
+      message: `Bu kombin üçün ${missing} çatışmır. Qarderoba həmin geyimləri əlavə edin və ya mövcud geyimlərin kateqoriyalarını düzəldin.`,
+      missingCategories: input.missingCategories,
+      availableCategories: input.availableCategories,
+    }
+  }
+
+  if (input.locale === 'ru') {
+    return {
+      status: 'insufficient_wardrobe',
+      message: `Для этого образа не хватает: ${missing}. Добавьте эти вещи в гардероб или исправьте категории существующих вещей.`,
+      missingCategories: input.missingCategories,
+      availableCategories: input.availableCategories,
+    }
+  }
+
+  return {
+    status: 'insufficient_wardrobe',
+    message: `This outfit is missing ${missing}. Add those items to your wardrobe or correct the categories of existing clothes.`,
+    missingCategories: input.missingCategories,
+    availableCategories: input.availableCategories,
+  }
+  /* const message = {
     az: `Bu kombin üçün ${missing} çatışmır. Qarderoba həmin geyimləri əlavə edin və ya mövcud geyimlərin kateqoriyalarını düzəldin.`,
     en: `This outfit is missing ${missing}. Add those items to your wardrobe or correct the categories of existing clothes.`,
     ru: `Для этого образа не хватает: ${missing}. Добавьте эти вещи в гардероб или исправьте категории существующих вещей.`,
@@ -266,7 +292,7 @@ function buildInsufficientWardrobeResult(input: {
     message,
     missingCategories: input.missingCategories,
     availableCategories: input.availableCategories,
-  }
+  } */
 }
 
 async function storeInsufficientRequest(input: {
@@ -348,60 +374,144 @@ async function generateAndValidateStylistBatch(input: {
   })
   const providerMetadata = envelope?.metadata
 
-  try {
-    const batch = validateStylistBatchResult(output, input.rankedWardrobe, {
-      requiredCategories: input.requiredCategories,
-      lockedItemIds: input.lockedItemIds,
-    })
-    if (batch.status === 'success') {
-      return {
-        ...batch,
-        metadata: {
-          ...batch.metadata,
-          retryCount: providerMetadata?.retryCount ?? 0,
-          providerRequestCount: providerMetadata?.requestCount ?? 1,
-          modelId:
-            providerMetadata?.modelId ??
-            providerDiagnostics.modelId ??
-            process.env.STYLIST_AI_MODEL_ID,
-          durationMs: Math.round(performance.now() - startedAt),
-        },
-      }
+  const buildValidationFeedback = (error: unknown) => {
+    if (!(error instanceof StylistValidationError)) {
+      return ['provider_output_validation_failed']
     }
-    return batch
-  } catch (batchError) {
-    logProviderValidationFailure({
-      error: batchError,
-      output,
-      metadata: providerMetadata,
-    })
 
+    const issueFeedback = error.issues.map((issue) =>
+      issue.path.length > 0
+        ? `${issue.path.join('.')}:${issue.code}`
+        : issue.code,
+    )
+
+    return [error.message, ...issueFeedback].slice(0, 8)
+  }
+
+  const enrichSuccessMetadata = (
+    metadata: StylistProviderResponseMetadata | undefined,
+    regenerationUsed: boolean,
+  ) => ({
+    retryCount: metadata?.retryCount ?? 0,
+    providerRequestCount: metadata?.requestCount ?? 1,
+    modelId:
+      metadata?.modelId ??
+      providerDiagnostics.modelId ??
+      process.env.STYLIST_AI_MODEL_ID,
+    durationMs: Math.round(performance.now() - startedAt),
+    regenerationUsed,
+  })
+
+  const validateNormalizedOutput = (
+    candidateOutput: unknown,
+    metadata: StylistProviderResponseMetadata | undefined,
+    regenerationUsed: boolean,
+  ) => {
     try {
-      const single = validateStylistResult(output, input.rankedWardrobe, {
-        requiredCategories: input.requiredCategories,
-        lockedItemIds: input.lockedItemIds,
-      })
-      if (single.status === 'success') {
-        const localBatch = buildLocalCandidateBatch({
-          baseOutfit: single.outfit,
-          wardrobeItems: input.rankedWardrobe,
-          request: input.request,
-          candidateCount: input.candidateCount,
-          lockedItemIds: input.lockedItemIds,
-        })
-        return validateStylistBatchResult(localBatch, input.rankedWardrobe, {
+      const batch = validateStylistBatchResult(
+        candidateOutput,
+        input.rankedWardrobe,
+        {
           requiredCategories: input.requiredCategories,
           lockedItemIds: input.lockedItemIds,
+          request: input.request,
+        },
+      )
+      if (batch.status === 'success') {
+        return {
+          ...batch,
+          metadata: {
+            ...batch.metadata,
+            ...enrichSuccessMetadata(metadata, regenerationUsed),
+          },
+        }
+      }
+      return batch
+    } catch (batchError) {
+      logProviderValidationFailure({
+        error: batchError,
+        output: candidateOutput,
+        metadata,
+      })
+
+      try {
+        const single = validateStylistResult(
+          candidateOutput,
+          input.rankedWardrobe,
+          {
+            requiredCategories: input.requiredCategories,
+            lockedItemIds: input.lockedItemIds,
+            request: input.request,
+          },
+        )
+        if (single.status === 'success') {
+          const localBatch = buildLocalCandidateBatch({
+            baseOutfit: single.outfit,
+            wardrobeItems: input.rankedWardrobe,
+            request: input.request,
+            candidateCount: input.candidateCount,
+            lockedItemIds: input.lockedItemIds,
+          })
+          return validateStylistBatchResult(localBatch, input.rankedWardrobe, {
+            requiredCategories: input.requiredCategories,
+            lockedItemIds: input.lockedItemIds,
+            request: input.request,
+          })
+        }
+        return single
+      } catch (singleError) {
+        logStylistDev('[dev] Stylist legacy output fallback rejected', {
+          message:
+            singleError instanceof Error ? singleError.message : 'unknown',
         })
       }
-      return single
-    } catch (singleError) {
-      logStylistDev('[dev] Stylist legacy output fallback rejected', {
-        message: singleError instanceof Error ? singleError.message : 'unknown',
-      })
+
+      throw batchError
+    }
+  }
+
+  try {
+    return validateNormalizedOutput(output, providerMetadata, false)
+  } catch (batchError) {
+    if (!(batchError instanceof StylistValidationError)) {
+      throw batchError
     }
 
-    throw batchError
+    const validationFeedback = buildValidationFeedback(batchError)
+    console.info('[stylist-generate] controlled regeneration requested', {
+      reason: batchError.message,
+      validationFeedback,
+    })
+
+    const retryProviderOutput = await provider.generateOutfit({
+      userId: input.userId,
+      locale: input.request.locale,
+      request: input.request,
+      wardrobeItems: input.rankedWardrobe,
+      missingItems: input.missingItems,
+      candidateCount: input.candidateCount,
+      preferenceContext: input.preferenceContext,
+      lockedItemIds: input.lockedItemIds,
+      strictRetry: true,
+      validationFeedback,
+    })
+    const retryEnvelope = isStylistProviderEnvelope(retryProviderOutput)
+      ? retryProviderOutput
+      : undefined
+    const retryOutput = normalizeStylistProviderOutput(
+      retryEnvelope?.output ?? retryProviderOutput,
+      normalizationContext,
+    )
+
+    console.info('[stylist-generate] provider output normalization', {
+      candidateDiagnostics: getProviderCandidateNormalizationDiagnostics(
+        retryEnvelope?.output ?? retryProviderOutput,
+        normalizationContext,
+      ),
+      regenerationUsed: true,
+    })
+
+    return validateNormalizedOutput(retryOutput, retryEnvelope?.metadata, true)
   }
 }
 

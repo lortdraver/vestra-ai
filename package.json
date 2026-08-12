@@ -23,7 +23,8 @@
     "background-removal:diagnose": "node scripts/diagnose-background-removal.mjs",
     "storage:diagnose": "node scripts/diagnose-storage.mjs",
     "storage:migrate:r2": "node scripts/migrate-local-storage-to-r2.mjs",
-    "wardrobe:thumbnails:backfill": "node scripts/backfill-wardrobe-thumbnails.mjs"
+    "wardrobe:thumbnails:backfill": "node scripts/backfill-wardrobe-thumbnails.mjs",
+    "wardrobe:taxonomy:backfill": "node scripts/backfill-wardrobe-taxonomy.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

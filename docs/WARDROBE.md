@@ -21,6 +21,22 @@ changes around Better Auth tables.
 
 `wardrobe_item` stores one user-owned clothing item.
 
+Vestra now treats wardrobe taxonomy as a shared canonical layer. Stored
+`category` values are normalized to:
+
+- `top`
+- `bottom`
+- `outerwear`
+- `one_piece`
+- `shoes`
+- `accessory`
+- `unresolved`
+
+Stored `clothingType` values are normalized to canonical subtypes such as
+`t_shirt`, `shirt`, `polo`, `trousers`, `shorts`, `jeans`, `sneakers`, and
+other role-specific values. The unresolved fallback remains available only for
+legacy or genuinely ambiguous items and is not the normal path for new uploads.
+
 Important fields:
 
 - `userId` - required ownership scope for every query.
@@ -34,6 +50,16 @@ Important fields:
 - `backgroundRemovalStatus`, `backgroundRemovalProvider`, `backgroundRemovalModelId` - image processing metadata.
 - `imageDeletionStatus`, `imageDeleteRequestedAt` - preparation for async image cleanup.
 - `analysisStatus`, `aiAnalysis`, `userCorrections` - AI analysis state and review data.
+
+Legacy values can be normalized in place with:
+
+```bash
+pnpm wardrobe:taxonomy:backfill
+pnpm wardrobe:taxonomy:backfill -- --apply --limit=250
+```
+
+The command is dry-run by default, preserves item IDs, never deletes data,
+updates only taxonomy-related fields, and is idempotent.
 
 `wardrobe_image_deletion_queue` records images that must be deleted after item deletion, image replacement, or future account deletion.
 

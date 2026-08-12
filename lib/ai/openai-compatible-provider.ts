@@ -1,5 +1,13 @@
 import { clothingAnalysisSchema } from './analysis-schema'
 import type { ClothingAnalysisProvider } from './provider'
+import {
+  wardrobeColorFamilies,
+  wardrobeFormalityValues,
+  wardrobeSeasons,
+  wardrobeStoredRoles,
+  wardrobeStoredSubtypes,
+  wardrobeStyleTags,
+} from '@/lib/wardrobe/taxonomy'
 
 type OpenRouterErrorBody = {
   error?: {
@@ -63,16 +71,18 @@ const responseJsonSchema = {
     type: 'object',
     additionalProperties: false,
     required: [
-      'detectedClothingType',
-      'detectedCategory',
+      'role',
+      'subtype',
       'colors',
+      'colorFamilies',
       'dominantHexColors',
       'material',
       'season',
-      'style',
+      'styleTags',
       'fit',
       'pattern',
       'warmthLevel',
+      'formality',
       'formalityLevel',
       'brandGuess',
       'confidenceScore',
@@ -83,23 +93,16 @@ const responseJsonSchema = {
       'modelId',
     ],
     properties: {
-      detectedClothingType: { type: 'string' },
-      detectedCategory: {
+      role: {
         type: 'string',
-        enum: [
-          'tops',
-          'bottoms',
-          'dresses',
-          'outerwear',
-          'shoes',
-          'accessories',
-          'bags',
-          'underwear',
-          'activewear',
-          'other',
-        ],
+        enum: [...wardrobeStoredRoles],
       },
+      subtype: { type: 'string', enum: [...wardrobeStoredSubtypes] },
       colors: { type: 'array', items: { type: 'string' } },
+      colorFamilies: {
+        type: 'array',
+        items: { type: 'string', enum: [...wardrobeColorFamilies] },
+      },
       dominantHexColors: {
         type: 'array',
         items: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' },
@@ -107,31 +110,16 @@ const responseJsonSchema = {
       material: { type: 'string' },
       season: {
         type: 'array',
-        items: {
-          type: 'string',
-          enum: ['spring', 'summer', 'autumn', 'winter'],
-        },
+        items: { type: 'string', enum: [...wardrobeSeasons] },
       },
-      style: {
+      styleTags: {
         type: 'array',
-        items: {
-          type: 'string',
-          enum: [
-            'casual',
-            'formal',
-            'business',
-            'streetwear',
-            'classic',
-            'minimal',
-            'sport',
-            'evening',
-            'other',
-          ],
-        },
+        items: { type: 'string', enum: [...wardrobeStyleTags] },
       },
       fit: { type: 'string' },
       pattern: { type: 'string' },
       warmthLevel: { type: 'integer', minimum: 1, maximum: 5 },
+      formality: { type: 'string', enum: [...wardrobeFormalityValues] },
       formalityLevel: { type: 'integer', minimum: 1, maximum: 5 },
       brandGuess: { type: 'string' },
       confidenceScore: { type: 'number', minimum: 0, maximum: 1 },
@@ -139,16 +127,18 @@ const responseJsonSchema = {
         type: 'object',
         additionalProperties: false,
         properties: {
-          detectedClothingType: { type: 'number', minimum: 0, maximum: 1 },
-          detectedCategory: { type: 'number', minimum: 0, maximum: 1 },
+          role: { type: 'number', minimum: 0, maximum: 1 },
+          subtype: { type: 'number', minimum: 0, maximum: 1 },
           colors: { type: 'number', minimum: 0, maximum: 1 },
+          colorFamilies: { type: 'number', minimum: 0, maximum: 1 },
           dominantHexColors: { type: 'number', minimum: 0, maximum: 1 },
           material: { type: 'number', minimum: 0, maximum: 1 },
           season: { type: 'number', minimum: 0, maximum: 1 },
-          style: { type: 'number', minimum: 0, maximum: 1 },
+          styleTags: { type: 'number', minimum: 0, maximum: 1 },
           fit: { type: 'number', minimum: 0, maximum: 1 },
           pattern: { type: 'number', minimum: 0, maximum: 1 },
           warmthLevel: { type: 'number', minimum: 0, maximum: 1 },
+          formality: { type: 'number', minimum: 0, maximum: 1 },
           formalityLevel: { type: 'number', minimum: 0, maximum: 1 },
           brandGuess: { type: 'number', minimum: 0, maximum: 1 },
           visualDescription: { type: 'number', minimum: 0, maximum: 1 },
@@ -159,16 +149,18 @@ const responseJsonSchema = {
         items: {
           type: 'string',
           enum: [
-            'detectedClothingType',
-            'detectedCategory',
+            'role',
+            'subtype',
             'colors',
+            'colorFamilies',
             'dominantHexColors',
             'material',
             'season',
-            'style',
+            'styleTags',
             'fit',
             'pattern',
             'warmthLevel',
+            'formality',
             'formalityLevel',
             'brandGuess',
             'visualDescription',
@@ -309,14 +301,14 @@ export class OpenAICompatibleClothingAnalysisProvider implements ClothingAnalysi
         {
           role: 'system',
           content:
-            'You are a precise clothing vision system for a virtual wardrobe. Analyze the garment, not the background. Prefer the visible garment color over background color. Detect logos/brand text only when visible. Return strict JSON only with: detectedClothingType, detectedCategory, colors, dominantHexColors, material, season, style, fit, pattern, warmthLevel, formalityLevel, brandGuess, confidenceScore, fieldConfidences, needsReviewFields, visualDescription, promptVersion, modelId. fieldConfidences must be 0-1 per field. needsReviewFields must include low-confidence fields under 0.6. Categories must be one of tops, bottoms, dresses, outerwear, shoes, accessories, bags, underwear, activewear, other. Seasons must use spring, summer, autumn, winter. Styles must use casual, formal, business, streetwear, classic, minimal, sport, evening, other.',
+            'You are a precise clothing vision system for a virtual wardrobe. Analyze the garment, not the background. Prefer the visible garment color over background color. Detect logos or brand text only when clearly visible. Return strict JSON only with: role, subtype, colors, colorFamilies, dominantHexColors, material, season, styleTags, fit, pattern, warmthLevel, formality, formalityLevel, brandGuess, confidenceScore, fieldConfidences, needsReviewFields, visualDescription, promptVersion, modelId. role must be one of top, bottom, outerwear, one_piece, shoes, accessory, unresolved. subtype must use the supplied enum. colorFamilies must use normalized families such as gray, navy, blue, beige, brown, and burgundy. styleTags must use the supplied enum only. formality must be one of relaxed, casual, smart_casual, business, formal. Do not infer a brand unless it is visible and confident. fieldConfidences must be 0-1 per field, and needsReviewFields must include every field below 0.6 confidence.',
         },
         {
           role: 'user',
           content: [
             {
               type: 'text',
-              text: `Analyze this wardrobe item. Manual name: ${input.name}. Manual category: ${input.category}. Manual type: ${input.clothingType}. Deterministic browser color hints: colors=${(input.imageColorHints?.colors ?? input.colors ?? []).join(', ') || 'none'}, dominantHexColors=${(input.imageColorHints?.dominantHexColors ?? []).join(', ') || 'none'}. If the image shows a grey Levi's t-shirt, return clothing type t-shirt, category tops, grey/light grey color, Levi's brand, cotton or cotton blend, casual style, spring/summer/autumn seasons, solid pattern, low formality.`,
+              text: `Analyze this wardrobe item. Manual name: ${input.name}. Manual role hint: ${input.category}. Manual subtype hint: ${input.clothingType}. Deterministic browser color hints: colors=${(input.imageColorHints?.colors ?? input.colors ?? []).join(', ') || 'none'}, dominantHexColors=${(input.imageColorHints?.dominantHexColors ?? []).join(', ') || 'none'}. Example expectations: a gray Levi's tee should return role=top, subtype=t_shirt, colorFamilies including gray, casual styleTags, spring/summer/autumn season, low formality, and Levi's only if the logo is visible. Blue Nike shorts should return role=bottom, subtype=shorts. A light blue polo should return role=top, subtype=polo. A button-up Oxford shirt should return role=top, subtype=shirt.`,
             },
             {
               type: 'image_url',

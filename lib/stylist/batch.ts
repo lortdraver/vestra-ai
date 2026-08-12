@@ -13,12 +13,12 @@ const styleDirections = [
   'smart casual',
 ] as const
 
-function byCategory(items: StylistWardrobeItem[], category: string) {
-  return items.filter((item) => item.category === category)
+function byRole(items: StylistWardrobeItem[], role: string) {
+  return items.filter((item) => item.role === role)
 }
 
 function explanation(item: StylistWardrobeItem) {
-  return `${item.name} supports the outfit through its ${item.category} role.`
+  return `${item.name} supports the outfit through its ${item.role} role and ${item.subtype} subtype.`
 }
 
 export function buildLocalCandidateBatch({
@@ -34,12 +34,12 @@ export function buildLocalCandidateBatch({
   candidateCount?: number
   lockedItemIds?: string[]
 }): StylistBatchResult {
-  const tops = byCategory(wardrobeItems, 'tops')
-  const bottoms = byCategory(wardrobeItems, 'bottoms')
-  const shoes = byCategory(wardrobeItems, 'shoes')
+  const tops = byRole(wardrobeItems, 'top')
+  const bottoms = byRole(wardrobeItems, 'bottom')
+  const shoes = byRole(wardrobeItems, 'shoes')
   const accessories = [
-    ...byCategory(wardrobeItems, 'outerwear'),
-    ...byCategory(wardrobeItems, 'accessories'),
+    ...byRole(wardrobeItems, 'outerwear'),
+    ...byRole(wardrobeItems, 'accessory'),
   ]
   const target = Math.min(Math.max(candidateCount, 1), 5)
   const candidates: StylistOutfit[] = []
@@ -71,10 +71,11 @@ export function buildLocalCandidateBatch({
       occasion: request.quickRequest ?? baseOutfit.occasion,
       styleDirection: styleDirections[index % styleDirections.length],
       seasonLabel: uniqueSelected.flatMap((item) => item.seasons)[0] ?? '',
-      formalityLabel: request.quickRequest === 'business' ? 'business' : '',
+      formalityLabel:
+        uniqueSelected.find((item) => item.formality)?.formality ?? '',
       items: uniqueSelected.map((item) => ({
         wardrobeItemId: item.id,
-        role: item.category,
+        role: item.role,
         explanation: explanation(item),
       })),
       overallExplanation:
@@ -87,6 +88,11 @@ export function buildLocalCandidateBatch({
       ),
       alternativeSuggestions: [],
       missingItems: [],
+      candidateScore: Math.max(
+        (baseOutfit.candidateScore ?? 36) - index * 2,
+        28,
+      ),
+      scoreBreakdown: baseOutfit.scoreBreakdown,
     })
   }
 
@@ -101,9 +107,10 @@ export function buildLocalCandidateBatch({
     metadata: {
       providerRequestCount: 1,
       retryCount: 0,
-      promptVersion: 'stylist-batch-v1',
-      schemaVersion: 'stylist-batch-v1',
+      promptVersion: 'stylist-batch-v2',
+      schemaVersion: 'stylist-batch-v2',
       durationMs: 0,
+      regenerationUsed: false,
     },
   }
 }

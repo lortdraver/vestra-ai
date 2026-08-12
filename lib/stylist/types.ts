@@ -1,5 +1,13 @@
 import { z } from 'zod'
 import type { Locale } from '@/lib/i18n/config'
+import {
+  wardrobeColorFamilies,
+  wardrobeFormalityValues,
+  wardrobeRoles,
+  wardrobeSeasons,
+  wardrobeStoredSubtypes,
+  wardrobeStyleTags,
+} from '@/lib/wardrobe/taxonomy'
 
 export const quickRequestIds = [
   'university',
@@ -58,15 +66,20 @@ export type StylistRequest = z.infer<typeof stylistRequestSchema>
 export type StylistWardrobeItem = {
   id: string
   name: string
+  imageUrl: string
+  notes?: string
+  role: string
+  subtype: string
   category: string
   clothingType: string
   colors: string[]
+  colorFamilies: string[]
   seasons: string[]
   styles: string[]
+  styleTags: string[]
+  formality: string
   material: string
   brand: string
-  notes: string
-  imageUrl: string
 }
 
 export const outfitItemSelectionSchema = z.object({
@@ -90,6 +103,20 @@ export const stylistOutfitSchema = z.object({
   items: z.array(outfitItemSelectionSchema).min(1).max(8),
   overallExplanation: z.string().trim().min(1).max(1200),
   confidenceScore: z.number().min(0).max(1),
+  candidateScore: z.number().min(0).max(100).optional(),
+  scoreBreakdown: z
+    .object({
+      completeness: z.number().min(0).max(20).default(0),
+      occasionMatch: z.number().min(0).max(20).default(0),
+      subtypeCompatibility: z.number().min(-20).max(20).default(0),
+      formalityConsistency: z.number().min(-20).max(15).default(0),
+      weatherSeason: z.number().min(-20).max(15).default(0),
+      colorCompatibility: z.number().min(-20).max(15).default(0),
+      styleConsistency: z.number().min(-20).max(10).default(0),
+      preferenceMatch: z.number().min(-10).max(10).default(0),
+      duplicatePenalty: z.number().min(-20).max(0).default(0),
+    })
+    .optional(),
   alternativeSuggestions: z.array(outfitSuggestionSchema).max(3).default([]),
   missingItems: z.array(z.string().trim().min(1).max(120)).max(8).default([]),
 })
@@ -135,16 +162,18 @@ export const stylistBatchSuccessResultSchema = z.object({
       providerRequestCount: z.number().int().min(1).default(1),
       retryCount: z.number().int().min(0).default(0),
       modelId: z.string().trim().max(160).optional(),
-      promptVersion: z.string().trim().max(120).default('stylist-batch-v1'),
-      schemaVersion: z.string().trim().max(120).default('stylist-batch-v1'),
+      promptVersion: z.string().trim().max(120).default('stylist-batch-v2'),
+      schemaVersion: z.string().trim().max(120).default('stylist-batch-v2'),
       durationMs: z.number().int().min(0).default(0),
+      regenerationUsed: z.boolean().default(false),
     })
     .default({
       providerRequestCount: 1,
       retryCount: 0,
-      promptVersion: 'stylist-batch-v1',
-      schemaVersion: 'stylist-batch-v1',
+      promptVersion: 'stylist-batch-v2',
+      schemaVersion: 'stylist-batch-v2',
       durationMs: 0,
+      regenerationUsed: false,
     }),
 })
 
@@ -171,6 +200,7 @@ export type StylistProviderInput = {
   lockedItemIds?: string[]
   preferenceContext?: string
   wearHistoryMode?: 'include_underused' | 'avoid_recently_worn' | 'none'
+  validationFeedback?: string[]
 }
 
 export interface StylistProvider {
@@ -203,3 +233,14 @@ export type OutfitDto = {
   }>
   createdAt: string
 }
+
+export const stylistProviderRoleEnum = [...wardrobeRoles] as const
+export const stylistProviderSubtypeEnum = [...wardrobeStoredSubtypes] as const
+export const stylistProviderStyleEnum = [...wardrobeStyleTags] as const
+export const stylistProviderSeasonEnum = [...wardrobeSeasons] as const
+export const stylistProviderFormalityEnum = [
+  ...wardrobeFormalityValues,
+] as const
+export const stylistProviderColorFamilyEnum = [
+  ...wardrobeColorFamilies,
+] as const

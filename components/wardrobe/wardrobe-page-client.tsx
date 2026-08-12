@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { ApiErrorCode } from '@/lib/api/errors'
 import type { Dictionary } from '@/lib/i18n/dictionaries'
+import type { Locale } from '@/lib/i18n/config'
 import type { WardrobeInsightsDto, WearLogDto } from '@/lib/wear'
 import {
   acceptedImageTypes,
@@ -33,6 +34,18 @@ import {
   wardrobeSeasons,
   wardrobeStyles,
 } from '@/lib/wardrobe/constants'
+import {
+  getWardrobeFormalityLabel,
+  getWardrobeFormalityFromLevel,
+  getWardrobeFormalityLevel,
+  getWardrobeRoleLabel,
+  getWardrobeStyleTagLabel,
+  getWardrobeSubtypeLabel,
+  unresolvedWardrobeRole,
+  unresolvedWardrobeSubtype,
+  wardrobeFormalityValues,
+  wardrobeSubtypesByRole,
+} from '@/lib/wardrobe/taxonomy'
 import {
   compressWardrobeImage,
   extractWardrobeImageColors,
@@ -118,7 +131,7 @@ type ImagePreviewState = {
 
 const emptyForm: FormState = {
   name: '',
-  category: 'tops',
+  category: 'top',
   clothingType: '',
   colors: '',
   seasons: [],
@@ -130,7 +143,7 @@ const emptyForm: FormState = {
 
 const emptyCorrections: AnalysisCorrectionState = {
   detectedClothingType: '',
-  detectedCategory: 'tops',
+  detectedCategory: 'top',
   colors: '',
   season: '',
   style: '',
@@ -147,6 +160,13 @@ const emptyCorrections: AnalysisCorrectionState = {
 
 function listToText(values: string[]) {
   return values.join(', ')
+}
+
+function textToList(value: string) {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
 }
 
 function toggleValue(values: string[], value: string) {
@@ -268,7 +288,13 @@ function makeWearIdempotencyKey(scope: string) {
   return `${scope}:${Date.now()}:${crypto.randomUUID()}`
 }
 
-export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
+export function WardrobePageClient({
+  dictionary,
+  locale,
+}: {
+  dictionary: Dictionary
+  locale: Locale
+}) {
   const t = dictionary.wardrobe
   const [items, setItems] = useState<WardrobeItemDto[]>([])
   const [selectedItem, setSelectedItem] = useState<WardrobeItemDto | null>(null)
@@ -540,10 +566,13 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
     const isAiFirstCreate = !editingItem && !advancedManualMode
     const formData = new FormData()
     formData.set('name', form.name.trim() || t.upload.defaultName)
-    formData.set('category', isAiFirstCreate ? 'other' : form.category)
+    formData.set(
+      'category',
+      isAiFirstCreate ? unresolvedWardrobeRole : form.category,
+    )
     formData.set(
       'clothingType',
-      isAiFirstCreate ? t.upload.pendingClothingType : form.clothingType,
+      isAiFirstCreate ? unresolvedWardrobeSubtype : form.clothingType,
     )
     formData.set(
       'colors',
@@ -683,6 +712,27 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
       setIsSubmitting(false)
     }
   }
+
+  const styleOptionLabels = useMemo(
+    () =>
+      Object.fromEntries(
+        wardrobeStyles.map((style) => [
+          style,
+          getWardrobeStyleTagLabel(locale, style),
+        ]),
+      ) as Record<(typeof wardrobeStyles)[number], string>,
+    [locale],
+  )
+
+  const subtypeOptions = useMemo(
+    () =>
+      form.category in wardrobeSubtypesByRole
+        ? wardrobeSubtypesByRole[
+            form.category as keyof typeof wardrobeSubtypesByRole
+          ]
+        : [],
+    [form.category],
+  )
 
   const handleDelete = async (item: WardrobeItemDto) => {
     if (deletingItemIds.has(item.id)) return
@@ -1043,23 +1093,33 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
                   >
                     {wardrobeCategories.map((category) => (
                       <option key={category} value={category}>
-                        {t.options.categories[category]}
+                        {getWardrobeRoleLabel(locale, category)}
                       </option>
                     ))}
                   </select>
                 </div>
-                <Field
-                  id="clothingType"
-                  label={t.fields.clothingType}
-                  value={form.clothingType}
-                  onChange={(value) =>
-                    setForm((current) => ({
-                      ...current,
-                      clothingType: value,
-                    }))
-                  }
-                  required={showManualFields}
-                />
+                <div className="grid gap-2">
+                  <Label htmlFor="clothingType">{t.fields.clothingType}</Label>
+                  <select
+                    id="clothingType"
+                    value={form.clothingType}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        clothingType: event.target.value,
+                      }))
+                    }
+                    className="h-10 rounded-lg border border-input bg-background px-2.5 text-base md:h-8 md:text-sm"
+                    required={showManualFields}
+                  >
+                    <option value="">{t.upload.pendingClothingType}</option>
+                    {subtypeOptions.map((subtype) => (
+                      <option key={subtype} value={subtype}>
+                        {getWardrobeSubtypeLabel(locale, subtype)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <Field
                   id="colors"
                   label={t.fields.colors}
@@ -1104,7 +1164,7 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
                 label={t.fields.style}
                 values={wardrobeStyles}
                 selected={form.styles}
-                labels={t.options.styles}
+                labels={styleOptionLabels}
                 onToggle={(value) =>
                   setForm((current) => ({
                     ...current,
@@ -1165,7 +1225,7 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
             <option value="">{t.filters.allCategories}</option>
             {wardrobeCategories.map((category) => (
               <option key={category} value={category}>
-                {t.options.categories[category]}
+                {getWardrobeRoleLabel(locale, category)}
               </option>
             ))}
           </select>
@@ -1191,7 +1251,7 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
             <option value="">{t.filters.allStyles}</option>
             {wardrobeStyles.map((style) => (
               <option key={style} value={style}>
-                {t.options.styles[style]}
+                {getWardrobeStyleTagLabel(locale, style)}
               </option>
             ))}
           </select>
@@ -1483,6 +1543,7 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
           </div>
           <AnalysisPanel
             dictionary={dictionary}
+            locale={locale}
             item={selectedItem}
             corrections={corrections}
             setCorrections={setCorrections}
@@ -1762,6 +1823,7 @@ function AnalysisStatusBadge({
 
 function AnalysisPanel({
   dictionary,
+  locale,
   item,
   corrections,
   setCorrections,
@@ -1771,6 +1833,7 @@ function AnalysisPanel({
   onSaveCorrections,
 }: {
   dictionary: Dictionary
+  locale: Locale
   item: WardrobeItemDto
   corrections: AnalysisCorrectionState
   setCorrections: React.Dispatch<React.SetStateAction<AnalysisCorrectionState>>
@@ -1781,6 +1844,39 @@ function AnalysisPanel({
 }) {
   const t = dictionary.wardrobe.analysis
   const analysis = item.effectiveAnalysis
+  const seasonOptionLabels = dictionary.wardrobe.options.seasons
+  const styleOptionLabels = useMemo(
+    () =>
+      Object.fromEntries(
+        wardrobeStyles.map((style) => [
+          style,
+          getWardrobeStyleTagLabel(locale, style),
+        ]),
+      ) as Record<(typeof wardrobeStyles)[number], string>,
+    [locale],
+  )
+  const selectedCorrectionRole =
+    corrections.detectedCategory || analysis?.detectedCategory || 'top'
+  const correctionSubtypeOptions =
+    selectedCorrectionRole in wardrobeSubtypesByRole
+      ? wardrobeSubtypesByRole[
+          selectedCorrectionRole as keyof typeof wardrobeSubtypesByRole
+        ]
+      : []
+  const selectedFormality = getWardrobeFormalityFromLevel(
+    Number(corrections.formalityLevel || analysis?.formalityLevel || 2),
+  )
+  const formatSeasonList = (values: string[]) =>
+    values
+      .map(
+        (value) =>
+          seasonOptionLabels[
+            value as keyof typeof dictionary.wardrobe.options.seasons
+          ] ?? value,
+      )
+      .join(', ')
+  const formatStyleList = (values: string[]) =>
+    values.map((value) => getWardrobeStyleTagLabel(locale, value)).join(', ')
 
   return (
     <div className="mt-5 rounded-xl border border-foreground/10 bg-background/60 p-4 shadow-sm">
@@ -1858,15 +1954,15 @@ function AnalysisPanel({
             <div className="flex flex-wrap gap-2">
               <AnalysisTag
                 label={t.fields.detectedCategory}
-                value={analysis.detectedCategory}
+                value={getWardrobeRoleLabel(locale, analysis.detectedCategory)}
               />
               <AnalysisTag
                 label={t.fields.style}
-                value={listToText(analysis.style)}
+                value={formatStyleList(analysis.style)}
               />
               <AnalysisTag
                 label={t.fields.season}
-                value={listToText(analysis.season)}
+                value={formatSeasonList(analysis.season)}
               />
               <AnalysisTag
                 label={t.fields.material}
@@ -1878,7 +1974,7 @@ function AnalysisPanel({
               />
               <AnalysisTag
                 label={t.fields.formalityLevel}
-                value={String(analysis.formalityLevel)}
+                value={getWardrobeFormalityLabel(locale, analysis.formality)}
               />
               <AnalysisTag
                 label={t.fields.warmthLevel}
@@ -1889,11 +1985,14 @@ function AnalysisPanel({
           <dl className="grid gap-3 text-sm md:grid-cols-2">
             <Detail
               label={t.fields.detectedClothingType}
-              value={analysis.detectedClothingType}
+              value={getWardrobeSubtypeLabel(
+                locale,
+                analysis.detectedClothingType,
+              )}
             />
             <Detail
               label={t.fields.detectedCategory}
-              value={analysis.detectedCategory}
+              value={getWardrobeRoleLabel(locale, analysis.detectedCategory)}
             />
             <Detail
               label={t.fields.colors}
@@ -1901,9 +2000,12 @@ function AnalysisPanel({
             />
             <Detail
               label={t.fields.season}
-              value={listToText(analysis.season)}
+              value={formatSeasonList(analysis.season)}
             />
-            <Detail label={t.fields.style} value={listToText(analysis.style)} />
+            <Detail
+              label={t.fields.style}
+              value={formatStyleList(analysis.style)}
+            />
             <Detail label={t.fields.material} value={analysis.material} />
             <Detail label={t.fields.fit} value={analysis.fit} />
             <Detail label={t.fields.pattern} value={analysis.pattern} />
@@ -1914,7 +2016,7 @@ function AnalysisPanel({
             />
             <Detail
               label={t.fields.formalityLevel}
-              value={String(analysis.formalityLevel)}
+              value={getWardrobeFormalityLabel(locale, analysis.formality)}
             />
             <Detail
               label={t.fields.confidenceScore}
@@ -1955,6 +2057,10 @@ function AnalysisPanel({
               <CorrectionField
                 label={t.fields.detectedClothingType}
                 value={corrections.detectedClothingType}
+                selectOptions={correctionSubtypeOptions.map((subtype) => ({
+                  value: subtype,
+                  label: getWardrobeSubtypeLabel(locale, subtype),
+                }))}
                 onChange={(value) =>
                   setCorrections((current) => ({
                     ...current,
@@ -1976,7 +2082,7 @@ function AnalysisPanel({
                 >
                   {wardrobeCategories.map((category) => (
                     <option key={category} value={category}>
-                      {dictionary.wardrobe.options.categories[category]}
+                      {getWardrobeRoleLabel(locale, category)}
                     </option>
                   ))}
                 </select>
@@ -1988,18 +2094,32 @@ function AnalysisPanel({
                   setCorrections((current) => ({ ...current, colors: value }))
                 }
               />
-              <CorrectionField
+              <CheckboxGroup
                 label={t.fields.season}
-                value={corrections.season}
-                onChange={(value) =>
-                  setCorrections((current) => ({ ...current, season: value }))
+                values={wardrobeSeasons}
+                selected={textToList(corrections.season)}
+                labels={seasonOptionLabels}
+                onToggle={(value) =>
+                  setCorrections((current) => ({
+                    ...current,
+                    season: listToText(
+                      toggleValue(textToList(current.season), value),
+                    ),
+                  }))
                 }
               />
-              <CorrectionField
+              <CheckboxGroup
                 label={t.fields.style}
-                value={corrections.style}
-                onChange={(value) =>
-                  setCorrections((current) => ({ ...current, style: value }))
+                values={wardrobeStyles}
+                selected={textToList(corrections.style)}
+                labels={styleOptionLabels}
+                onToggle={(value) =>
+                  setCorrections((current) => ({
+                    ...current,
+                    style: listToText(
+                      toggleValue(textToList(current.style), value),
+                    ),
+                  }))
                 }
               />
               <CorrectionField
@@ -2056,19 +2176,27 @@ function AnalysisPanel({
                   }))
                 }
               />
-              <CorrectionField
-                label={t.fields.formalityLevel}
-                value={corrections.formalityLevel}
-                type="number"
-                min={1}
-                max={5}
-                onChange={(value) =>
-                  setCorrections((current) => ({
-                    ...current,
-                    formalityLevel: value,
-                  }))
-                }
-              />
+              <div className="grid gap-2">
+                <Label>{t.fields.formalityLevel}</Label>
+                <select
+                  value={selectedFormality}
+                  onChange={(event) =>
+                    setCorrections((current) => ({
+                      ...current,
+                      formalityLevel: String(
+                        getWardrobeFormalityLevel(event.target.value),
+                      ),
+                    }))
+                  }
+                  className="h-10 rounded-lg border border-input bg-background px-2.5 text-base md:h-8 md:text-sm"
+                >
+                  {wardrobeFormalityValues.map((formality) => (
+                    <option key={formality} value={formality}>
+                      {getWardrobeFormalityLabel(locale, formality)}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="grid gap-2">
               <Label>{t.fields.visualDescription}</Label>
@@ -2107,6 +2235,7 @@ function CorrectionField({
   type = 'text',
   min,
   max,
+  selectOptions,
   onChange,
 }: {
   label: string
@@ -2114,18 +2243,34 @@ function CorrectionField({
   type?: 'text' | 'number'
   min?: number
   max?: number
+  selectOptions?: Array<{ value: string; label: string }>
   onChange: (value: string) => void
 }) {
   return (
     <div className="grid gap-2">
       <Label>{label}</Label>
-      <Input
-        type={type}
-        min={min}
-        max={max}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
+      {selectOptions ? (
+        <select
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-10 rounded-lg border border-input bg-background px-2.5 text-base md:h-8 md:text-sm"
+        >
+          <option value="" />
+          {selectOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <Input
+          type={type}
+          min={min}
+          max={max}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      )}
     </div>
   )
 }

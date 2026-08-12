@@ -17,9 +17,12 @@ Each wardrobe item has `analysisStatus`:
 
 Raw AI output is stored in `aiAnalysis` and validated with Zod:
 
+- role
+- subtype
 - detected clothing type
 - detected category
 - colors
+- color families
 - dominant hex colors
 - material
 - season
@@ -37,6 +40,20 @@ Raw AI output is stored in `aiAnalysis` and validated with Zod:
 - model id
 
 User review data is stored separately in `userCorrections`. Effective display values are raw AI values with corrections applied on top.
+
+The canonical taxonomy is shared with wardrobe editing and the stylist. AI
+analysis now normalizes role/category values to:
+
+- `top`
+- `bottom`
+- `outerwear`
+- `one_piece`
+- `shoes`
+- `accessory`
+- `unresolved`
+
+Subtype output is also canonical, for example `t_shirt`, `shirt`, `polo`,
+`shorts`, `trousers`, `jeans`, or `sneakers`.
 
 ## Provider Architecture
 
@@ -58,6 +75,7 @@ The upload flow also extracts deterministic browser-side color hints from the de
 Provider output is post-processed with deterministic quality rules:
 
 - clothing type normalization, including t-shirt/tee detection
+- role and subtype normalization from trusted taxonomy
 - top-category correction for shirts, t-shirts, polos, sweaters, hoodies, and similar tops
 - color override from deterministic image color hints
 - dominant HEX color override from deterministic image color hints
@@ -66,8 +84,8 @@ Provider output is post-processed with deterministic quality rules:
 
 For a grey Levi's t-shirt, expected output is:
 
-- clothing type: `t-shirt`
-- category: `tops`
+- role: `top`
+- subtype: `t_shirt`
 - color: grey/light grey
 - brand guess: `Levi's` when visible in the image or name
 - material: cotton or cotton blend

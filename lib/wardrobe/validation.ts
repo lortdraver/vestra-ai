@@ -1,10 +1,15 @@
 import {
   acceptedImageTypes,
   maxUploadedImageBytes,
-  wardrobeCategories,
   wardrobeSeasons,
   wardrobeStyles,
 } from './constants'
+import {
+  normalizeWardrobeRole,
+  normalizeWardrobeSeason,
+  normalizeWardrobeStyleTag,
+  normalizeWardrobeSubtype,
+} from './taxonomy'
 import type { WardrobeItemPayload } from './types'
 
 type ValidationResult<T> =
@@ -70,19 +75,35 @@ function parseImageColorHints(value: FormDataEntryValue | null) {
 export function parseWardrobePayload(
   formData: FormData,
 ): ValidationResult<WardrobeItemPayload> {
+  const rawCategory = cleanText(formData.get('category'), textLimit.category)
+  const rawClothingType = cleanText(
+    formData.get('clothingType'),
+    textLimit.clothingType,
+  )
   const payload = {
     name: cleanText(formData.get('name'), textLimit.name),
-    category: cleanText(formData.get('category'), textLimit.category),
-    clothingType: cleanText(
-      formData.get('clothingType'),
-      textLimit.clothingType,
-    ),
+    category: normalizeWardrobeRole(rawCategory) ?? '',
+    clothingType:
+      normalizeWardrobeSubtype(rawClothingType, {
+        role: rawCategory,
+      }) ?? '',
     colors: parseList(formData.get('colors')),
     seasons: keepKnownValues(
-      parseList(formData.get('seasons')),
+      parseList(formData.get('seasons'))
+        .map((value) => normalizeWardrobeSeason(value))
+        .filter((value): value is (typeof wardrobeSeasons)[number] =>
+          Boolean(value),
+        ),
       wardrobeSeasons,
     ),
-    styles: keepKnownValues(parseList(formData.get('styles')), wardrobeStyles),
+    styles: keepKnownValues(
+      parseList(formData.get('styles'))
+        .map((value) => normalizeWardrobeStyleTag(value))
+        .filter((value): value is (typeof wardrobeStyles)[number] =>
+          Boolean(value),
+        ),
+      wardrobeStyles,
+    ),
     material: cleanText(formData.get('material'), textLimit.material),
     brand: cleanText(formData.get('brand'), textLimit.brand),
     notes: cleanText(formData.get('notes'), textLimit.notes),
@@ -90,11 +111,10 @@ export function parseWardrobePayload(
   }
 
   if (!payload.name || !payload.category || !payload.clothingType) {
+    if (payload.name && rawCategory && !payload.category) {
+      return { ok: false, message: 'invalid_category', status: 400 }
+    }
     return { ok: false, message: 'missing_required_fields', status: 400 }
-  }
-
-  if (!wardrobeCategories.includes(payload.category as never)) {
-    return { ok: false, message: 'invalid_category', status: 400 }
   }
 
   return { ok: true, data: payload }

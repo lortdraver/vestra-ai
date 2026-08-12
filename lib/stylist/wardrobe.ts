@@ -1,4 +1,21 @@
 import type { wardrobeItem } from '@/lib/db/schema'
+import {
+  mergeAnalysisCorrections,
+  parseAnalysisCorrections,
+  parseClothingAnalysis,
+} from '@/lib/ai/analysis-schema'
+import {
+  getWardrobeColorFamilyLabel,
+  getWardrobeFormalityFromLevel,
+  normalizeWardrobeColorFamilies,
+  normalizeWardrobeFormality,
+  normalizeWardrobeRole,
+  normalizeWardrobeStyleTags,
+  resolveWardrobeTaxonomy,
+  unresolvedWardrobeRole,
+  unresolvedWardrobeSubtype,
+  type WardrobeRole,
+} from '@/lib/wardrobe/taxonomy'
 import type {
   QuickRequestId,
   StylistRequest,
@@ -7,122 +24,113 @@ import type {
 
 type WardrobeRow = typeof wardrobeItem.$inferSelect
 
-const requestStyles: Partial<Record<QuickRequestId, string[]>> = {
-  old_money: ['classic', 'minimal', 'formal'],
-  luxury: ['classic', 'formal', 'evening'],
-  streetwear: ['streetwear', 'casual'],
-  sport: ['sport'],
-  business: ['business', 'formal', 'classic'],
-  work: ['business', 'formal', 'classic'],
-  wedding: ['formal', 'evening', 'classic'],
-  date: ['evening', 'classic', 'casual'],
-  restaurant: ['evening', 'classic', 'casual'],
-  university: ['casual', 'minimal', 'sport'],
+type RequestProfile = {
+  preferredRoles?: WardrobeRole[]
+  preferredTopSubtypes?: string[]
+  preferredBottomSubtypes?: string[]
+  preferredShoeSubtypes?: string[]
+  preferredOuterwearSubtypes?: string[]
+  preferredStyles?: string[]
+  preferredFormality?: string[]
+  avoidSubtypes?: string[]
 }
 
-const requestSeasons: Partial<Record<QuickRequestId, string[]>> = {
-  cold_weather: ['winter', 'autumn'],
-  hot_weather: ['summer', 'spring'],
-  rain: ['autumn', 'spring', 'winter'],
-  vacation: ['summer', 'spring'],
+const requestProfiles: Partial<Record<QuickRequestId, RequestProfile>> = {
+  university: {
+    preferredTopSubtypes: ['t_shirt', 'polo', 'shirt', 'hoodie', 'sweater'],
+    preferredBottomSubtypes: ['jeans', 'chinos', 'shorts', 'joggers'],
+    preferredShoeSubtypes: ['sneakers', 'loafers'],
+    preferredStyles: ['casual', 'relaxed', 'smart_casual'],
+    preferredFormality: ['casual', 'smart_casual'],
+  },
+  work: {
+    preferredTopSubtypes: ['shirt', 'polo', 'sweater'],
+    preferredBottomSubtypes: ['trousers', 'chinos', 'jeans'],
+    preferredShoeSubtypes: ['loafers', 'dress_shoes', 'sneakers'],
+    preferredOuterwearSubtypes: ['blazer', 'cardigan'],
+    preferredStyles: ['business', 'classic', 'smart_casual'],
+    preferredFormality: ['smart_casual', 'business'],
+    avoidSubtypes: ['joggers', 'sweatpants'],
+  },
+  business: {
+    preferredTopSubtypes: ['shirt', 'polo'],
+    preferredBottomSubtypes: ['trousers', 'chinos'],
+    preferredShoeSubtypes: ['dress_shoes', 'loafers'],
+    preferredOuterwearSubtypes: ['blazer'],
+    preferredStyles: ['business', 'formal', 'classic'],
+    preferredFormality: ['business', 'formal'],
+    avoidSubtypes: ['shorts', 'joggers', 'sweatpants'],
+  },
+  wedding: {
+    preferredTopSubtypes: ['shirt'],
+    preferredBottomSubtypes: ['trousers'],
+    preferredShoeSubtypes: ['dress_shoes', 'loafers', 'heels'],
+    preferredOuterwearSubtypes: ['blazer'],
+    preferredStyles: ['formal', 'classic', 'evening'],
+    preferredFormality: ['formal', 'business'],
+    avoidSubtypes: ['shorts', 'joggers', 'sneakers'],
+  },
+  restaurant: {
+    preferredTopSubtypes: ['shirt', 'polo', 'sweater'],
+    preferredBottomSubtypes: ['trousers', 'chinos', 'jeans'],
+    preferredShoeSubtypes: ['loafers', 'dress_shoes', 'sneakers'],
+    preferredStyles: ['classic', 'smart_casual', 'evening'],
+    preferredFormality: ['smart_casual', 'business'],
+  },
+  date: {
+    preferredTopSubtypes: ['shirt', 'polo', 'sweater'],
+    preferredBottomSubtypes: ['trousers', 'chinos', 'jeans'],
+    preferredShoeSubtypes: ['loafers', 'sneakers', 'heels'],
+    preferredStyles: ['classic', 'casual', 'evening'],
+    preferredFormality: ['casual', 'smart_casual'],
+  },
+  sport: {
+    preferredTopSubtypes: ['t_shirt', 'tank_top', 'hoodie'],
+    preferredBottomSubtypes: ['shorts', 'joggers', 'sweatpants'],
+    preferredShoeSubtypes: ['sneakers'],
+    preferredStyles: ['sport'],
+    preferredFormality: ['relaxed', 'casual'],
+    avoidSubtypes: ['blazer', 'dress_shoes', 'heels'],
+  },
+  hot_weather: {
+    preferredTopSubtypes: ['t_shirt', 'polo', 'tank_top', 'shirt'],
+    preferredBottomSubtypes: ['shorts', 'chinos', 'trousers'],
+    preferredShoeSubtypes: ['sneakers', 'sandals', 'loafers'],
+    avoidSubtypes: ['coat', 'hoodie', 'sweater', 'boots'],
+  },
+  cold_weather: {
+    preferredTopSubtypes: ['hoodie', 'sweater', 'shirt', 'sweatshirt'],
+    preferredBottomSubtypes: ['jeans', 'trousers', 'joggers'],
+    preferredShoeSubtypes: ['boots', 'sneakers', 'loafers'],
+    preferredOuterwearSubtypes: ['jacket', 'coat', 'cardigan', 'blazer'],
+  },
+  rain: {
+    preferredShoeSubtypes: ['boots', 'sneakers'],
+    preferredOuterwearSubtypes: ['jacket', 'coat'],
+  },
 }
 
-export const requiredCoreCategories = ['tops', 'bottoms', 'shoes'] as const
-
-const categoryAliases: Record<string, string> = {
-  top: 'tops',
-  tops: 'tops',
-  shirt: 'tops',
-  't-shirt': 'tops',
-  tshirt: 'tops',
-  tee: 'tops',
-  blouse: 'tops',
-  sweater: 'tops',
-  sweatshirt: 'tops',
-  hoodie: 'tops',
-  polo: 'tops',
-  'tank-top': 'tops',
-  köynək: 'tops',
-  koynek: 'tops',
-  футболка: 'tops',
-  рубашка: 'tops',
-  верх: 'tops',
-  bottom: 'bottoms',
-  bottoms: 'bottoms',
-  pants: 'bottoms',
-  trousers: 'bottoms',
-  jeans: 'bottoms',
-  shorts: 'bottoms',
-  skirt: 'bottoms',
-  leggings: 'bottoms',
-  şalvar: 'bottoms',
-  salvar: 'bottoms',
-  брюки: 'bottoms',
-  джинсы: 'bottoms',
-  низ: 'bottoms',
-  shoe: 'shoes',
-  shoes: 'shoes',
-  footwear: 'shoes',
-  sneaker: 'shoes',
-  sneakers: 'shoes',
-  trainers: 'shoes',
-  boots: 'shoes',
-  loafers: 'shoes',
-  heels: 'shoes',
-  sandals: 'shoes',
-  ayaqqabı: 'shoes',
-  ayaqqabi: 'shoes',
-  обувь: 'shoes',
-  dress: 'dresses',
-  dresses: 'dresses',
-  jumpsuit: 'dresses',
-  suit: 'dresses',
-  'one-piece': 'dresses',
-  платье: 'dresses',
-  jacket: 'outerwear',
-  coat: 'outerwear',
-  blazer: 'outerwear',
-  cardigan: 'outerwear',
-  vest: 'outerwear',
-  outerwear: 'outerwear',
-  'верхняя-одежда': 'outerwear',
-  bag: 'bags',
-  bags: 'bags',
-  accessory: 'accessories',
-  accessories: 'accessories',
-  belt: 'accessories',
-  hat: 'accessories',
-  cap: 'accessories',
-  scarf: 'accessories',
-  jewelry: 'accessories',
-  watch: 'accessories',
-  glasses: 'accessories',
-  аксессуар: 'accessories',
-  аксессуары: 'accessories',
-}
-
-function normalizeToken(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[_\s]+/g, '-')
-}
+export const requiredCoreCategories = ['top', 'bottom', 'shoes'] as const
 
 export function normalizeStylistCategory(category: string, clothingType = '') {
-  const normalizedCategory = categoryAliases[normalizeToken(category)]
-  if (normalizedCategory && normalizedCategory !== 'other') {
-    return normalizedCategory
-  }
+  const normalizedCategory = normalizeWardrobeRole(category, {
+    allowUnresolved: false,
+  })
+  if (normalizedCategory) return normalizedCategory
 
-  const normalizedType = normalizeToken(clothingType)
-  return categoryAliases[normalizedType] ?? normalizedCategory ?? 'other'
+  const normalizedTypeRole = normalizeWardrobeRole(clothingType, {
+    allowUnresolved: false,
+  })
+  if (normalizedTypeRole) return normalizedTypeRole
+
+  return resolveWardrobeTaxonomy({
+    category,
+    clothingType,
+  }).role
 }
 
 export type StylistRoleResolutionSource =
-  | 'wardrobe_category'
-  | 'wardrobe_clothing_type'
-  | 'provider_role'
-  | 'unresolved'
+  'wardrobe_role' | 'wardrobe_subtype' | 'provider_role' | 'unresolved'
 
 export type StylistRoleResolution = {
   role: string
@@ -133,61 +141,48 @@ export function resolveStylistOutfitRole(input: {
   providerRole?: string
   wardrobeCategory?: string
   wardrobeSubcategory?: string
+  wardrobeRole?: string
+  wardrobeSubtype?: string
 }): StylistRoleResolution {
-  const categoryRole = normalizeStylistCategory(input.wardrobeCategory ?? '')
-  if (categoryRole !== 'other') {
-    return { role: categoryRole, source: 'wardrobe_category' }
+  const wardrobeRole = normalizeWardrobeRole(input.wardrobeRole, {
+    allowUnresolved: false,
+  })
+  if (wardrobeRole) {
+    return { role: wardrobeRole, source: 'wardrobe_role' }
   }
 
-  const clothingTypeRole = normalizeStylistCategory(
-    '',
-    input.wardrobeSubcategory ?? '',
-  )
-  if (clothingTypeRole !== 'other') {
-    return { role: clothingTypeRole, source: 'wardrobe_clothing_type' }
+  const resolvedFromWardrobe = resolveWardrobeTaxonomy({
+    role: input.wardrobeCategory,
+    subtype: input.wardrobeSubcategory,
+  })
+  if (resolvedFromWardrobe.role !== unresolvedWardrobeRole) {
+    return {
+      role: resolvedFromWardrobe.role,
+      source:
+        resolvedFromWardrobe.subtype !== unresolvedWardrobeSubtype
+          ? 'wardrobe_subtype'
+          : 'wardrobe_role',
+    }
   }
 
-  const providerRole = normalizeStylistCategory(input.providerRole ?? '')
-  if (providerRole !== 'other') {
+  const providerRole = normalizeWardrobeRole(input.providerRole, {
+    allowUnresolved: false,
+  })
+  if (providerRole) {
     return { role: providerRole, source: 'provider_role' }
   }
 
-  return { role: 'other', source: 'unresolved' }
+  return { role: unresolvedWardrobeRole, source: 'unresolved' }
 }
 
-export function toStylistWardrobeItem(row: WardrobeRow): StylistWardrobeItem {
-  return {
-    id: row.id,
-    name: row.name,
-    category: normalizeStylistCategory(row.category, row.clothingType),
-    clothingType: row.clothingType,
-    colors: row.colors,
-    seasons: row.seasons,
-    styles: row.styles,
-    material: row.material,
-    brand: row.brand,
-    notes: row.notes,
-    imageUrl: row.processedImageUrl ?? row.imageUrl,
-  }
+function getPreferredProfile(request: StylistRequest) {
+  return request.quickRequest
+    ? (requestProfiles[request.quickRequest] ?? {})
+    : {}
 }
 
-export function getStylistWardrobeDiagnostics(rows: WardrobeRow[]) {
-  const activeRows = rows.filter((row) => row.imageDeletionStatus === 'active')
-  const excludedRows = rows.filter(
-    (row) => row.imageDeletionStatus !== 'active',
-  )
-  const normalizedItems = activeRows.map(toStylistWardrobeItem)
-  const categories = countBy(normalizedItems.map((item) => item.category))
-  const analysisStatuses = countBy(rows.map((row) => row.analysisStatus))
-
-  return {
-    eligibleItemCount: normalizedItems.length,
-    categories,
-    analysisStatuses,
-    excluded: {
-      imageDeletionNotActive: excludedRows.length,
-    },
-  }
+function buildPromptContext(request: StylistRequest) {
+  return `${request.message} ${request.quickRequest ?? ''} ${request.occasion ?? ''}`.toLowerCase()
 }
 
 function countBy(values: string[]) {
@@ -197,27 +192,138 @@ function countBy(values: string[]) {
   }, {})
 }
 
-function scoreItem(item: StylistWardrobeItem, request: StylistRequest) {
-  const prompt =
-    `${request.message} ${request.quickRequest ?? ''}`.toLowerCase()
-  const desiredStyles = request.quickRequest
-    ? (requestStyles[request.quickRequest] ?? [])
-    : []
-  const desiredSeasons = request.quickRequest
-    ? (requestSeasons[request.quickRequest] ?? [])
-    : []
+export function toStylistWardrobeItem(row: WardrobeRow): StylistWardrobeItem {
+  const aiAnalysis = row.aiAnalysis
+    ? parseClothingAnalysis(row.aiAnalysis)
+    : null
+  const userCorrections = row.userCorrections
+    ? parseAnalysisCorrections(row.userCorrections)
+    : null
+  const effectiveAnalysis = mergeAnalysisCorrections(
+    aiAnalysis,
+    userCorrections,
+  )
+  const taxonomy = resolveWardrobeTaxonomy({
+    role:
+      effectiveAnalysis?.role ??
+      effectiveAnalysis?.detectedCategory ??
+      row.category,
+    subtype:
+      effectiveAnalysis?.subtype ??
+      effectiveAnalysis?.detectedClothingType ??
+      row.clothingType,
+    category: row.category,
+    clothingType: row.clothingType,
+    analysisRole: aiAnalysis?.role ?? aiAnalysis?.detectedCategory,
+    analysisSubtype: aiAnalysis?.subtype ?? aiAnalysis?.detectedClothingType,
+  })
+  const styleTags =
+    effectiveAnalysis?.styleTags?.length || effectiveAnalysis?.style?.length
+      ? normalizeWardrobeStyleTags(
+          effectiveAnalysis.styleTags ?? effectiveAnalysis.style,
+        )
+      : normalizeWardrobeStyleTags(row.styles)
+  const colorFamilies =
+    effectiveAnalysis?.colorFamilies?.length ||
+    effectiveAnalysis?.colors?.length
+      ? normalizeWardrobeColorFamilies(
+          effectiveAnalysis.colorFamilies ?? effectiveAnalysis.colors,
+        )
+      : normalizeWardrobeColorFamilies(row.colors)
+  const formality =
+    effectiveAnalysis?.formality ??
+    getWardrobeFormalityFromLevel(effectiveAnalysis?.formalityLevel ?? 2)
 
+  return {
+    id: row.id,
+    name: row.name,
+    imageUrl: row.processedImageUrl ?? row.imageUrl,
+    notes: row.notes,
+    role: taxonomy.role,
+    subtype: taxonomy.subtype,
+    category: taxonomy.role,
+    clothingType: taxonomy.subtype,
+    colors:
+      effectiveAnalysis?.colors?.length && effectiveAnalysis.colors.length > 0
+        ? effectiveAnalysis.colors
+        : row.colors,
+    colorFamilies,
+    seasons:
+      effectiveAnalysis?.season?.length && effectiveAnalysis.season.length > 0
+        ? effectiveAnalysis.season
+        : row.seasons,
+    styles: styleTags,
+    styleTags,
+    formality: normalizeWardrobeFormality(formality) ?? 'casual',
+    material: effectiveAnalysis?.material || row.material,
+    brand: effectiveAnalysis?.brandGuess || row.brand,
+  }
+}
+
+export function getStylistWardrobeDiagnostics(rows: WardrobeRow[]) {
+  const activeRows = rows.filter((row) => row.imageDeletionStatus === 'active')
+  const excludedRows = rows.filter(
+    (row) => row.imageDeletionStatus !== 'active',
+  )
+  const normalizedItems = activeRows.map(toStylistWardrobeItem)
+  const categories = countBy(normalizedItems.map((item) => item.role))
+  const subtypes = countBy(normalizedItems.map((item) => item.subtype))
+  const analysisStatuses = countBy(rows.map((row) => row.analysisStatus))
+
+  return {
+    eligibleItemCount: normalizedItems.length,
+    categories,
+    subtypes,
+    analysisStatuses,
+    excluded: {
+      imageDeletionNotActive: excludedRows.length,
+      unresolvedTaxonomy: normalizedItems.filter(
+        (item) =>
+          item.role === unresolvedWardrobeRole ||
+          item.subtype === unresolvedWardrobeSubtype,
+      ).length,
+    },
+  }
+}
+
+function scoreItem(item: StylistWardrobeItem, request: StylistRequest) {
+  const prompt = buildPromptContext(request)
+  const profile = getPreferredProfile(request)
   let score = 0
+
   if (prompt.includes(item.name.toLowerCase())) score += 4
-  if (prompt.includes(item.clothingType.toLowerCase())) score += 3
-  if (prompt.includes(item.category.toLowerCase())) score += 2
-  score +=
-    item.styles.filter((style) => desiredStyles.includes(style)).length * 3
-  score +=
-    item.seasons.filter((season) => desiredSeasons.includes(season)).length * 2
-  score += item.colors.filter((color) => prompt.includes(color)).length
-  if (item.category === 'shoes') score += 1
-  if (item.category === 'tops' || item.category === 'bottoms') score += 2
+  if (prompt.includes(item.subtype.toLowerCase())) score += 3
+  if (prompt.includes(item.role.toLowerCase())) score += 2
+  if (profile.preferredRoles?.includes(item.role as WardrobeRole)) score += 2
+  if (profile.preferredTopSubtypes?.includes(item.subtype)) score += 5
+  if (profile.preferredBottomSubtypes?.includes(item.subtype)) score += 5
+  if (profile.preferredShoeSubtypes?.includes(item.subtype)) score += 5
+  if (profile.preferredOuterwearSubtypes?.includes(item.subtype)) score += 4
+  if (
+    profile.preferredStyles?.some((style) => item.styleTags.includes(style))
+  ) {
+    score += 4
+  }
+  if (profile.preferredFormality?.includes(item.formality)) score += 4
+  if (profile.avoidSubtypes?.includes(item.subtype)) score -= 8
+
+  if (
+    request.weatherContext &&
+    request.weatherContext.temperatureC >= 28 &&
+    ['coat', 'hoodie', 'sweater', 'boots'].includes(item.subtype)
+  ) {
+    score -= 8
+  }
+  if (
+    request.weatherContext &&
+    request.weatherContext.temperatureC <= 8 &&
+    ['shorts', 'tank_top', 'sandals'].includes(item.subtype)
+  ) {
+    score -= 7
+  }
+
+  if (item.role === 'shoes') score += 1
+  if (item.role === 'top' || item.role === 'bottom') score += 2
 
   return score
 }
@@ -226,24 +332,11 @@ export function filterAndRankWardrobe(
   items: StylistWardrobeItem[],
   request: StylistRequest,
 ) {
-  const desiredStyles = request.quickRequest
-    ? (requestStyles[request.quickRequest] ?? [])
-    : []
-  const desiredSeasons = request.quickRequest
-    ? (requestSeasons[request.quickRequest] ?? [])
-    : []
-
+  const profile = getPreferredProfile(request)
   const filtered = items.filter((item) => {
-    const styleOk =
-      desiredStyles.length === 0 ||
-      item.styles.length === 0 ||
-      item.styles.some((style) => desiredStyles.includes(style))
-    const seasonOk =
-      desiredSeasons.length === 0 ||
-      item.seasons.length === 0 ||
-      item.seasons.some((season) => desiredSeasons.includes(season))
-
-    return styleOk && seasonOk
+    if (item.role === unresolvedWardrobeRole) return false
+    if (profile.avoidSubtypes?.includes(item.subtype)) return false
+    return true
   })
 
   return [...(filtered.length > 0 ? filtered : items)]
@@ -253,7 +346,7 @@ export function filterAndRankWardrobe(
 }
 
 export function findMissingCoreItems(items: StylistWardrobeItem[]) {
-  const categories = new Set(items.map((item) => item.category))
+  const categories = new Set(items.map((item) => item.role))
   return requiredCoreCategories.filter((category) => !categories.has(category))
 }
 
@@ -262,8 +355,7 @@ export function hasCompleteOutfit(items: StylistWardrobeItem[]) {
 }
 
 export function isSingleItemStylistRequest(request: StylistRequest) {
-  const prompt =
-    `${request.message} ${request.quickRequest ?? ''}`.toLowerCase()
+  const prompt = buildPromptContext(request)
 
   return (
     /\b(suggest|choose|pick|select)\s+(only\s+)?(a\s+)?(top|shirt|t-shirt|tee|polo|shoes?|sneakers?|bottom|pants|jeans)\b/.test(
@@ -288,6 +380,15 @@ export function findMissingRequiredCategories(
   items: StylistWardrobeItem[],
   requiredCategories: string[],
 ) {
-  const categories = new Set(items.map((item) => item.category))
+  const categories = new Set(items.map((item) => item.role))
   return requiredCategories.filter((category) => !categories.has(category))
+}
+
+export function describeAvailableCategories(
+  items: StylistWardrobeItem[],
+  locale: StylistRequest['locale'],
+) {
+  return Array.from(new Set(items.map((item) => item.role))).map((role) =>
+    getWardrobeColorFamilyLabel(locale, role),
+  )
 }

@@ -58,11 +58,11 @@ export class MockStylistProvider implements StylistProvider {
       }
     }
 
-    const top = pickByCategory(input.wardrobeItems, 'tops')
-    const bottom = pickByCategory(input.wardrobeItems, 'bottoms')
+    const top = pickByCategory(input.wardrobeItems, 'top')
+    const bottom = pickByCategory(input.wardrobeItems, 'bottom')
     const shoes = pickByCategory(input.wardrobeItems, 'shoes')
     const accessory =
-      pickByCategory(input.wardrobeItems, 'accessories') ??
+      pickByCategory(input.wardrobeItems, 'accessory') ??
       pickByCategory(input.wardrobeItems, 'outerwear')
     const selected = [top, bottom, shoes, accessory].filter(
       Boolean,

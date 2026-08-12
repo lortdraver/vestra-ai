@@ -26,6 +26,7 @@ Tables:
 
 - All wardrobe queries are scoped by `userId`.
 - The provider receives only the authenticated user's ranked wardrobe items.
+- The provider payload is structured and excludes private notes and image URLs.
 - Every returned clothing ID is validated against the scoped wardrobe set.
 - Duplicate clothing IDs are rejected.
 - Normal complete outfit requests require at least one top, one bottom, and one
@@ -36,6 +37,26 @@ Tables:
   remain incomplete, the API returns a structured non-success result and does not
   store an outfit.
 - AI responses must use the selected locale.
+
+## Canonical Taxonomy
+
+Stylist generation now uses the same canonical wardrobe taxonomy as AI clothing
+analysis and manual wardrobe editing.
+
+Top-level outfit roles:
+
+- `top`
+- `bottom`
+- `outerwear`
+- `one_piece`
+- `shoes`
+- `accessory`
+
+Canonical subtypes include `t_shirt`, `shirt`, `polo`, `hoodie`, `trousers`,
+`shorts`, `jeans`, `sneakers`, `boots`, `dress_shoes`, and other role-specific
+values. Legacy values are normalized before ranking and validation. Items that
+remain genuinely ambiguous are marked `unresolved` and are penalized or
+excluded from normal outfit generation.
 
 ## Provider Architecture
 
@@ -57,6 +78,22 @@ JSON, retries once with `json_object`. The model must have enough context to
 read the ranked wardrobe candidates and generate up to three complete outfit
 candidates without inventing item IDs.
 
+Each provider request receives structured wardrobe candidates such as:
+
+- `id`
+- `role`
+- `subtype`
+- `colors`
+- `colorFamilies`
+- `seasons`
+- `styleTags`
+- `formality`
+- `material`
+- `brand`
+
+This reduces vague "other" behavior and gives the model better context for
+shorts vs trousers vs jeans, shirt vs polo vs t-shirt, and similar decisions.
+
 `nex-agi/nex-n2-mini` is treated as `json_object`-only in Vestra because strict
 `json_schema` has not been reliable for this production route on OpenRouter.
 Stylist requests are hard-limited by `STYLIST_AI_REQUEST_TIMEOUT_MS`, which
@@ -71,12 +108,30 @@ Each candidate is stored as a normal `outfit` row and grouped by
 
 Successful candidates must pass Zod schema validation, authenticated ownership
 validation, active wardrobe item validation, hallucinated ID rejection, duplicate
-item rejection, required-role validation for complete outfits, and deterministic
-diversity checks.
+item rejection, required-role validation for complete outfits, deterministic
+scoring, and diversity checks.
 
 If the wardrobe cannot support enough different combinations, Vestra returns
 fewer valid candidates and marks the batch as limited variety rather than
 inventing items.
+
+## Deterministic Scoring
+
+Outfit candidates are post-scored on transparent dimensions:
+
+- role completeness
+- occasion match
+- subtype compatibility
+- formality consistency
+- season and weather suitability
+- color compatibility
+- style consistency
+- user preference match
+- duplicate penalty
+
+Candidates below the minimum threshold are rejected. When provider output is
+recoverable but fails validation or scoring, Vestra performs one controlled
+regeneration with validation feedback and then stops.
 
 ## Candidate Diversity
 

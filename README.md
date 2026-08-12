@@ -1,10 +1,14 @@
 # Vestra
 
-AI virtual wardrobe and personal stylist foundation.
+AI virtual wardrobe and personal stylist platform.
 
-Milestone 5 adds subscription architecture: Free/Premium plans, usage limits,
-feature flags, trial support, payment provider abstractions, and premium UI.
-Real payment processing remains out of scope.
+The current codebase includes:
+
+- production-ready wardrobe CRUD with authenticated private storage;
+- background-removal and thumbnail image pipelines;
+- real AI clothing analysis with user corrections;
+- AI stylist generation with ownership validation and hallucination prevention;
+- wear tracking, planner foundations, subscriptions, and consent-aware analytics.
 
 ## Stack
 
@@ -18,6 +22,8 @@ Real payment processing remains out of scope.
 - Storage abstraction with guarded local development storage
 - Wardrobe thumbnail generation with private original/processed master images
 - AI provider abstraction with Zod-validated clothing analysis
+- Canonical wardrobe taxonomy shared by AI analysis, manual editing, validation,
+  and stylist generation
 - Background-removal provider abstraction with guarded production credentials
 - Stylist provider abstraction with hallucination prevention and outfit validation
 - Subscription architecture with Free/Premium plans and provider abstractions
@@ -61,7 +67,14 @@ pnpm wardrobe:thumbnails:backfill
 pnpm wardrobe:thumbnails:backfill -- --apply --limit=100
 ```
 
-5. Start development:
+5. Backfill legacy wardrobe taxonomy values when needed. Dry-run is the default:
+
+```bash
+pnpm wardrobe:taxonomy:backfill
+pnpm wardrobe:taxonomy:backfill -- --apply --limit=250
+```
+
+6. Start development:
 
 ```bash
 pnpm dev
@@ -80,7 +93,8 @@ pnpm build
 
 ## Milestone Boundary
 
-Current milestone: M5 Subscription Architecture.
+Current implemented platform status includes Milestones 1-6.3 foundations plus
+taxonomy/stylist quality improvements.
 
 Not included yet:
 

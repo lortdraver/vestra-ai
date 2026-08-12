@@ -21,13 +21,12 @@ export type WeatherSuitabilityResult = {
 function text(item: StylistWardrobeItem) {
   return [
     item.name,
-    item.category,
-    item.clothingType,
+    item.role,
+    item.subtype,
     item.material,
     item.brand,
-    item.notes,
     ...item.seasons,
-    ...item.styles,
+    ...item.styleTags,
   ]
     .join(' ')
     .toLowerCase()
@@ -80,7 +79,7 @@ function isHotWeatherOk(item: StylistWardrobeItem) {
 }
 
 function hasCategory(items: StylistWardrobeItem[], category: string) {
-  return items.some((item) => item.category === category)
+  return items.some((item) => item.role === category)
 }
 
 export function applyWeatherSuitability(
@@ -97,14 +96,12 @@ export function applyWeatherSuitability(
   if (signals.includes('cold')) {
     suitableItems = suitableItems.filter(
       (item) =>
-        item.category !== 'outerwear' ||
-        isWarm(item) ||
-        item.seasons.length === 0,
+        item.role !== 'outerwear' || isWarm(item) || item.seasons.length === 0,
     )
   }
   if (signals.includes('rain') || signals.includes('snow')) {
     const weatherReady = suitableItems.filter(
-      (item) => item.category !== 'outerwear' || isRainReady(item),
+      (item) => item.role !== 'outerwear' || isRainReady(item),
     )
     suitableItems = weatherReady.length > 0 ? weatherReady : suitableItems
   }

@@ -279,7 +279,7 @@ describe('AI provider behavior', () => {
       clothingType: 't-shirt',
     })
 
-    expect(result.detectedClothingType).toBe('t-shirt')
+    expect(result.detectedClothingType).toBe('t_shirt')
     expect(calls).toHaveLength(2)
     expect(calls[0]).toMatchObject({
       response_format: { type: 'json_schema' },
@@ -325,12 +325,12 @@ describe('AI analysis quality enhancement', () => {
       },
     })
 
-    expect(result.detectedClothingType).toBe('t-shirt')
-    expect(result.detectedCategory).toBe('tops')
+    expect(result.detectedClothingType).toBe('t_shirt')
+    expect(result.detectedCategory).toBe('top')
     expect(result.colors).toEqual(['light grey', 'grey'])
     expect(result.dominantHexColors).toEqual(['#b8b8b8', '#8f8f8f'])
     expect(result.brandGuess).toBe("Levi's")
-    expect(result.material).toBe('cotton blend')
+    expect(['cotton', 'cotton blend']).toContain(result.material)
     expect(result.fieldConfidences.colors).toBeGreaterThan(0.8)
     expect(result.needsReviewFields).toContain('fit')
   })

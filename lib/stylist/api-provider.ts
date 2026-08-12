@@ -3,6 +3,14 @@ import {
   parseProviderJson,
   type StylistProviderEnvelope,
 } from './provider-output'
+import {
+  stylistProviderColorFamilyEnum,
+  stylistProviderFormalityEnum,
+  stylistProviderRoleEnum,
+  stylistProviderSeasonEnum,
+  stylistProviderStyleEnum,
+  stylistProviderSubtypeEnum,
+} from './types'
 
 export type ApiStylistProviderConfig = {
   apiKey: string
@@ -124,15 +132,7 @@ const responseJsonSchema = {
                       wardrobeItemId: { type: 'string' },
                       role: {
                         type: 'string',
-                        enum: [
-                          'tops',
-                          'bottoms',
-                          'shoes',
-                          'outerwear',
-                          'accessories',
-                          'dresses',
-                          'bags',
-                        ],
+                        enum: [...stylistProviderRoleEnum],
                       },
                     },
                   },
@@ -293,6 +293,27 @@ export class ApiStylistProvider implements StylistProvider {
 
     let response: Response | null = null
     try {
+      const structuredWardrobe = input.wardrobeItems.map((item) => ({
+        id: item.id,
+        role: item.role,
+        subtype: item.subtype,
+        colors: item.colors,
+        colorFamilies: item.colorFamilies,
+        seasons: item.seasons.filter((season) =>
+          stylistProviderSeasonEnum.includes(
+            season as (typeof stylistProviderSeasonEnum)[number],
+          ),
+        ),
+        styleTags: item.styleTags.filter((style) =>
+          stylistProviderStyleEnum.includes(
+            style as (typeof stylistProviderStyleEnum)[number],
+          ),
+        ),
+        formality: item.formality,
+        material: item.material,
+        brand: item.brand || null,
+      }))
+
       response = await fetch(this.endpoint, {
         method: 'POST',
         signal: controller.signal,
@@ -315,21 +336,31 @@ export class ApiStylistProvider implements StylistProvider {
             {
               role: 'system',
               content: input.strictRetry
-                ? `STRICT RETRY: Return valid JSON only. Use only supplied wardrobeItemId values. Include the missing required roles if possible: ${input.missingItems.join(', ') || 'none'}. Return status="success" only when outfit.items has valid owned items for every required role. Otherwise return status="insufficient_wardrobe" with missingCategories and availableCategories. Never invent IDs.`
-                : 'Return JSON only. Use only wardrobeItemId values from the supplied candidate list. Never invent item IDs. If no valid complete combination exists, return {"status":"insufficient_wardrobe","message":"...","missingCategories":[],"availableCategories":[]}. If a valid outfit exists, return {"status":"success","outfit":{...}}. Never return status="success" with an empty items array. Respond in the requested locale.',
+                ? `STRICT RETRY: Return valid JSON only. Use only supplied wardrobeItemId values. Required outfit roles must be complete unless the user explicitly asked for a single-item recommendation. If the previous attempt missed a rule, fix it using this validation feedback: ${(input.validationFeedback ?? []).join('; ') || 'none'}. Never return role="other". Never invent IDs. If no valid combination exists, return status="insufficient_wardrobe".`
+                : 'Return JSON only. Select only wardrobeItemId values from the supplied candidate list. Never invent wardrobe items or IDs. Respect canonical roles top, bottom, outerwear, one_piece, shoes, accessory. Prefer coherent subtype combinations for the request context, season, weather, and formality. Return 2-3 ranked candidates when enough compatible items exist. If no valid complete combination exists, return status="insufficient_wardrobe". Never return status="success" with empty items.',
             },
             {
               role: 'user',
               content: JSON.stringify({
                 locale: input.locale,
                 request: input.request,
-                wardrobeItems: input.wardrobeItems,
+                canonicalTaxonomy: {
+                  roles: stylistProviderRoleEnum,
+                  subtypes: stylistProviderSubtypeEnum,
+                  seasons: stylistProviderSeasonEnum,
+                  styleTags: stylistProviderStyleEnum,
+                  formality: stylistProviderFormalityEnum,
+                  colorFamilies: stylistProviderColorFamilyEnum,
+                },
+                wardrobeItems: structuredWardrobe,
                 missingItems: input.missingItems,
                 weatherContext: input.request.weatherContext,
                 locationName: input.request.locationName,
                 occasion: input.request.occasion,
                 wearHistoryMode: input.request.wearHistoryMode,
                 preferenceContext: input.preferenceContext,
+                lockedItemIds: input.lockedItemIds,
+                validationFeedback: input.validationFeedback ?? [],
               }),
             },
           ],

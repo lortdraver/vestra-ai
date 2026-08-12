@@ -49,11 +49,16 @@ const wardrobe: StylistWardrobeItem[] = [
   {
     id: '11111111-1111-4111-8111-111111111111',
     name: 'White shirt',
-    category: 'tops',
+    role: 'top',
+    subtype: 'shirt',
+    category: 'top',
     clothingType: 'shirt',
     colors: ['white'],
+    colorFamilies: ['white'],
     seasons: ['spring'],
     styles: ['business'],
+    styleTags: ['business'],
+    formality: 'business',
     material: 'cotton',
     brand: '',
     notes: '',
@@ -62,11 +67,16 @@ const wardrobe: StylistWardrobeItem[] = [
   {
     id: '22222222-2222-4222-8222-222222222222',
     name: 'Dark trousers',
-    category: 'bottoms',
+    role: 'bottom',
+    subtype: 'trousers',
+    category: 'bottom',
     clothingType: 'trousers',
     colors: ['black'],
+    colorFamilies: ['black'],
     seasons: ['spring'],
     styles: ['business'],
+    styleTags: ['business'],
+    formality: 'business',
     material: 'wool',
     brand: '',
     notes: '',
@@ -75,11 +85,16 @@ const wardrobe: StylistWardrobeItem[] = [
   {
     id: '33333333-3333-4333-8333-333333333333',
     name: 'Leather sneakers',
+    role: 'shoes',
+    subtype: 'sneakers',
     category: 'shoes',
     clothingType: 'sneakers',
     colors: ['white'],
+    colorFamilies: ['white'],
     seasons: ['spring'],
     styles: ['business'],
+    styleTags: ['business'],
+    formality: 'smart_casual',
     material: 'leather',
     brand: '',
     notes: '',
@@ -509,7 +524,7 @@ describe('outfit validation', () => {
       {
         status: 'insufficient_wardrobe',
         message: 'Missing core items.',
-        missingCategories: ['tops', 'bottoms', 'shoes'],
+        missingCategories: ['top', 'bottom', 'shoes'],
         availableCategories: [],
       },
       [],
@@ -520,7 +535,7 @@ describe('outfit validation', () => {
 
   it('detects only one top as missing bottoms and shoes', () => {
     expect(findMissingCoreItems(wardrobe.slice(0, 1))).toEqual([
-      'bottoms',
+      'bottom',
       'shoes',
     ])
   })
@@ -528,7 +543,7 @@ describe('outfit validation', () => {
   it('detects top but no bottoms or shoes', () => {
     const topOnly = [wardrobe[0]]
     expect(hasCompleteOutfit(topOnly)).toBe(false)
-    expect(findMissingCoreItems(topOnly)).toEqual(['bottoms', 'shoes'])
+    expect(findMissingCoreItems(topOnly)).toEqual(['bottom', 'shoes'])
   })
 
   it('uses manual categories even when AI analysis failed', () => {
@@ -581,14 +596,14 @@ describe('outfit validation', () => {
       },
     ])
 
-    expect(diagnostics.categories).toEqual({ bottoms: 1 })
+    expect(diagnostics.categories).toEqual({ bottom: 1 })
     expect(diagnostics.analysisStatuses).toEqual({ failed: 1 })
   })
 
   it('normalizes common category and clothing type aliases', () => {
-    expect(normalizeStylistCategory('top')).toBe('tops')
-    expect(normalizeStylistCategory('other', 't-shirt')).toBe('tops')
-    expect(normalizeStylistCategory('other', 'pants')).toBe('bottoms')
+    expect(normalizeStylistCategory('top')).toBe('top')
+    expect(normalizeStylistCategory('other', 't-shirt')).toBe('top')
+    expect(normalizeStylistCategory('other', 'pants')).toBe('bottom')
     expect(normalizeStylistCategory('shoe')).toBe('shoes')
     expect(normalizeStylistCategory('other', 'sneakers')).toBe('shoes')
   })
@@ -640,7 +655,7 @@ describe('outfit validation', () => {
         },
         wardrobe,
       ),
-    ).toThrow('incomplete_outfit:bottoms,shoes')
+    ).toThrow('incomplete_outfit:bottom,shoes')
   })
 
   it('rejects complete wardrobe success when provider omits shoes', () => {
@@ -784,16 +799,16 @@ describe('outfit validation', () => {
       {
         status: 'insufficient_wardrobe',
         message: 'Для праздничного образа не хватает низа и обуви.',
-        missingCategories: ['bottoms', 'shoes'],
-        availableCategories: ['tops'],
+        missingCategories: ['bottom', 'shoes'],
+        availableCategories: ['top'],
       },
       wardrobe.slice(0, 1),
     )
 
     expect(result).toMatchObject({
       status: 'insufficient_wardrobe',
-      missingCategories: ['bottoms', 'shoes'],
-      availableCategories: ['tops'],
+      missingCategories: ['bottom', 'shoes'],
+      availableCategories: ['top'],
     })
   })
 
@@ -1146,8 +1161,8 @@ describe('batch outfit validation', () => {
 
     expect(result.candidates[0].confidenceScore).toBe(0.77)
     expect(result.candidates[0].items.map((item) => item.role)).toEqual([
-      'tops',
-      'bottoms',
+      'top',
+      'bottom',
       'shoes',
     ])
   })
@@ -1253,7 +1268,7 @@ describe('batch outfit validation', () => {
         providerRole: 'other',
         wardrobeCategory: 't-shirt',
       }),
-    ).toEqual({ role: 'tops', source: 'wardrobe_category' })
+    ).toEqual({ role: 'top', source: 'wardrobe_role' })
   })
 
   it('resolves missing provider roles from trusted wardrobe jeans category', () => {
@@ -1261,7 +1276,7 @@ describe('batch outfit validation', () => {
       resolveStylistOutfitRole({
         wardrobeCategory: 'jeans',
       }),
-    ).toEqual({ role: 'bottoms', source: 'wardrobe_category' })
+    ).toEqual({ role: 'bottom', source: 'wardrobe_role' })
   })
 
   it('resolves localized Russian and Azerbaijani wardrobe categories', () => {
@@ -1270,19 +1285,19 @@ describe('batch outfit validation', () => {
         providerRole: 'other',
         wardrobeCategory: 'верх',
       }),
-    ).toEqual({ role: 'tops', source: 'wardrobe_category' })
+    ).toEqual({ role: 'top', source: 'wardrobe_role' })
     expect(
       resolveStylistOutfitRole({
         providerRole: 'other',
         wardrobeCategory: 'şalvar',
       }),
-    ).toEqual({ role: 'bottoms', source: 'wardrobe_category' })
+    ).toEqual({ role: 'bottom', source: 'wardrobe_role' })
     expect(
       resolveStylistOutfitRole({
         providerRole: 'other',
         wardrobeCategory: 'ayaqqabı',
       }),
-    ).toEqual({ role: 'shoes', source: 'wardrobe_category' })
+    ).toEqual({ role: 'shoes', source: 'wardrobe_role' })
   })
 
   it('uses provider aliases only after trusted wardrobe metadata is unresolved', () => {
@@ -1298,9 +1313,9 @@ describe('batch outfit validation', () => {
     expect(
       resolveStylistOutfitRole({
         providerRole: 'shoes',
-        wardrobeCategory: 'tops',
+        wardrobeCategory: 'top',
       }),
-    ).toEqual({ role: 'tops', source: 'wardrobe_category' })
+    ).toEqual({ role: 'top', source: 'wardrobe_role' })
   })
 
   it('leaves genuinely unknown categories unresolved', () => {
@@ -1310,23 +1325,29 @@ describe('batch outfit validation', () => {
         wardrobeCategory: 'mystery',
         wardrobeSubcategory: 'unknown',
       }),
-    ).toEqual({ role: 'other', source: 'unresolved' })
+    ).toEqual({ role: 'unresolved', source: 'unresolved' })
   })
 
   it('resolves four provider "other" roles from known wardrobe categories', () => {
     const fourItemWardrobe: StylistWardrobeItem[] = [
       {
         ...wardrobe[0],
+        role: 'top',
+        subtype: 't_shirt',
         category: 't-shirt',
         clothingType: 't-shirt',
       },
       {
         ...wardrobe[1],
+        role: 'bottom',
+        subtype: 'jeans',
         category: 'jeans',
         clothingType: 'jeans',
       },
       {
         ...wardrobe[2],
+        role: 'shoes',
+        subtype: 'sneakers',
         category: 'sneakers',
         clothingType: 'sneakers',
       },
@@ -1334,6 +1355,8 @@ describe('batch outfit validation', () => {
         ...wardrobe[0],
         id: '77777777-7777-4777-8777-777777777777',
         name: 'Black blazer',
+        role: 'outerwear',
+        subtype: 'blazer',
         category: 'blazer',
         clothingType: 'blazer',
       },
@@ -1359,8 +1382,8 @@ describe('batch outfit validation', () => {
     expect(result.status).toBe('success')
     if (result.status !== 'success') throw new Error('expected success')
     expect(result.candidates[0].items.map((item) => item.role)).toEqual([
-      'tops',
-      'bottoms',
+      'top',
+      'bottom',
       'shoes',
       'outerwear',
     ])
@@ -1370,6 +1393,8 @@ describe('batch outfit validation', () => {
     const unresolvedWardrobe: StylistWardrobeItem[] = [
       {
         ...wardrobe[0],
+        role: 'unresolved',
+        subtype: 'unresolved',
         category: 'mystery',
         clothingType: 'unknown',
       },
@@ -1392,7 +1417,7 @@ describe('batch outfit validation', () => {
               confidence: 0.5,
               items: [
                 { wardrobeItemId: wardrobe[0].id, role: 'other' },
-                { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+                { wardrobeItemId: wardrobe[1].id, role: 'bottom' },
                 { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
               ],
             },

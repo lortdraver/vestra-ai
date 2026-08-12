@@ -1,16 +1,18 @@
 import {
-  stylistInsufficientWardrobeResultSchema,
   stylistBatchResultSchema,
+  stylistInsufficientWardrobeResultSchema,
   stylistOutfitSchema,
   stylistResultSchema,
   type StylistBatchResult,
   type StylistCandidate,
   type StylistOutfit,
+  type StylistRequest,
   type StylistResult,
   type StylistWardrobeItem,
 } from './types'
 import {
   findMissingRequiredCategories,
+  getRequiredCategoriesForStylistRequest,
   normalizeStylistCategory,
   requiredCoreCategories,
   resolveStylistOutfitRole,
@@ -20,6 +22,18 @@ export type StylistValidationIssue = {
   path: string[]
   code: string
   message: string
+}
+
+export type StylistCandidateScoreBreakdown = {
+  completeness: number
+  occasionMatch: number
+  subtypeCompatibility: number
+  formalityConsistency: number
+  weatherSeason: number
+  colorCompatibility: number
+  styleConsistency: number
+  preferenceMatch: number
+  duplicatePenalty: number
 }
 
 export class StylistValidationError extends Error {
@@ -44,7 +58,6 @@ function toValidationIssues(
 
 function logValidationIssues(message: string, issues: unknown) {
   if (process.env.NODE_ENV !== 'development') return
-
   console.warn(message, { issues })
 }
 
@@ -100,10 +113,221 @@ export function filterDiverseCandidates(candidates: StylistCandidate[]) {
   return accepted
 }
 
+function getResolvedItemRoleMap(
+  outfit: StylistOutfit,
+  wardrobeItems: StylistWardrobeItem[],
+) {
+  const wardrobeById = new Map(wardrobeItems.map((item) => [item.id, item]))
+  const roleDiagnostics = outfit.items.map((item) => {
+    const wardrobeItem = wardrobeById.get(item.wardrobeItemId)
+    const resolution = resolveStylistOutfitRole({
+      providerRole: item.role,
+      wardrobeCategory: wardrobeItem?.role ?? wardrobeItem?.category,
+      wardrobeSubcategory: wardrobeItem?.subtype ?? wardrobeItem?.clothingType,
+      wardrobeRole: wardrobeItem?.role,
+      wardrobeSubtype: wardrobeItem?.subtype,
+    })
+
+    return {
+      item,
+      wardrobeItem,
+      resolution,
+      diagnostics: {
+        providerRole: item.role,
+        normalizedProviderRole: normalizeStylistCategory(item.role),
+        wardrobeCategory: wardrobeItem?.role ?? wardrobeItem?.category ?? null,
+        wardrobeSubcategory:
+          wardrobeItem?.subtype ?? wardrobeItem?.clothingType ?? null,
+        resolvedRole: resolution.role,
+        resolutionSource: resolution.source,
+      },
+    }
+  })
+
+  logRoleResolutionDiagnostics(
+    roleDiagnostics.map((entry) => entry.diagnostics),
+  )
+
+  return roleDiagnostics
+}
+
+function buildScoreBreakdown(
+  outfit: StylistOutfit,
+  selectedItems: StylistWardrobeItem[],
+  request?: StylistRequest,
+): StylistCandidateScoreBreakdown {
+  const breakdown: StylistCandidateScoreBreakdown = {
+    completeness: 0,
+    occasionMatch: 0,
+    subtypeCompatibility: 0,
+    formalityConsistency: 0,
+    weatherSeason: 0,
+    colorCompatibility: 0,
+    styleConsistency: 0,
+    preferenceMatch: 0,
+    duplicatePenalty: 0,
+  }
+
+  const requiredCategories = request
+    ? getRequiredCategoriesForStylistRequest(request)
+    : [...requiredCoreCategories]
+  const selectedRoles = new Set(selectedItems.map((item) => item.role))
+  const hasAllRequired = requiredCategories.every((role) =>
+    selectedRoles.has(role),
+  )
+  breakdown.completeness = hasAllRequired ? 20 : 6
+
+  const subtypes = selectedItems.map((item) => item.subtype)
+  const styleTags = selectedItems.flatMap((item) => item.styleTags)
+  const formalityValues = selectedItems.map((item) => item.formality)
+  const colorFamilies = selectedItems.flatMap((item) => item.colorFamilies)
+  const message =
+    `${request?.message ?? ''} ${request?.quickRequest ?? ''}`.toLowerCase()
+
+  if (
+    request?.quickRequest === 'wedding' ||
+    request?.quickRequest === 'business' ||
+    /\bformal|wedding|business|office|smart\b/.test(message)
+  ) {
+    breakdown.occasionMatch += 10
+    if (
+      subtypes.some((value) =>
+        ['shorts', 'joggers', 'sweatpants'].includes(value),
+      )
+    ) {
+      breakdown.subtypeCompatibility -= 14
+    } else {
+      breakdown.subtypeCompatibility += 10
+    }
+    if (
+      subtypes.some((value) =>
+        ['shirt', 'trousers', 'blazer', 'dress_shoes', 'loafers'].includes(
+          value,
+        ),
+      )
+    ) {
+      breakdown.occasionMatch += 8
+    }
+  }
+
+  if (
+    request?.quickRequest === 'sport' ||
+    /\bsport|gym|training|workout\b/.test(message)
+  ) {
+    if (
+      subtypes.some((value) =>
+        ['shorts', 'joggers', 'sweatpants'].includes(value),
+      )
+    ) {
+      breakdown.subtypeCompatibility += 10
+    } else {
+      breakdown.subtypeCompatibility -= 10
+    }
+    if (subtypes.includes('sneakers')) {
+      breakdown.occasionMatch += 10
+    } else {
+      breakdown.occasionMatch -= 8
+    }
+  }
+
+  if (request?.quickRequest === 'university') {
+    if (
+      subtypes.some((value) =>
+        ['t_shirt', 'polo', 'shirt', 'hoodie'].includes(value),
+      )
+    ) {
+      breakdown.occasionMatch += 8
+    }
+    if (
+      subtypes.some((value) =>
+        ['jeans', 'chinos', 'shorts', 'joggers'].includes(value),
+      )
+    ) {
+      breakdown.subtypeCompatibility += 8
+    }
+    if (subtypes.includes('sneakers') || subtypes.includes('loafers')) {
+      breakdown.occasionMatch += 4
+    }
+  }
+
+  const uniqueFormality = new Set(formalityValues)
+  breakdown.formalityConsistency =
+    uniqueFormality.size <= 2
+      ? 10
+      : Math.max(-10, 12 - uniqueFormality.size * 6)
+
+  if (request?.weatherContext) {
+    if (request.weatherContext.temperatureC >= 28) {
+      if (
+        subtypes.some((value) =>
+          ['shorts', 'tank_top', 'polo', 't_shirt'].includes(value),
+        )
+      ) {
+        breakdown.weatherSeason += 10
+      }
+      if (
+        subtypes.some((value) =>
+          ['coat', 'hoodie', 'sweater', 'boots'].includes(value),
+        )
+      ) {
+        breakdown.weatherSeason -= 10
+      }
+    }
+    if (request.weatherContext.temperatureC <= 8) {
+      if (
+        subtypes.some((value) =>
+          ['hoodie', 'sweater', 'coat', 'jacket', 'boots'].includes(value),
+        )
+      ) {
+        breakdown.weatherSeason += 10
+      }
+      if (
+        subtypes.some((value) =>
+          ['shorts', 'sandals', 'tank_top'].includes(value),
+        )
+      ) {
+        breakdown.weatherSeason -= 10
+      }
+    }
+  }
+
+  const neutralCount = colorFamilies.filter((value) =>
+    ['black', 'white', 'gray', 'navy', 'beige', 'brown'].includes(value),
+  ).length
+  const brightCount = colorFamilies.filter((value) =>
+    ['red', 'pink', 'yellow', 'orange', 'purple', 'green'].includes(value),
+  ).length
+  breakdown.colorCompatibility =
+    neutralCount >= 2 ? 10 : brightCount >= 3 ? -6 : 4
+
+  const uniqueStyles = new Set(styleTags)
+  breakdown.styleConsistency = uniqueStyles.size <= 3 ? 8 : 3
+
+  return breakdown
+}
+
+function totalCandidateScore(breakdown: StylistCandidateScoreBreakdown) {
+  return (
+    breakdown.completeness +
+    breakdown.occasionMatch +
+    breakdown.subtypeCompatibility +
+    breakdown.formalityConsistency +
+    breakdown.weatherSeason +
+    breakdown.colorCompatibility +
+    breakdown.styleConsistency +
+    breakdown.preferenceMatch +
+    breakdown.duplicatePenalty
+  )
+}
+
 export function validateStylistOutfit(
   output: unknown,
   wardrobeItems: StylistWardrobeItem[],
-  options?: { requiredCategories?: string[]; lockedItemIds?: string[] },
+  options?: {
+    requiredCategories?: string[]
+    lockedItemIds?: string[]
+    request?: StylistRequest
+  },
 ) {
   const parsed = stylistOutfitSchema.safeParse(output)
   if (!parsed.success) {
@@ -138,39 +362,14 @@ export function validateStylistOutfit(
     )
   }
 
-  const roleDiagnostics = outfit.items.map((item) => {
-    const wardrobeItem = wardrobeById.get(item.wardrobeItemId)
-    const resolution = resolveStylistOutfitRole({
-      providerRole: item.role,
-      wardrobeCategory: wardrobeItem?.category,
-      wardrobeSubcategory: wardrobeItem?.clothingType,
-    })
-
-    return {
-      item,
-      wardrobeItem,
-      resolution,
-      diagnostics: {
-        providerRole: item.role,
-        normalizedProviderRole: normalizeStylistCategory(item.role),
-        wardrobeCategory: wardrobeItem?.category ?? null,
-        wardrobeSubcategory: wardrobeItem?.clothingType ?? null,
-        resolvedRole: resolution.role,
-        resolutionSource: resolution.source,
-      },
-    }
-  })
-  logRoleResolutionDiagnostics(
-    roleDiagnostics.map((entry) => entry.diagnostics),
-  )
-
-  const unsupportedRoles = roleDiagnostics
-    .filter((entry) => entry.resolution.role === 'other')
+  const roleDiagnostics = getResolvedItemRoleMap(outfit, wardrobeItems)
+  const unresolvedRoles = roleDiagnostics
+    .filter((entry) => entry.resolution.role === 'unresolved')
     .map((entry) => entry.item.role)
 
-  if (unsupportedRoles.length > 0) {
+  if (unresolvedRoles.length > 0) {
     throw new StylistValidationError(
-      `unsupported_roles:${unsupportedRoles.join(',')}`,
+      `unsupported_roles:${unresolvedRoles.join(',')}`,
     )
   }
 
@@ -181,11 +380,13 @@ export function validateStylistOutfit(
       role: roleDiagnostics[index]?.resolution.role ?? item.role,
     })),
   }
+
   const selectedItems = roleDiagnostics
     .map((entry) =>
       entry.wardrobeItem
         ? {
             ...entry.wardrobeItem,
+            role: entry.resolution.role,
             category: entry.resolution.role,
           }
         : null,
@@ -215,24 +416,45 @@ export function validateStylistOutfit(
     )
   }
 
+  const scoreBreakdown = buildScoreBreakdown(
+    resolvedOutfit,
+    selectedItems,
+    options?.request,
+  )
+  const candidateScore = totalCandidateScore(scoreBreakdown)
+  const minimumScore = requiredCategories.length === 0 ? 25 : 32
+  if (candidateScore < minimumScore) {
+    throw new StylistValidationError(
+      `candidate_score_too_low:${candidateScore}`,
+    )
+  }
+
   for (const alternative of outfit.alternativeSuggestions) {
     const invalidAlternativeIds = alternative.itemIds.filter(
       (id) => !allowedIds.has(id),
     )
     if (invalidAlternativeIds.length > 0) {
-      throw new Error(
+      throw new StylistValidationError(
         `hallucinated_alternative_items:${invalidAlternativeIds.join(',')}`,
       )
     }
   }
 
-  return resolvedOutfit satisfies StylistOutfit
+  return {
+    ...resolvedOutfit,
+    candidateScore,
+    scoreBreakdown,
+  } satisfies StylistOutfit
 }
 
 export function validateStylistResult(
   output: unknown,
   wardrobeItems: StylistWardrobeItem[],
-  options?: { requiredCategories?: string[]; lockedItemIds?: string[] },
+  options?: {
+    requiredCategories?: string[]
+    lockedItemIds?: string[]
+    request?: StylistRequest
+  },
 ): StylistResult {
   const batchParsed = stylistBatchResultSchema.safeParse(output)
   if (batchParsed.success && batchParsed.data.status === 'success') {
@@ -271,7 +493,11 @@ export function validateStylistResult(
 export function validateStylistBatchResult(
   output: unknown,
   wardrobeItems: StylistWardrobeItem[],
-  options?: { requiredCategories?: string[]; lockedItemIds?: string[] },
+  options?: {
+    requiredCategories?: string[]
+    lockedItemIds?: string[]
+    request?: StylistRequest
+  },
 ): StylistBatchResult {
   const parsed = stylistBatchResultSchema.safeParse(output)
   if (!parsed.success) {
@@ -293,7 +519,7 @@ export function validateStylistBatchResult(
   const diverseCandidates = filterDiverseCandidates(validatedCandidates)
 
   if (diverseCandidates.length === 0) {
-    throw new Error('empty_stylist_candidates')
+    throw new StylistValidationError('empty_stylist_candidates')
   }
 
   return {

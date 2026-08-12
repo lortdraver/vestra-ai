@@ -1,5 +1,8 @@
 import { z } from 'zod'
-import { normalizeStylistCategory } from './wardrobe'
+import {
+  normalizeWardrobeRole,
+  unresolvedWardrobeRole,
+} from '@/lib/wardrobe/taxonomy'
 import type { Locale } from '@/lib/i18n/config'
 import type { StylistProviderInput, StylistWardrobeItem } from './types'
 
@@ -97,12 +100,20 @@ export function parseProviderJson(value: unknown) {
   return JSON.parse(stripJsonCodeFence(value)) as unknown
 }
 
+function normalizeProviderRole(value: unknown) {
+  return (
+    normalizeWardrobeRole(String(value ?? ''), {
+      allowUnresolved: true,
+    }) ?? unresolvedWardrobeRole
+  )
+}
+
 function normalizeProviderItem(value: unknown) {
   if (!isRecord(value)) return value
 
   return {
     wardrobeItemId: value.wardrobeItemId,
-    role: normalizeStylistCategory(String(value.role ?? '')),
+    role: normalizeProviderRole(value.role),
     explanation:
       typeof value.explanation === 'string' && value.explanation.trim()
         ? value.explanation
@@ -184,9 +195,9 @@ function buildFallbackExplanation(
   if (itemNames.length > 0) {
     const itemList = itemNames.slice(0, 4).join(', ')
     return {
-      az: `${itemList} birlikdə seçildi, çünki bu geyimlər qarderobunuzdan uyğun və tamamlanmış kombin yaradır.${requestLabel ? ' Sorğunuz nəzərə alındı.' : ''}`,
-      en: `${itemList} were selected together because these wardrobe items create a complete and suitable outfit.${requestLabel ? ' The request context was considered.' : ''}`,
-      ru: `${itemList} выбраны вместе, потому что эти вещи из гардероба создают завершенный и подходящий образ.${requestLabel ? ' Контекст запроса учтен.' : ''}`,
+      az: `${itemList} birlikdə seçildi, çünki bu geyimlər sorğunuza uyğun tamamlanmış kombin yaradır.${requestLabel ? ' Sorğunun konteksti nəzərə alındı.' : ''}`,
+      en: `${itemList} were selected together because these wardrobe items create a complete outfit for your request.${requestLabel ? ' The request context was considered.' : ''}`,
+      ru: `${itemList} выбраны вместе, потому что эти вещи создают завершенный образ под ваш запрос.${requestLabel ? ' Контекст запроса учтен.' : ''}`,
     }[locale]
   }
 
@@ -307,12 +318,12 @@ export function normalizeStylistProviderOutput(
       message: parsed.message,
       missingCategories: Array.isArray(parsed.missingCategories)
         ? parsed.missingCategories.map((category) =>
-            normalizeStylistCategory(String(category)),
+            normalizeProviderRole(String(category)),
           )
         : [],
       availableCategories: Array.isArray(parsed.availableCategories)
         ? parsed.availableCategories.map((category) =>
-            normalizeStylistCategory(String(category)),
+            normalizeProviderRole(String(category)),
           )
         : [],
     }
@@ -400,14 +411,7 @@ export function getSanitizedProviderPreview(value: unknown, maxLength = 700) {
   if (process.env.NODE_ENV !== 'development') return undefined
 
   const normalized = normalizeStylistProviderOutput(value)
-  const preview = JSON.stringify(normalized, (_key, child) => {
-    if (
-      ['notes', 'preferenceContext', 'request', 'wardrobeItems'].includes(_key)
-    ) {
-      return '[redacted]'
-    }
-    return child
-  })
+  const preview = JSON.stringify(normalized)
 
   return preview.length > maxLength
     ? `${preview.slice(0, maxLength)}...`
