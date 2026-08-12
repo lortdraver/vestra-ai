@@ -1,9 +1,22 @@
 # Vestra First-Party Analytics
 
-Phase 2 adds a server-side product event ledger in PostgreSQL. It does not add
-GA4, Microsoft Clarity, advertising pixels, partner dashboards, or a public
-analytics page. The optional browser analytics consent from Phase 1 remains
-only for optional external/browser analytics.
+Phase 2 added a server-side product event ledger in PostgreSQL. Phase 3 adds
+consent-aware GA4 and Microsoft Clarity loaders. It does not add advertising
+pixels, partner dashboards, or a public analytics page.
+
+GA4 and Clarity are optional browser integrations and remain separate from the
+first-party event ledger. They load only after the `vestra_consent` Analytics
+decision is true.
+
+## Environment
+
+- `NEXT_PUBLIC_GA_MEASUREMENT_ID` - GA4 Measurement ID; empty disables GA4.
+- `NEXT_PUBLIC_CLARITY_PROJECT_ID` - Clarity Project ID; empty disables Clarity.
+- `ANALYTICS_DEBUG` - server diagnostics flag.
+- `NEXT_PUBLIC_ANALYTICS_DEBUG` - browser loader diagnostics flag.
+
+IDs are public identifiers, not secrets. They must still be configured only for
+the intended Vestra property/project.
 
 ## Architecture
 
@@ -28,6 +41,31 @@ Signup completion, login completion, email verification completion, and
 subscription lifecycle names are reserved in the taxonomy but deferred until
 the installed Better Auth/payment flows expose reliable success hooks. No
 events are fabricated from UI placeholders.
+
+## GA4 and client events
+
+The client bridge in `lib/analytics/client.ts` supports only high-level
+events: `page_view`, `sign_up`, `login`,
+`first_wardrobe_item_created`, `stylist_generation_completed`,
+`upgrade_viewed`, and `checkout_started`. It checks browser consent, rejects
+forbidden properties, and silently no-ops when GA4 is not configured.
+
+Automatic App Router page views use pathname-only values for `/`, auth pages,
+dashboard, wardrobe, stylist, planner, outfits, account, and privacy routes.
+Query strings are never sent, so reset, verification, callback, email, auth,
+and session values cannot leave the browser through page-view parameters.
+
+Sign-up/login and product success events remain deferred from the client until
+there is an authoritative sanitized bridge. First-party server events remain
+the source of truth for product metrics.
+
+## Microsoft Clarity
+
+Clarity is dynamically loaded only after consent and disabled on withdrawal.
+The client calls Clarity's consent signal, removes the script, and stops future
+optional tracking. Auth, password recovery, wardrobe upload/edit, and stylist
+prompt forms carry `data-clarity-mask="true"`. No custom sensitive values are
+sent to Clarity.
 
 ## Privacy rules
 

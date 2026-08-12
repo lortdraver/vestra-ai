@@ -449,6 +449,7 @@ export function StylistPageClient({
           </div>
           <form
             className="mt-3 flex flex-col gap-2 sm:flex-row"
+            data-clarity-mask="true"
             onSubmit={(event) => {
               event.preventDefault()
               void requestOutfit({ message })

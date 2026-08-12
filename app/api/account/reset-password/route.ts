@@ -3,6 +3,8 @@ import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
+import { extractAuthErrorDetails } from '@/lib/auth-diagnostics/shared'
+import { getUserCredentialDiagnosticByUserId } from '@/lib/auth-diagnostics/server'
 import { db } from '@/lib/db'
 import { verification } from '@/lib/db/schema'
 import {
@@ -81,9 +83,14 @@ function logFailure(input: {
   error: unknown
   durationMs: number
 }) {
+  const betterAuthError = extractAuthErrorDetails(input.error)
+
   console.error('[password-reset] reset failed', {
     stage: input.stage,
     ...getErrorDetail(input.error),
+    betterAuthStatus: betterAuthError.status,
+    betterAuthCode: betterAuthError.code,
+    betterAuthMessage: betterAuthError.message,
     durationMs: input.durationMs,
     requiredEnvPresent: {
       betterAuthUrl: Boolean(process.env.BETTER_AUTH_URL),
@@ -113,6 +120,7 @@ export async function POST(request: Request) {
     const [row] = await db
       .select({
         expiresAt: verification.expiresAt,
+        userId: verification.value,
       })
       .from(verification)
       .where(eq(verification.identifier, identifier))
@@ -126,6 +134,10 @@ export async function POST(request: Request) {
       return errorResponse('password_reset_expired_token', stage)
     }
 
+    logStage(
+      'PASSWORD_RESET_CREDENTIAL_STATE_BEFORE',
+      await getUserCredentialDiagnosticByUserId(row.userId),
+    )
     await auth.api.resetPassword({
       body: {
         token: parsed.data.token,
@@ -137,6 +149,8 @@ export async function POST(request: Request) {
     stage = 'PASSWORD_RESET_COMPLETED'
     logStage(stage, {
       durationMs: Math.round(performance.now() - startedAt),
+      resetSucceeded: true,
+      credentialState: await getUserCredentialDiagnosticByUserId(row.userId),
     })
 
     return NextResponse.json({ ok: true, status: 'password_reset' })

@@ -156,7 +156,7 @@ export function getPrivacyPolicyCopy(
           title: 'Kukilər və analitika',
           body: [
             'Zəruri kukilər giriş, təhlükəsizlik, dil və hesab funksiyaları üçün lazımdır və analitika seçimindən asılı deyil.',
-            'Analitika kukiləri yalnız razılıq verildikdə aktivləşdirilir. Vestra GA4 və Clarity üçün hazırdır, lakin bu mərhələdə onlar tətbiq edilməyib.',
+            'Analitika kukiləri yalnız razılıq verildikdə aktivləşdirilir. Vestra GA4 və Clarity-ni yalnız razılığınızdan sonra yükləyir.',
             'Vercel Analytics qeyri-zəruri analitika kimi qəbul edilir və yalnız analitika razılığı olduqda yüklənir.',
           ],
         },
@@ -224,7 +224,7 @@ export function getPrivacyPolicyCopy(
           title: 'Cookies and analytics',
           body: [
             'Necessary cookies support sign-in, security, language, and account features. They continue to work even if Analytics is rejected.',
-            'Analytics cookies are enabled only after consent. Vestra is prepared for GA4 and Clarity, but they are not implemented in this phase.',
+            'Analytics cookies are enabled only after consent. Vestra loads GA4 and Clarity only after you allow Analytics.',
             'Vercel Analytics is treated as non-essential analytics and only loads after Analytics consent.',
           ],
         },
@@ -292,7 +292,7 @@ export function getPrivacyPolicyCopy(
           title: 'Cookies и аналитика',
           body: [
             'Необходимые cookies поддерживают вход, безопасность, язык и функции аккаунта. Они продолжают работать, даже если аналитика отклонена.',
-            'Аналитические cookies включаются только после согласия. Vestra подготовлена к GA4 и Clarity, но они не реализуются на этом этапе.',
+            'Аналитические cookies включаются только после согласия. Vestra загружает GA4 и Clarity только после разрешения аналитики.',
             'Vercel Analytics считается необязательной аналитикой и загружается только после согласия на аналитику.',
           ],
         },

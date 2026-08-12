@@ -36,6 +36,26 @@ const appHeaderSource = readFileSync(
   join(process.cwd(), 'components/app-header.tsx'),
   'utf8',
 )
+const optionalAnalyticsSource = readFileSync(
+  join(process.cwd(), 'components/analytics/optional-analytics.tsx'),
+  'utf8',
+)
+const clientAnalyticsSource = readFileSync(
+  join(process.cwd(), 'lib/analytics/client.ts'),
+  'utf8',
+)
+const authFormSource = readFileSync(
+  join(process.cwd(), 'components/auth-form.tsx'),
+  'utf8',
+)
+const wardrobeSource = readFileSync(
+  join(process.cwd(), 'components/wardrobe/wardrobe-page-client.tsx'),
+  'utf8',
+)
+const stylistSource = readFileSync(
+  join(process.cwd(), 'components/stylist/stylist-page-client.tsx'),
+  'utf8',
+)
 
 describe('privacy consent architecture', () => {
   it('returns no decision when there is no previous consent', () => {
@@ -131,6 +151,25 @@ describe('privacy consent architecture', () => {
     expect(consentManagerSource).toContain(
       'consent.hasAnalyticsConsent && <Analytics />',
     )
+  })
+
+  it('keeps GA4 and Clarity behind the same consent authority', () => {
+    expect(consentManagerSource).toContain('<OptionalAnalytics')
+    expect(optionalAnalyticsSource).toContain('enabled')
+    expect(optionalAnalyticsSource).toContain('googletagmanager.com/gtag/js')
+    expect(optionalAnalyticsSource).toContain('www.clarity.ms/tag/')
+    expect(optionalAnalyticsSource).toContain("analytics_storage: 'denied'")
+    expect(optionalAnalyticsSource).toContain("window.clarity('consentv2'")
+    expect(optionalAnalyticsSource).toContain("analytics_Storage: 'granted'")
+    expect(optionalAnalyticsSource).toContain("consent', false")
+    expect(clientAnalyticsSource).toContain('getBrowserConsent')
+    expect(clientAnalyticsSource).toContain('sanitizeAnalyticsProperties')
+  })
+
+  it('marks sensitive user input regions for Clarity masking', () => {
+    expect(authFormSource).toContain('data-clarity-mask="true"')
+    expect(wardrobeSource).toContain('data-clarity-mask="true"')
+    expect(stylistSource).toContain('data-clarity-mask="true"')
   })
 
   it('provides accept, reject, and preference update actions', () => {

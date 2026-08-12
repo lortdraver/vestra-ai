@@ -8,7 +8,6 @@ import {
   lt,
   sql,
 } from 'drizzle-orm'
-import { db } from '@/lib/db'
 import { analyticsEvent, user } from '@/lib/db/schema'
 import {
   analyticsEventPropertySchemas,
@@ -24,6 +23,11 @@ function logAnalyticsFailure(error: unknown, eventName?: string) {
       error: error instanceof Error ? error.message : 'unknown_error',
     })
   }
+}
+
+async function getAnalyticsDb() {
+  const { db } = await import('@/lib/db')
+  return db
 }
 
 export async function writeServerEvent(input: AnalyticsEventInput) {
@@ -44,6 +48,7 @@ export async function writeServerEvent(input: AnalyticsEventInput) {
     return false
   }
   try {
+    const db = await getAnalyticsDb()
     await db.insert(analyticsEvent).values({
       eventName: input.eventName,
       userId: input.userId ?? null,
@@ -81,6 +86,7 @@ export async function countEventsByRange(
   range: AnalyticsRange,
   eventName?: AnalyticsEventName,
 ) {
+  const db = await getAnalyticsDb()
   const [row] = await db
     .select({ count: count() })
     .from(analyticsEvent)
@@ -94,6 +100,7 @@ export async function countEventsByRange(
 }
 
 export async function countActiveUsersByRange(range: AnalyticsRange) {
+  const db = await getAnalyticsDb()
   const [row] = await db
     .select({ count: countDistinct(analyticsEvent.userId) })
     .from(analyticsEvent)
@@ -123,6 +130,7 @@ export async function getMonthlyActiveUsers(now = new Date()) {
 }
 
 export async function countActivatedUsers(range: AnalyticsRange) {
+  const db = await getAnalyticsDb()
   const [row] = await db
     .select({ count: countDistinct(analyticsEvent.userId) })
     .from(analyticsEvent)
@@ -163,6 +171,7 @@ export async function getRetentionCounts(input: {
   cohortFrom: Date
   cohortTo: Date
 }) {
+  const db = await getAnalyticsDb()
   const cohortRows = await db
     .select({ userId: analyticsEvent.userId })
     .from(analyticsEvent)

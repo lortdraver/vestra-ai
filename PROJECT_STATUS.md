@@ -286,9 +286,10 @@
 - Rate limiting is currently in-memory and must be moved to a distributed store before multi-instance production traffic.
 - Account deletion cleanup queue exists, but the asynchronous deletion worker is not implemented.
 - Forgot/reset password and email verification are architecture-ready, but real email delivery is not connected yet.
-- GA4, Microsoft Clarity, partner analytics, and public analytics dashboards are
-  intentionally deferred. Phase 2 now includes the first-party server event
-  ledger, privacy sanitizer, and read-only metric helpers.
+- Partner analytics and public analytics dashboards remain deferred. Phase 2
+  includes the first-party server event ledger, privacy sanitizer, and metric
+  helpers. Phase 3 adds consent-aware GA4, Microsoft Clarity, page views, and a
+  sanitized client event bridge.
 
 ## Next Steps
 

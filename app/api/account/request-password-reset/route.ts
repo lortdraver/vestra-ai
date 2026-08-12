@@ -5,6 +5,7 @@ import {
   AccountEmailProviderError,
   getAccountEmailProviderDiagnostics,
 } from '@/lib/account/email-provider'
+import { extractAuthErrorDetails } from '@/lib/auth-diagnostics/shared'
 import { auth } from '@/lib/auth'
 import {
   createPasswordResetErrorPayload,
@@ -92,10 +93,14 @@ function logFailure(input: {
   const providerDiagnostics = getAccountEmailProviderDiagnostics()
   const providerError =
     input.error instanceof AccountEmailProviderError ? input.error : null
+  const betterAuthError = extractAuthErrorDetails(input.error)
 
   console.error('[password-reset] request failed', {
     stage: input.stage,
     ...getErrorDetail(input.error),
+    betterAuthStatus: betterAuthError.status,
+    betterAuthCode: betterAuthError.code,
+    betterAuthMessage: betterAuthError.message,
     provider:
       providerError?.diagnostics.provider ?? providerDiagnostics.provider,
     providerHttpStatus: providerError?.diagnostics.httpStatus ?? null,

@@ -4,6 +4,11 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
+import { getLocalizedAuthErrorMessage } from '@/lib/auth-diagnostics/messages'
+import {
+  canonicalizeAuthErrorCode,
+  extractAuthErrorDetails,
+} from '@/lib/auth-diagnostics/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -25,39 +30,22 @@ export function AuthForm({
 
   const isSignUp = mode === 'sign-up'
 
-  const getAuthErrorMessage = (authError: unknown) => {
-    const value =
-      typeof authError === 'object' && authError !== null
-        ? `${'code' in authError ? authError.code : ''} ${
-            'message' in authError ? authError.message : ''
-          }`
-        : String(authError)
-    const normalized = value.toLowerCase()
+  const logSignInDiagnostic = (stage: string, authError?: unknown) => {
+    if (isSignUp) return
 
-    if (normalized.includes('email') && normalized.includes('invalid')) {
-      return dictionary.auth.invalidEmail
-    }
-    if (normalized.includes('password')) {
-      return dictionary.auth.wrongPassword
-    }
-    if (normalized.includes('not_found') || normalized.includes('not found')) {
-      return dictionary.auth.accountNotFound
-    }
-    if (normalized.includes('exists') || normalized.includes('already')) {
-      return dictionary.auth.accountAlreadyExists
-    }
-    if (normalized.includes('rate') || normalized.includes('too many')) {
-      return dictionary.auth.tooManyAttempts
-    }
-    if (
-      normalized.includes('email_not_verified') ||
-      normalized.includes('not verified') ||
-      normalized.includes('verify your email')
-    ) {
-      return dictionary.auth.emailNotVerified
-    }
+    const details = authError ? extractAuthErrorDetails(authError) : null
+    const logger = stage === 'SIGN_IN_FAILED' ? console.warn : console.info
 
-    return dictionary.auth.genericError
+    logger(`[auth] ${stage}`, {
+      httpStatus: details?.status ?? null,
+      code: authError ? canonicalizeAuthErrorCode(authError) : null,
+      safeMessage: details?.message ?? null,
+      requestOrigin: window.location.origin,
+      requestHost: window.location.host,
+      errorLocation: details?.location ?? null,
+      isTopLevelError: details?.isTopLevelError ?? false,
+      isNestedBetterFetchError: details?.isNestedBetterFetchError ?? false,
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,7 +60,11 @@ export function AuthForm({
     setLoading(true)
 
     try {
-      const { error } = isSignUp
+      if (!isSignUp) {
+        logSignInDiagnostic('SIGN_IN_STARTED')
+      }
+
+      const result = isSignUp
         ? await authClient.signUp.email({
             email,
             password,
@@ -80,16 +72,38 @@ export function AuthForm({
             callbackURL: '/verify-email?status=success',
           })
         : await authClient.signIn.email({ email, password })
+      const { error } = result
+
+      if (!isSignUp) {
+        logSignInDiagnostic('SIGN_IN_RESPONSE_RECEIVED', error)
+      }
 
       if (error) {
-        setError(getAuthErrorMessage(error))
+        if (!isSignUp) {
+          logSignInDiagnostic('SIGN_IN_FAILED', error)
+        }
+        setError(getLocalizedAuthErrorMessage(dictionary, error))
         return
+      }
+
+      if (!isSignUp) {
+        logSignInDiagnostic('SIGN_IN_SUCCEEDED')
       }
 
       router.push(isSignUp ? '/verify-email?status=sent' : '/dashboard')
       router.refresh()
-    } catch {
-      setError(dictionary.auth.networkError)
+    } catch (authError) {
+      const details = extractAuthErrorDetails(authError)
+
+      if (!isSignUp) {
+        logSignInDiagnostic('SIGN_IN_FAILED', authError)
+      }
+
+      setError(
+        details.code || details.message
+          ? getLocalizedAuthErrorMessage(dictionary, authError)
+          : dictionary.auth.networkError,
+      )
     } finally {
       setLoading(false)
     }
@@ -114,7 +128,11 @@ export function AuthForm({
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-4"
+        data-clarity-mask="true"
+      >
         {isSignUp && (
           <div className="flex flex-col gap-2">
             <Label htmlFor="name">{dictionary.auth.name}</Label>

@@ -10,6 +10,12 @@
 - `PRIVACY_CONTACT_EMAIL` - optional public privacy contact shown on
   `/privacy`. Leave empty until a real privacy contact is ready; do not invent
   a legal contact.
+- `NEXT_PUBLIC_GA_MEASUREMENT_ID` - optional GA4 Measurement ID, for example
+  `G-XXXXXXXXXX`. Leave empty to disable GA4.
+- `NEXT_PUBLIC_CLARITY_PROJECT_ID` - optional Microsoft Clarity project ID.
+  Leave empty to disable Clarity.
+- `ANALYTICS_DEBUG` - optional server-side analytics diagnostics flag.
+- `NEXT_PUBLIC_ANALYTICS_DEBUG` - optional browser analytics diagnostics flag.
 - `STORAGE_DRIVER` - object storage adapter. Use `local` only for development.
 - `R2_ACCOUNT_ID` - Cloudflare account id for R2.
 - `R2_ACCESS_KEY_ID` - server-only R2 access key id.
@@ -68,9 +74,10 @@ or other personal data.
 Necessary cookies remain active regardless of analytics consent because they are
 required for authentication, security, language, and private image access.
 
-Vercel Analytics is treated as optional analytics and only loads after Analytics
-consent. Future GA4, Microsoft Clarity, and first-party client analytics must
-check the same consent helpers before loading or sending client events.
+Vercel Analytics, GA4, and Microsoft Clarity are optional analytics and only
+load after Analytics consent. GA4 and Clarity are safely disabled when their
+public IDs are empty. The first-party server event ledger remains independent
+from this optional browser consent.
 
 The public Privacy Policy is available at `/privacy` and uses
 `PRIVACY_CONTACT_EMAIL` if configured.

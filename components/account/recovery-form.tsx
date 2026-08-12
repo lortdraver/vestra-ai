@@ -149,7 +149,11 @@ export function RecoveryForm({
 
   return (
     <RecoveryShell dictionary={dictionary} isReset={isReset}>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-4"
+        data-clarity-mask="true"
+      >
         {!isReset && (
           <div className="flex flex-col gap-2">
             <Label htmlFor="email">{dictionary.auth.email}</Label>

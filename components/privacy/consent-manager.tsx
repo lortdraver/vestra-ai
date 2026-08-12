@@ -1,6 +1,7 @@
 'use client'
 
 import { Analytics } from '@vercel/analytics/next'
+import { OptionalAnalytics } from '@/components/analytics/optional-analytics'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Check, X } from 'lucide-react'
@@ -70,6 +71,7 @@ export function ConsentManager({
   return (
     <>
       {consent.hasAnalyticsConsent && <Analytics />}
+      <OptionalAnalytics enabled={consent.hasAnalyticsConsent} />
 
       {showBanner && (
         <section

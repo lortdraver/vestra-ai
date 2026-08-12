@@ -65,7 +65,13 @@ unconditionally. The root layout passes the server-read consent state into the
 client consent manager, and `@vercel/analytics/next` is rendered only when
 Analytics consent is present.
 
-Future GA4 and Microsoft Clarity loaders must follow the same rule:
+GA4 and Microsoft Clarity use the same consent manager and are loaded only
+after Analytics consent. Their public IDs are optional; an empty ID disables
+the integration. The implementation uses `OptionalAnalytics` in the root
+consent manager and sends no automatic page view until the GA4 loader is ready.
+
+Client loaders should use the browser consent helper and must not load tags
+before Analytics is allowed:
 
 ```ts
 import { hasAnalyticsConsent } from '@/lib/privacy/consent'
@@ -78,8 +84,10 @@ Analytics cookie. They never include emails, tokens, raw prompts or responses,
 private notes, image URLs/storage keys, or raw photos. They are not used for
 advertising without a future consent and policy review.
 
-Client loaders should use the browser consent helper and must not load tags
-before Analytics is allowed.
+Consent withdrawal updates GA4 storage consent to denied, disables future
+client events, sends Clarity's current `consentv2` denied signal plus the
+cookie-erasing shutdown call, removes the optional scripts, and prevents future
+page views until consent is granted again.
 
 ## Privacy Policy
 

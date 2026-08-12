@@ -46,6 +46,7 @@ describe('first-party analytics privacy boundary', () => {
 
 describe('first-party analytics server writer', () => {
   it('writes a valid event with a dedupe key without blocking the caller', async () => {
+    vi.resetModules()
     const values = vi.fn().mockResolvedValue(undefined)
     const insert = vi.fn(() => ({ values }))
     vi.doMock('@/lib/db', () => ({ db: { insert } }))

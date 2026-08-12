@@ -915,7 +915,11 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="grid gap-4">
+        <form
+          onSubmit={handleSubmit}
+          className="grid gap-4"
+          data-clarity-mask="true"
+        >
           <div className="grid gap-2">
             <Label htmlFor="image">{t.fields.image}</Label>
             <label className="group grid cursor-pointer place-items-center rounded-xl border border-dashed border-foreground/20 bg-muted/40 px-4 py-6 text-center transition hover:border-foreground/50 hover:bg-muted/70">
