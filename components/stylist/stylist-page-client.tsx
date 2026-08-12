@@ -14,13 +14,19 @@ import {
   Sparkles,
   Star,
   Sun,
+  Trash2,
   Umbrella,
 } from 'lucide-react'
+import { OutfitDeleteDialog } from '@/components/outfits/outfit-delete-dialog'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import type { Dictionary } from '@/lib/i18n/dictionaries'
 import type { Locale } from '@/lib/i18n/config'
+import {
+  getOutfitDeleteScope,
+  removeOutfitFromCollection,
+} from '@/lib/outfits/client'
 import type { OutfitDto, QuickRequestId } from '@/lib/stylist'
 import type { WearLogDto } from '@/lib/wear'
 import { cn } from '@/lib/utils'
@@ -124,6 +130,14 @@ export function StylistPageClient({
   const [preferences, setPreferences] =
     useState<PreferenceState>(emptyPreferences)
   const [lockedItemIds, setLockedItemIds] = useState<string[]>([])
+  const [deletingOutfitIds, setDeletingOutfitIds] = useState<Set<string>>(
+    () => new Set(),
+  )
+  const [deleteDialog, setDeleteDialog] = useState<{
+    outfit: OutfitDto
+    scope: 'saved' | 'history'
+    plannerReferences: number
+  } | null>(null)
   const [lastRequest, setLastRequest] = useState<{
     message: string
     quickRequest?: QuickRequestId
@@ -379,6 +393,86 @@ export function StylistPageClient({
     }
   }
 
+  const closeDeleteDialog = () => {
+    if (deleteDialog && deletingOutfitIds.has(deleteDialog.outfit.id)) return
+    setDeleteDialog(null)
+  }
+
+  const requestDelete = (
+    outfit: OutfitDto,
+    view: 'saved' | 'history' | 'generated',
+  ) => {
+    setError(null)
+    setDeleteDialog({
+      outfit,
+      scope: getOutfitDeleteScope({ view, isSaved: outfit.isSaved }),
+      plannerReferences: 0,
+    })
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteDialog) return
+
+    const { outfit, scope, plannerReferences } = deleteDialog
+    setDeletingOutfitIds((current) => new Set(current).add(outfit.id))
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/stylist/outfits/${outfit.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          confirmPlannerPreservation: plannerReferences > 0,
+        }),
+      })
+      const data = (await response.json()) as {
+        ok?: boolean
+        code?: string
+        plannerReferences?: number
+      }
+
+      if (
+        response.status === 409 &&
+        data.code === 'outfit_has_planner_references' &&
+        typeof data.plannerReferences === 'number'
+      ) {
+        setDeleteDialog((current) =>
+          current
+            ? {
+                ...current,
+                plannerReferences: data.plannerReferences ?? 0,
+              }
+            : current,
+        )
+        return
+      }
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.code ?? 'delete_failed')
+      }
+
+      setCandidates((current) => removeOutfitFromCollection(current, outfit.id))
+      setHistory((current) => removeOutfitFromCollection(current, outfit.id))
+      setSavedOutfits((current) =>
+        removeOutfitFromCollection(current, outfit.id),
+      )
+      setToastMessage(
+        scope === 'saved'
+          ? dictionary.outfits.deletion.savedSuccess
+          : dictionary.outfits.deletion.historySuccess,
+      )
+      setDeleteDialog(null)
+    } catch {
+      setError(dictionary.outfits.deletion.error)
+    } finally {
+      setDeletingOutfitIds((current) => {
+        const next = new Set(current)
+        next.delete(outfit.id)
+        return next
+      })
+    }
+  }
+
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
       <section className="grid gap-5">
@@ -538,6 +632,8 @@ export function StylistPageClient({
                     void submitFeedback(candidate, rating)
                   }
                   onRate={(rating) => void rateOutfit(candidate, rating)}
+                  isDeleting={deletingOutfitIds.has(candidate.id)}
+                  onDelete={() => requestDelete(candidate, 'generated')}
                 />
               ))}
             </div>
@@ -565,17 +661,31 @@ export function StylistPageClient({
               <p className="text-sm text-muted-foreground">{t.saved.empty}</p>
             ) : (
               savedOutfits.map((outfit) => (
-                <button
+                <div
                   key={outfit.id}
-                  type="button"
-                  onClick={() => setCandidates([outfit])}
-                  className="rounded-xl border border-border p-3 text-left text-sm transition hover:bg-muted/50"
+                  className="flex items-start gap-2 rounded-xl border border-border p-3"
                 >
-                  <span className="font-medium">{outfit.title}</span>
-                  <span className="mt-1 block text-muted-foreground">
-                    {Math.round(outfit.confidenceScore * 100)}%
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setCandidates([outfit])}
+                    className="min-w-0 flex-1 text-left text-sm transition hover:text-foreground"
+                  >
+                    <span className="font-medium">{outfit.title}</span>
+                    <span className="mt-1 block text-muted-foreground">
+                      {Math.round(outfit.confidenceScore * 100)}%
+                    </span>
+                  </button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={deletingOutfitIds.has(outfit.id)}
+                    aria-label={dictionary.outfits.actions.deleteSaved}
+                    onClick={() => requestDelete(outfit, 'saved')}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
               ))
             )}
           </div>
@@ -588,14 +698,28 @@ export function StylistPageClient({
               <p className="text-sm text-muted-foreground">{t.history.empty}</p>
             ) : (
               history.map((outfit) => (
-                <button
+                <div
                   key={outfit.id}
-                  type="button"
-                  onClick={() => setCandidates([outfit])}
-                  className="rounded-md px-2 py-1 text-left text-sm transition hover:bg-muted"
+                  className="flex items-center gap-2 rounded-md px-2 py-1 transition hover:bg-muted"
                 >
-                  {outfit.title}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setCandidates([outfit])}
+                    className="min-w-0 flex-1 text-left text-sm"
+                  >
+                    {outfit.title}
+                  </button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={deletingOutfitIds.has(outfit.id)}
+                    aria-label={dictionary.outfits.actions.deleteHistory}
+                    onClick={() => requestDelete(outfit, 'history')}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
               ))
             )}
           </div>
@@ -646,6 +770,15 @@ export function StylistPageClient({
           {toastMessage}
         </div>
       )}
+      <OutfitDeleteDialog
+        dictionary={dictionary}
+        state={deleteDialog}
+        isDeleting={
+          deleteDialog ? deletingOutfitIds.has(deleteDialog.outfit.id) : false
+        }
+        onClose={closeDeleteDialog}
+        onConfirm={() => void confirmDelete()}
+      />
     </div>
   )
 }
@@ -754,6 +887,8 @@ function OutfitResult({
   onToggleKeep,
   onFeedback,
   onRate,
+  isDeleting,
+  onDelete,
 }: {
   dictionary: Dictionary
   outfit: OutfitDto
@@ -768,6 +903,8 @@ function OutfitResult({
   onToggleKeep: (wardrobeItemId: string) => void
   onFeedback: (rating: string) => void
   onRate: (rating: string) => void
+  isDeleting: boolean
+  onDelete: () => void
 }) {
   const t = dictionary.stylist
 
@@ -822,6 +959,19 @@ function OutfitResult({
               {isRecordingWear
                 ? dictionary.common.loading
                 : dictionary.wear.actions.woreThisOutfit}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={isDeleting}
+              onClick={onDelete}
+            >
+              <Trash2 />
+              {isDeleting
+                ? dictionary.outfits.actions.deleting
+                : outfit.isSaved
+                  ? dictionary.outfits.actions.deleteSaved
+                  : dictionary.outfits.actions.deleteHistory}
             </Button>
           </div>
         </div>

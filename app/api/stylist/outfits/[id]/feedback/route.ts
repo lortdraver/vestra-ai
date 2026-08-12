@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -37,7 +37,13 @@ export async function POST(
   const [existing] = await db
     .select({ id: outfit.id })
     .from(outfit)
-    .where(and(eq(outfit.id, id), eq(outfit.userId, userId)))
+    .where(
+      and(
+        eq(outfit.id, id),
+        eq(outfit.userId, userId),
+        isNull(outfit.deletedAt),
+      ),
+    )
     .limit(1)
 
   if (!existing) {

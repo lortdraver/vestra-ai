@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { count, eq } from 'drizzle-orm'
+import { and, count, eq, isNull } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import {
@@ -53,7 +53,9 @@ export default async function AccountPage() {
         db
           .select({ value: count() })
           .from(outfit)
-          .where(eq(outfit.userId, session.user.id)),
+          .where(
+            and(eq(outfit.userId, session.user.id), isNull(outfit.deletedAt)),
+          ),
       ),
       getCount(
         db

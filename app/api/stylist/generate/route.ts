@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, or } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, or } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { requireVerifiedEmailSession } from '@/lib/auth-email-verification'
@@ -666,6 +666,7 @@ export async function POST(request: Request) {
         .where(
           and(
             eq(outfit.userId, userId),
+            isNull(outfit.deletedAt),
             or(eq(outfit.isFavorite, true), eq(outfit.isSaved, true)),
           ),
         )

@@ -441,6 +441,30 @@ export const dictionaries = {
       count: '{count} kombin',
       confidence: 'Əminlik: {score}',
       rating: 'Kombin reytinqi',
+      actions: {
+        deleteHistory: 'Tarix\u00e7\u0259d\u0259n sil',
+        deleteSaved: 'Saxlan\u0131lan kombini sil',
+        cancelDelete: 'L\u0259\u011fv et',
+        confirmDelete: 'Kombini sil',
+        confirmDeleteScheduled: 'Sil v\u0259 planlar\u0131 saxla',
+        deleting: 'Silinir...',
+      },
+      deletion: {
+        title: 'Bu kombini sil\u0259k?',
+        historyDescription:
+          'Kombin tarix\u00e7\u0259d\u0259n yox olacaq v\u0259 s\u0259hif\u0259 yenil\u0259n\u0259nd\u0259n sonra geri g\u00f6r\u00fcnm\u0259y\u0259c\u0259k.',
+        savedDescription:
+          'Kombin saxlan\u0131lanlar siyah\u0131s\u0131ndan silin\u0259c\u0259k v\u0259 yenil\u0259n\u0259nd\u0259n sonra geri g\u00f6r\u00fcnm\u0259y\u0259c\u0259k.',
+        plannerWarning:
+          'Bu kombin planlay\u0131c\u0131da h\u0259l\u0259 {count} d\u0259f\u0259 planla\u015fd\u0131r\u0131l\u0131b.',
+        plannerPreserved:
+          'Plan qeydl\u0259ri ayr\u0131ca d\u0259yi\u015fdiril\u0259n\u0259 v\u0259 ya silin\u0259n\u0259 q\u0259d\u0259r qalacaq.',
+        wearHistoryPreserved:
+          'Ke\u00e7mi\u015f geyinm\u0259 tarix\u00e7\u0259si qorunacaq.',
+        historySuccess: 'Kombin tarix\u00e7\u0259d\u0259n silindi.',
+        savedSuccess: 'Saxlan\u0131lan kombin silindi.',
+        error: 'Kombini silm\u0259k olmad\u0131.',
+      },
     },
     wear: {
       actions: {
@@ -1121,6 +1145,29 @@ export const dictionaries = {
       count: '{count} outfits',
       confidence: 'Confidence: {score}',
       rating: 'Outfit rating',
+      actions: {
+        deleteHistory: 'Remove from history',
+        deleteSaved: 'Delete saved outfit',
+        cancelDelete: 'Cancel',
+        confirmDelete: 'Delete outfit',
+        confirmDeleteScheduled: 'Delete and keep planner entries',
+        deleting: 'Deleting...',
+      },
+      deletion: {
+        title: 'Delete this outfit?',
+        historyDescription:
+          'It will disappear from your outfit history and will not show up again after refresh.',
+        savedDescription:
+          'It will be removed from Saved Outfits and will not show up again after refresh.',
+        plannerWarning:
+          'This outfit is still scheduled in your planner {count} time(s).',
+        plannerPreserved:
+          'Planner entries will stay in place until you edit or delete them separately.',
+        wearHistoryPreserved: 'Past wear history stays preserved.',
+        historySuccess: 'Outfit removed from history.',
+        savedSuccess: 'Saved outfit deleted.',
+        error: 'Unable to delete the outfit.',
+      },
     },
     wear: {
       actions: {
@@ -1918,6 +1965,38 @@ export const dictionaries = {
       count: '{count} образов',
       confidence: 'Уверенность: {score}',
       rating: 'Оценка образа',
+      actions: {
+        deleteHistory:
+          '\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0438\u0437 \u0438\u0441\u0442\u043e\u0440\u0438\u0438',
+        deleteSaved:
+          '\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d\u043d\u044b\u0439 \u043e\u0431\u0440\u0430\u0437',
+        cancelDelete: '\u041e\u0442\u043c\u0435\u043d\u0430',
+        confirmDelete:
+          '\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u043e\u0431\u0440\u0430\u0437',
+        confirmDeleteScheduled:
+          '\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0438 \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u043f\u043b\u0430\u043d\u044b',
+        deleting: '\u0423\u0434\u0430\u043b\u0435\u043d\u0438\u0435...',
+      },
+      deletion: {
+        title:
+          '\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u044d\u0442\u043e\u0442 \u043e\u0431\u0440\u0430\u0437?',
+        historyDescription:
+          '\u041e\u0431\u0440\u0430\u0437 \u0438\u0441\u0447\u0435\u0437\u043d\u0435\u0442 \u0438\u0437 \u0438\u0441\u0442\u043e\u0440\u0438\u0438 \u0438 \u043d\u0435 \u043f\u043e\u044f\u0432\u0438\u0442\u0441\u044f \u0441\u043d\u043e\u0432\u0430 \u043f\u043e\u0441\u043b\u0435 \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u044b.',
+        savedDescription:
+          '\u041e\u0431\u0440\u0430\u0437 \u0431\u0443\u0434\u0435\u0442 \u0443\u0434\u0430\u043b\u0451\u043d \u0438\u0437 \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d\u043d\u044b\u0445 \u0438 \u043d\u0435 \u043f\u043e\u044f\u0432\u0438\u0442\u0441\u044f \u0441\u043d\u043e\u0432\u0430 \u043f\u043e\u0441\u043b\u0435 \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u044b.',
+        plannerWarning:
+          '\u042d\u0442\u043e\u0442 \u043e\u0431\u0440\u0430\u0437 \u0435\u0449\u0451 \u0437\u0430\u043f\u043b\u0430\u043d\u0438\u0440\u043e\u0432\u0430\u043d \u0432 \u043f\u043b\u0430\u043d\u0438\u0440\u043e\u0432\u0449\u0438\u043a\u0435 {count} \u0440\u0430\u0437.',
+        plannerPreserved:
+          '\u0417\u0430\u043f\u0438\u0441\u0438 \u0432 \u043f\u043b\u0430\u043d\u0438\u0440\u043e\u0432\u0449\u0438\u043a\u0435 \u0441\u043e\u0445\u0440\u0430\u043d\u044f\u0442\u0441\u044f, \u043f\u043e\u043a\u0430 \u0432\u044b \u043e\u0442\u0434\u0435\u043b\u044c\u043d\u043e \u043d\u0435 \u0438\u0437\u043c\u0435\u043d\u0438\u0442\u0435 \u0438\u043b\u0438 \u043d\u0435 \u0443\u0434\u0430\u043b\u0438\u0442\u0435 \u0438\u0445.',
+        wearHistoryPreserved:
+          '\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u043d\u043e\u0441\u043a\u0438 \u043e\u0441\u0442\u0430\u043d\u0435\u0442\u0441\u044f \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d\u043d\u043e\u0439.',
+        historySuccess:
+          '\u041e\u0431\u0440\u0430\u0437 \u0443\u0434\u0430\u043b\u0451\u043d \u0438\u0437 \u0438\u0441\u0442\u043e\u0440\u0438\u0438.',
+        savedSuccess:
+          '\u0421\u043e\u0445\u0440\u0430\u043d\u0451\u043d\u043d\u044b\u0439 \u043e\u0431\u0440\u0430\u0437 \u0443\u0434\u0430\u043b\u0451\u043d.',
+        error:
+          '\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0443\u0434\u0430\u043b\u0438\u0442\u044c \u043e\u0431\u0440\u0430\u0437.',
+      },
     },
     wear: {
       actions: {

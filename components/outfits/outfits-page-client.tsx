@@ -1,9 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Heart, Sparkles, Star } from 'lucide-react'
+import { Heart, Sparkles, Star, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { OutfitDeleteDialog } from '@/components/outfits/outfit-delete-dialog'
 import type { Dictionary } from '@/lib/i18n/dictionaries'
+import {
+  getOutfitDeleteScope,
+  removeOutfitFromCollection,
+} from '@/lib/outfits/client'
 import type { OutfitDto } from '@/lib/stylist'
 import type { WearLogDto } from '@/lib/wear'
 
@@ -25,6 +30,14 @@ export function OutfitsPageClient({ dictionary }: { dictionary: Dictionary }) {
   )
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [deletingOutfitIds, setDeletingOutfitIds] = useState<Set<string>>(
+    () => new Set(),
+  )
+  const [deleteDialog, setDeleteDialog] = useState<{
+    outfit: OutfitDto
+    scope: 'saved' | 'history'
+    plannerReferences: number
+  } | null>(null)
 
   useEffect(() => {
     const fetchOutfits = async () => {
@@ -92,6 +105,80 @@ export function OutfitsPageClient({ dictionary }: { dictionary: Dictionary }) {
       setError(dictionary.wear.errors.wear_log_write_failed)
     } finally {
       setWearingOutfitIds((current) => {
+        const next = new Set(current)
+        next.delete(outfit.id)
+        return next
+      })
+    }
+  }
+
+  const closeDeleteDialog = () => {
+    if (deletingOutfitIds.size > 0) return
+    setDeleteDialog(null)
+  }
+
+  const requestDelete = (outfit: OutfitDto, view: 'saved' | 'history') => {
+    setError(null)
+    setDeleteDialog({
+      outfit,
+      scope: getOutfitDeleteScope({ view, isSaved: outfit.isSaved }),
+      plannerReferences: 0,
+    })
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteDialog) return
+
+    const { outfit, scope, plannerReferences } = deleteDialog
+    setDeletingOutfitIds((current) => new Set(current).add(outfit.id))
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/stylist/outfits/${outfit.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          confirmPlannerPreservation: plannerReferences > 0,
+        }),
+      })
+      const data = (await response.json()) as {
+        ok?: boolean
+        code?: string
+        plannerReferences?: number
+      }
+
+      if (
+        response.status === 409 &&
+        data.code === 'outfit_has_planner_references' &&
+        typeof data.plannerReferences === 'number'
+      ) {
+        setDeleteDialog((current) =>
+          current
+            ? {
+                ...current,
+                plannerReferences: data.plannerReferences ?? 0,
+              }
+            : current,
+        )
+        return
+      }
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.code ?? 'delete_failed')
+      }
+
+      setOutfits((current) => removeOutfitFromCollection(current, outfit.id))
+      setSavedOutfits((current) =>
+        removeOutfitFromCollection(current, outfit.id),
+      )
+      setToastMessage(
+        scope === 'saved' ? t.deletion.savedSuccess : t.deletion.historySuccess,
+      )
+      setDeleteDialog(null)
+    } catch {
+      setError(t.deletion.error)
+    } finally {
+      setDeletingOutfitIds((current) => {
         const next = new Set(current)
         next.delete(outfit.id)
         return next
@@ -167,7 +254,9 @@ export function OutfitsPageClient({ dictionary }: { dictionary: Dictionary }) {
                 dictionary={dictionary}
                 outfit={outfit}
                 isRecordingWear={wearingOutfitIds.has(outfit.id)}
+                isDeleting={deletingOutfitIds.has(outfit.id)}
                 onRecordWear={() => void recordOutfitWear(outfit)}
+                onDelete={() => requestDelete(outfit, 'saved')}
               />
             ))}
           </div>
@@ -189,7 +278,19 @@ export function OutfitsPageClient({ dictionary }: { dictionary: Dictionary }) {
                   </p>
                   <h3 className="font-medium">{outfit.title}</h3>
                 </div>
-                <RatingPreview dictionary={dictionary} />
+                <div className="flex items-center gap-2">
+                  <RatingPreview dictionary={dictionary} />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={deletingOutfitIds.has(outfit.id)}
+                    aria-label={t.actions.deleteHistory}
+                    onClick={() => requestDelete(outfit, 'history')}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
               </div>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                 {outfit.overallExplanation}
@@ -206,6 +307,15 @@ export function OutfitsPageClient({ dictionary }: { dictionary: Dictionary }) {
           {toastMessage}
         </div>
       )}
+      <OutfitDeleteDialog
+        dictionary={dictionary}
+        state={deleteDialog}
+        isDeleting={
+          deleteDialog ? deletingOutfitIds.has(deleteDialog.outfit.id) : false
+        }
+        onClose={closeDeleteDialog}
+        onConfirm={() => void confirmDelete()}
+      />
     </div>
   )
 }
@@ -214,12 +324,16 @@ function OutfitCard({
   dictionary,
   outfit,
   isRecordingWear,
+  isDeleting,
   onRecordWear,
+  onDelete,
 }: {
   dictionary: Dictionary
   outfit: OutfitDto
   isRecordingWear: boolean
+  isDeleting: boolean
   onRecordWear: () => void
+  onDelete: () => void
 }) {
   const t = dictionary.outfits
 
@@ -267,12 +381,22 @@ function OutfitCard({
         <Button
           type="button"
           variant="outline"
-          disabled={isRecordingWear}
+          disabled={isRecordingWear || isDeleting}
           onClick={onRecordWear}
         >
           {isRecordingWear
             ? dictionary.common.loading
             : dictionary.wear.actions.woreThisOutfit}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={isDeleting}
+          aria-label={t.actions.deleteSaved}
+          onClick={onDelete}
+        >
+          <Trash2 />
+          {isDeleting ? t.actions.deleting : t.actions.deleteSaved}
         </Button>
       </div>
     </article>

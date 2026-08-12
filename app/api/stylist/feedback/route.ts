@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -46,7 +46,13 @@ export async function POST(request: Request) {
   const [ownedOutfit] = await db
     .select()
     .from(outfit)
-    .where(and(eq(outfit.id, parsed.data.outfitId), eq(outfit.userId, userId)))
+    .where(
+      and(
+        eq(outfit.id, parsed.data.outfitId),
+        eq(outfit.userId, userId),
+        isNull(outfit.deletedAt),
+      ),
+    )
     .limit(1)
   if (!ownedOutfit) return apiError('not_found', 404)
 

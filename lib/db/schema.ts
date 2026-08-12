@@ -535,6 +535,7 @@ export const outfit = pgTable(
     missingItems: jsonb('missingItems').$type<string[]>().notNull(),
     isSaved: boolean('isSaved').notNull().default(false),
     isFavorite: boolean('isFavorite').notNull().default(false),
+    deletedAt: timestamp('deletedAt'),
     createdAt: timestamp('createdAt').notNull().defaultNow(),
     updatedAt: timestamp('updatedAt').notNull().defaultNow(),
   },
@@ -554,6 +555,16 @@ export const outfit = pgTable(
     userBatchIdx: index('outfit_user_batch_idx').on(
       table.userId,
       table.generationBatchId,
+    ),
+    userActiveCreatedAtIdx: index('outfit_user_active_created_at_idx').on(
+      table.userId,
+      table.deletedAt,
+      table.createdAt,
+    ),
+    userSavedDeletedIdx: index('outfit_user_saved_deleted_idx').on(
+      table.userId,
+      table.isSaved,
+      table.deletedAt,
     ),
   }),
 )
