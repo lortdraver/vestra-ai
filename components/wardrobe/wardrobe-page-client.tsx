@@ -27,6 +27,8 @@ import type { ApiErrorCode } from '@/lib/api/errors'
 import type { Dictionary } from '@/lib/i18n/dictionaries'
 import type { WardrobeInsightsDto, WearLogDto } from '@/lib/wear'
 import {
+  acceptedImageTypes,
+  maxUploadedImageBytes,
   wardrobeCategories,
   wardrobeSeasons,
   wardrobeStyles,
@@ -34,6 +36,7 @@ import {
 import {
   compressWardrobeImage,
   extractWardrobeImageColors,
+  logClientImageStage,
   type WardrobeImageColorHints,
 } from '@/lib/wardrobe/image-compression'
 import { isWardrobeDeleteSuccessResponse } from '@/lib/wardrobe/delete'
@@ -477,7 +480,16 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
       return
     }
 
+    if (!acceptedImageTypes.includes(file.type as never)) {
+      setImageFile(null)
+      setImagePreview(null)
+      setImageColorHints(null)
+      setError(t.errors.invalid_image_type)
+      return
+    }
+
     const previewUrl = URL.createObjectURL(file)
+    setImageFile(file)
     setImagePreview({
       url: previewUrl,
       name: file.name,
@@ -502,15 +514,24 @@ export function WardrobePageClient({ dictionary }: { dictionary: Dictionary }) {
 
     setIsCompressing(true)
     try {
-      const [compressedFile, colorHints] = await Promise.all([
-        compressWardrobeImage(file),
-        extractWardrobeImageColors(file).catch(() => null),
-      ])
+      const compressedFile = await compressWardrobeImage(file)
       setImageFile(compressedFile)
-      setImageColorHints(colorHints)
     } catch {
-      setError(t.errors.compress)
+      if (file.size > maxUploadedImageBytes) {
+        setImageFile(null)
+        setError(t.errors.image_too_large)
+      } else {
+        setImageFile(file)
+        logClientImageStage('CLIENT_IMAGE_FALLBACK_ORIGINAL', {
+          inputMimeType: file.type,
+          inputBytes: file.size,
+        })
+      }
     } finally {
+      const colorHints = await extractWardrobeImageColors(file).catch(
+        () => null,
+      )
+      setImageColorHints(colorHints)
       setIsCompressing(false)
     }
   }
