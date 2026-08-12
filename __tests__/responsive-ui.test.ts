@@ -5,6 +5,7 @@ import {
   DASHBOARD_CONTENT_CLASS,
   DESKTOP_NAV_CLASS,
   MOBILE_BOTTOM_NAV_CLASS,
+  MOBILE_TOP_BAR_CLASS,
   WARDROBE_CARD_ACTION_CLASS,
   WARDROBE_CARD_IMAGE_CLASS,
   WARDROBE_GRID_CLASS,
@@ -78,6 +79,8 @@ describe('responsive UI contracts', () => {
   it('keeps mobile and desktop navigation mutually exclusive', () => {
     expect(DESKTOP_NAV_CLASS).toContain('hidden')
     expect(DESKTOP_NAV_CLASS).toContain('md:flex')
+    expect(MOBILE_TOP_BAR_CLASS).toContain('env(safe-area-inset-top)')
+    expect(MOBILE_TOP_BAR_CLASS).toContain('md:pt-0')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('fixed')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('w-screen')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('grid-cols-5')
@@ -94,8 +97,12 @@ describe('responsive UI contracts', () => {
     expect(appHeaderSource).toContain('openCookiePreferences')
     expect(appHeaderSource).toContain('dictionary.dashboard.signOut')
     expect(appHeaderSource).toContain('LanguageSwitcher')
+    expect(appHeaderSource).toContain('MOBILE_TOP_BAR_CLASS')
     expect(appHeaderSource).toContain(
       'top-[calc(env(safe-area-inset-top)+3.9rem)]',
+    )
+    expect(appHeaderSource).toContain(
+      '<User className="size-4" aria-hidden="true" />',
     )
     expect(languageSwitcherSource).toContain("variant?: 'compact' | 'menu'")
     expect(languageSwitcherSource).toContain('onLocaleChange?.(locale)')

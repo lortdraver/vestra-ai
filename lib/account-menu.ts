@@ -6,6 +6,9 @@ export type AccountMenuUser = {
   role?: string | null
 }
 
+export type UserAvatarFallback =
+  { kind: 'initials'; value: string } | { kind: 'icon' }
+
 export type AccountMenuItemKey =
   | 'accountSettings'
   | 'subscription'
@@ -18,7 +21,9 @@ export type AccountMenuItem = {
   href: string
 }
 
-export function getUserInitials(user: AccountMenuUser | null | undefined) {
+export function getUserAvatarFallback(
+  user: AccountMenuUser | null | undefined,
+): UserAvatarFallback {
   const nameParts =
     user?.name
       ?.trim()
@@ -27,10 +32,21 @@ export function getUserInitials(user: AccountMenuUser | null | undefined) {
       .filter(Boolean) ?? []
 
   const initials = nameParts.slice(0, 2).join('')
-  if (initials) return initials.toUpperCase()
+  if (initials) {
+    return { kind: 'initials', value: initials.toUpperCase() }
+  }
 
   const emailFallback = user?.email?.trim()[0]
-  return emailFallback ? emailFallback.toUpperCase() : 'U'
+  if (emailFallback) {
+    return { kind: 'initials', value: emailFallback.toUpperCase() }
+  }
+
+  return { kind: 'icon' }
+}
+
+export function getUserInitials(user: AccountMenuUser | null | undefined) {
+  const fallback = getUserAvatarFallback(user)
+  return fallback.kind === 'initials' ? fallback.value : 'U'
 }
 
 export function getAccountMenuItems(

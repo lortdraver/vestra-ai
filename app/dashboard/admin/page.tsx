@@ -31,7 +31,20 @@ export default async function AdminPage({
     .from(user)
     .where(eq(user.id, session.user.id))
     .limit(1)
-  if (!canAccessAdmin(currentUser?.role)) notFound()
+  const accessAllowed = canAccessAdmin(currentUser?.role)
+
+  console.info('[admin-dashboard] ACCESS_CHECK', {
+    route: '/dashboard/admin',
+    sessionExists: Boolean(session),
+    authenticated: Boolean(session?.user),
+    databaseUserFound: Boolean(currentUser),
+    role: currentUser?.role ?? null,
+    accessAllowed,
+    authorizationMode: 'database_role_admin_only',
+    adminEnvConfigured: false,
+  })
+
+  if (!accessAllowed) notFound()
 
   const params = await searchParams
   const preset = resolveAdminRangePreset(

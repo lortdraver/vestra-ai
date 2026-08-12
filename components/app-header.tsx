@@ -15,6 +15,7 @@ import {
   Shirt,
   SlidersHorizontal,
   Sparkles,
+  User,
   UserCog,
   X,
 } from 'lucide-react'
@@ -33,12 +34,16 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   getAccountMenuItems,
-  getUserInitials,
+  getUserAvatarFallback,
   type AccountMenuItemKey,
 } from '@/lib/account-menu'
 import type { Locale } from '@/lib/i18n/config'
 import type { Dictionary } from '@/lib/i18n/dictionaries'
-import { DESKTOP_NAV_CLASS, MOBILE_BOTTOM_NAV_CLASS } from '@/lib/ui/responsive'
+import {
+  DESKTOP_NAV_CLASS,
+  MOBILE_BOTTOM_NAV_CLASS,
+  MOBILE_TOP_BAR_CLASS,
+} from '@/lib/ui/responsive'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -129,7 +134,7 @@ export function AppHeader({
           image: sessionUser?.image ?? user?.image ?? null,
         }
   const isSessionLoading = session.isPending && !activeUser
-  const initials = getUserInitials(activeUser)
+  const avatarFallback = getUserAvatarFallback(activeUser)
   const planLabel =
     activeUser?.planKey === 'premium'
       ? dictionary.subscription.plans.premium
@@ -164,115 +169,65 @@ export function AppHeader({
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-[1680px] items-center justify-between gap-3 px-3 min-[390px]:px-4 md:h-16 md:px-6 xl:px-8">
-        <div className="flex min-w-0 items-center gap-8">
-          <Link
-            href="/dashboard"
-            className="truncate font-serif text-lg font-semibold tracking-tight text-foreground"
-          >
-            {dictionary.common.brand}
-          </Link>
-          <nav
-            aria-label={dictionary.common.mainNavigation}
-            className={DESKTOP_NAV_CLASS}
-          >
-            {navItems.map((item) => {
-              const isActive =
-                item.href === '/dashboard'
-                  ? pathname === '/dashboard'
-                  : pathname.startsWith(item.href)
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={isActive ? 'page' : undefined}
-                  className={cn(
-                    'rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-secondary text-foreground'
-                      : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-                  )}
-                >
-                  {getNavLabel(dictionary, locale, item.key)}
-                </Link>
-              )
-            })}
-          </nav>
-        </div>
+      <div className={MOBILE_TOP_BAR_CLASS}>
+        <div className="mx-auto flex h-14 max-w-[1680px] items-center justify-between gap-3 px-3 min-[390px]:px-4 md:h-16 md:px-6 xl:px-8">
+          <div className="flex min-w-0 items-center gap-8">
+            <Link
+              href="/dashboard"
+              className="truncate font-serif text-lg font-semibold tracking-tight text-foreground"
+            >
+              {dictionary.common.brand}
+            </Link>
+            <nav
+              aria-label={dictionary.common.mainNavigation}
+              className={DESKTOP_NAV_CLASS}
+            >
+              {navItems.map((item) => {
+                const isActive =
+                  item.href === '/dashboard'
+                    ? pathname === '/dashboard'
+                    : pathname.startsWith(item.href)
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={cn(
+                      'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-secondary text-foreground'
+                        : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                    )}
+                  >
+                    {getNavLabel(dictionary, locale, item.key)}
+                  </Link>
+                )
+              })}
+            </nav>
+          </div>
 
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-          <div className="hidden md:block">
-            <LanguageSwitcher
-              currentLocale={locale}
-              label={dictionary.common.language}
-            />
-          </div>
-          <div className="md:hidden">
-            {isSessionLoading ? (
-              <div
-                aria-label={dictionary.common.loading}
-                className="size-11 animate-pulse rounded-full bg-muted"
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <div className="hidden md:block">
+              <LanguageSwitcher
+                currentLocale={locale}
+                label={dictionary.common.language}
               />
-            ) : activeUser ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-lg"
-                className="size-11 rounded-full border border-transparent hover:border-border aria-expanded:border-border aria-expanded:bg-muted"
-                aria-label={dictionary.common.accountMenu}
-                aria-expanded={mobileMenuOpen}
-                onClick={() => setMobileMenuOpen((current) => !current)}
-              >
-                <Avatar className="size-8">
-                  {activeUser.image ? (
-                    <AvatarImage
-                      src={activeUser.image}
-                      alt={activeUser.name ?? activeUser.email ?? ''}
-                    />
-                  ) : null}
-                  <AvatarFallback className="bg-primary text-xs font-medium text-primary-foreground">
-                    {initials || dictionary.common.userFallback}
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Link
-                  href="/sign-in"
-                  className={cn(
-                    buttonVariants({ variant: 'ghost', size: 'sm' }),
-                  )}
-                >
-                  {dictionary.common.signIn}
-                </Link>
-                <Link
-                  href="/sign-up"
-                  className={cn(
-                    buttonVariants({ variant: 'default', size: 'sm' }),
-                  )}
-                >
-                  {dictionary.common.signUp}
-                </Link>
-              </div>
-            )}
-          </div>
-          <div className="hidden md:flex md:items-center md:gap-2">
-            {isSessionLoading ? (
-              <div
-                aria-label={dictionary.common.loading}
-                className="size-8 animate-pulse rounded-full bg-muted"
-              />
-            ) : activeUser ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-11 rounded-full border border-transparent hover:border-border aria-expanded:border-border aria-expanded:bg-muted"
-                      aria-label={dictionary.common.accountMenu}
-                    />
-                  }
+            </div>
+            <div className="md:hidden">
+              {isSessionLoading ? (
+                <div
+                  aria-label={dictionary.common.loading}
+                  className="size-11 animate-pulse rounded-full bg-muted"
+                />
+              ) : activeUser ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-lg"
+                  className="size-11 rounded-full border border-transparent hover:border-border aria-expanded:border-border aria-expanded:bg-muted"
+                  aria-label={dictionary.common.accountMenu}
+                  aria-expanded={mobileMenuOpen}
+                  onClick={() => setMobileMenuOpen((current) => !current)}
                 >
                   <Avatar className="size-8">
                     {activeUser.image ? (
@@ -282,107 +237,171 @@ export function AppHeader({
                       />
                     ) : null}
                     <AvatarFallback className="bg-primary text-xs font-medium text-primary-foreground">
-                      {initials || dictionary.common.userFallback}
+                      {avatarFallback.kind === 'initials' ? (
+                        avatarFallback.value
+                      ) : (
+                        <User className="size-4" aria-hidden="true" />
+                      )}
                     </AvatarFallback>
                   </Avatar>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  sideOffset={10}
-                  className="w-80 max-w-[calc(100vw-1rem)] rounded-2xl p-2 shadow-xl"
-                >
-                  <div className="p-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <Avatar className="size-10">
-                        {activeUser.image ? (
-                          <AvatarImage
-                            src={activeUser.image}
-                            alt={activeUser.name ?? activeUser.email ?? ''}
-                          />
-                        ) : null}
-                        <AvatarFallback className="bg-primary text-sm font-medium text-primary-foreground">
-                          {initials || dictionary.common.userFallback}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-foreground">
-                          {activeUser.name || activeUser.email}
-                        </p>
-                        <p className="truncate text-xs font-normal text-muted-foreground">
-                          {activeUser.email}
-                        </p>
-                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                          <span className="rounded-full bg-secondary px-2 py-0.5 text-[0.7rem] font-medium text-secondary-foreground">
-                            {planLabel}
-                          </span>
-                          {activeUser.emailVerified != null ? (
-                            <span className="rounded-full border border-border px-2 py-0.5 text-[0.7rem] font-medium text-muted-foreground">
-                              {activeUser.emailVerified
-                                ? dictionary.accountMenu.emailVerified
-                                : dictionary.accountMenu.emailUnverified}
-                            </span>
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/sign-in"
+                    className={cn(
+                      buttonVariants({ variant: 'ghost', size: 'sm' }),
+                    )}
+                  >
+                    {dictionary.common.signIn}
+                  </Link>
+                  <Link
+                    href="/sign-up"
+                    className={cn(
+                      buttonVariants({ variant: 'default', size: 'sm' }),
+                    )}
+                  >
+                    {dictionary.common.signUp}
+                  </Link>
+                </div>
+              )}
+            </div>
+            <div className="hidden md:flex md:items-center md:gap-2">
+              {isSessionLoading ? (
+                <div
+                  aria-label={dictionary.common.loading}
+                  className="size-8 animate-pulse rounded-full bg-muted"
+                />
+              ) : activeUser ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-11 rounded-full border border-transparent hover:border-border aria-expanded:border-border aria-expanded:bg-muted"
+                        aria-label={dictionary.common.accountMenu}
+                      />
+                    }
+                  >
+                    <Avatar className="size-8">
+                      {activeUser.image ? (
+                        <AvatarImage
+                          src={activeUser.image}
+                          alt={activeUser.name ?? activeUser.email ?? ''}
+                        />
+                      ) : null}
+                      <AvatarFallback className="bg-primary text-xs font-medium text-primary-foreground">
+                        {avatarFallback.kind === 'initials' ? (
+                          avatarFallback.value
+                        ) : (
+                          <User className="size-4" aria-hidden="true" />
+                        )}
+                      </AvatarFallback>
+                    </Avatar>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    sideOffset={10}
+                    className="w-80 max-w-[calc(100vw-1rem)] rounded-2xl p-2 shadow-xl"
+                  >
+                    <div className="p-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Avatar className="size-10">
+                          {activeUser.image ? (
+                            <AvatarImage
+                              src={activeUser.image}
+                              alt={activeUser.name ?? activeUser.email ?? ''}
+                            />
                           ) : null}
+                          <AvatarFallback className="bg-primary text-sm font-medium text-primary-foreground">
+                            {avatarFallback.kind === 'initials' ? (
+                              avatarFallback.value
+                            ) : (
+                              <User className="size-4" aria-hidden="true" />
+                            )}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">
+                            {activeUser.name || activeUser.email}
+                          </p>
+                          <p className="truncate text-xs font-normal text-muted-foreground">
+                            {activeUser.email}
+                          </p>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <span className="rounded-full bg-secondary px-2 py-0.5 text-[0.7rem] font-medium text-secondary-foreground">
+                              {planLabel}
+                            </span>
+                            {activeUser.emailVerified != null ? (
+                              <span className="rounded-full border border-border px-2 py-0.5 text-[0.7rem] font-medium text-muted-foreground">
+                                {activeUser.emailVerified
+                                  ? dictionary.accountMenu.emailVerified
+                                  : dictionary.accountMenu.emailUnverified}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    {menuItems.map((item) => {
-                      const Icon = menuIcons[item.key]
-                      return (
-                        <DropdownMenuItem
-                          key={item.key}
-                          render={<Link href={item.href} />}
-                          className="gap-2 px-2.5 py-2"
-                        >
-                          <Icon className="size-4 text-muted-foreground" />
-                          {dictionary.accountMenu[item.key]}
-                        </DropdownMenuItem>
-                      )
-                    })}
-                  </DropdownMenuGroup>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuGroup>
+                      {menuItems.map((item) => {
+                        const Icon = menuIcons[item.key]
+                        return (
+                          <DropdownMenuItem
+                            key={item.key}
+                            render={<Link href={item.href} />}
+                            className="gap-2 px-2.5 py-2"
+                          >
+                            <Icon className="size-4 text-muted-foreground" />
+                            {dictionary.accountMenu[item.key]}
+                          </DropdownMenuItem>
+                        )
+                      })}
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem
+                        onClick={openCookiePreferences}
+                        className="gap-2 px-2.5 py-2"
+                      >
+                        <Cookie className="size-4 text-muted-foreground" />
+                        {dictionary.privacy.cookiePreferences}
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      onClick={openCookiePreferences}
+                      variant="destructive"
+                      onClick={handleSignOut}
                       className="gap-2 px-2.5 py-2"
                     >
-                      <Cookie className="size-4 text-muted-foreground" />
-                      {dictionary.privacy.cookiePreferences}
+                      <LogOut className="size-4" />
+                      {dictionary.dashboard.signOut}
                     </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={handleSignOut}
-                    className="gap-2 px-2.5 py-2"
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/sign-in"
+                    className={cn(
+                      buttonVariants({ variant: 'ghost', size: 'sm' }),
+                    )}
                   >
-                    <LogOut className="size-4" />
-                    {dictionary.dashboard.signOut}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Link
-                  href="/sign-in"
-                  className={cn(
-                    buttonVariants({ variant: 'ghost', size: 'sm' }),
-                  )}
-                >
-                  {dictionary.common.signIn}
-                </Link>
-                <Link
-                  href="/sign-up"
-                  className={cn(
-                    buttonVariants({ variant: 'default', size: 'sm' }),
-                  )}
-                >
-                  {dictionary.common.signUp}
-                </Link>
-              </div>
-            )}
+                    {dictionary.common.signIn}
+                  </Link>
+                  <Link
+                    href="/sign-up"
+                    className={cn(
+                      buttonVariants({ variant: 'default', size: 'sm' }),
+                    )}
+                  >
+                    {dictionary.common.signUp}
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

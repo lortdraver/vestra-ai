@@ -26,10 +26,14 @@ function getArg(name) {
 
 function summarize(rows, currentUser) {
   const credentialRows = rows.filter((row) => row.provider_id === 'credential')
+  const role = currentUser?.role ?? 'user'
 
   return {
     userExists: Boolean(currentUser),
     emailVerified: currentUser?.email_verified ?? false,
+    role,
+    moderatorAccess: role === 'moderator' || role === 'admin',
+    adminAccess: role === 'admin',
     accountRowCount: rows.length,
     credentialAccountCount: credentialRows.length,
     credentialProviderIds: Array.from(
@@ -63,7 +67,7 @@ try {
 
   const normalizedEmail = emailInput.trim().toLowerCase()
   const userResult = await client.query(
-    'select id, email_verified from "user" where email = $1 limit 1',
+    'select id, email_verified, role from "user" where email = $1 limit 1',
     [normalizedEmail],
   )
   const currentUser = userResult.rows[0]

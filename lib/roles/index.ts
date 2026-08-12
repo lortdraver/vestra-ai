@@ -1,4 +1,6 @@
-export const roles = ['user', 'moderator', 'admin'] as const
+import { canonicalRoles } from './constants'
+
+export const roles = canonicalRoles as readonly ['user', 'moderator', 'admin']
 export type Role = (typeof roles)[number]
 
 const roleRank: Record<Role, number> = {
