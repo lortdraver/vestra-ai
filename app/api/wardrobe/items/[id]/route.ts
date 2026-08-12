@@ -2,6 +2,7 @@ import { and, count, eq } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import { trackServerEvent } from '@/lib/analytics/server'
 import { getBackgroundRemovalProvider } from '@/lib/background-removal'
 import { db } from '@/lib/db'
 import {
@@ -475,6 +476,13 @@ export async function DELETE(
 
     stage = 'STORAGE_DELETE_COMPLETED'
     logDeleteStage(stage, { itemId: id, storageCleanup })
+
+    void trackServerEvent({
+      eventName: 'wardrobe_item_deleted',
+      userId,
+      properties: { storageCleanup },
+      dedupeKey: `wardrobe-delete:${id}`,
+    })
 
     stage = 'SUCCESS'
     logDeleteStage(stage, { itemId: id, storageCleanup })

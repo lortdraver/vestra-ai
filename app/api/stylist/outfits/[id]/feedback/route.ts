@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
+import { trackServerEvent } from '@/lib/analytics/server'
 import { db } from '@/lib/db'
 import { outfit, outfitFeedback } from '@/lib/db/schema'
 
@@ -52,6 +53,13 @@ export async function POST(
       comment: parsed.data.comment,
     })
     .returning()
+
+  void trackServerEvent({
+    eventName: 'stylist_feedback_submitted',
+    userId,
+    properties: { rating: Number(parsed.data.rating) },
+    dedupeKey: `outfit-feedback:${feedback.id}`,
+  })
 
   return NextResponse.json({ feedback })
 }

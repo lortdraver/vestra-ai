@@ -1,7 +1,10 @@
-import { Analytics } from '@vercel/analytics/next'
+import { cookies } from 'next/headers'
 import type { Metadata, Viewport } from 'next'
 import { Inter, Playfair_Display } from 'next/font/google'
+import { ConsentManager } from '@/components/privacy/consent-manager'
 import { getDictionary, getLocale } from '@/lib/i18n/server'
+import { consentCopy } from '@/lib/privacy/copy'
+import { consentCookieName, getConsent } from '@/lib/privacy/consent'
 import './globals.css'
 
 const inter = Inter({
@@ -56,7 +59,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const locale = await getLocale()
+  const [locale, cookieStore] = await Promise.all([getLocale(), cookies()])
+  const initialConsent = getConsent(cookieStore.get(consentCookieName)?.value)
 
   return (
     <html lang={locale} className="bg-background">
@@ -64,7 +68,10 @@ export default async function RootLayout({
         className={`${inter.variable} ${playfair.variable} font-sans antialiased`}
       >
         {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        <ConsentManager
+          copy={consentCopy[locale]}
+          initialConsent={initialConsent}
+        />
       </body>
     </html>
   )

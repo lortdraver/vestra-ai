@@ -26,6 +26,11 @@ export const dictionaries = {
       secondaryCta: 'Hesabım var',
       footer: 'Vestra - sahib olduğunuz geyimlərlə daha ağıllı geyinin.',
     },
+    privacy: {
+      title: 'Məxfilik siyasəti',
+      cookiePreferences: 'Kuki seçimləri',
+      cookiesTitle: 'Kuki siyasəti',
+    },
     auth: {
       createAccount: 'Hesab yaradın',
       welcomeBack: 'Xoş gəlmisiniz',
@@ -696,6 +701,11 @@ export const dictionaries = {
       primaryCta: 'Build your wardrobe',
       secondaryCta: 'I have an account',
       footer: 'Vestra - dress smarter with what you own.',
+    },
+    privacy: {
+      title: 'Privacy Policy',
+      cookiePreferences: 'Cookie preferences',
+      cookiesTitle: 'Cookie Policy',
     },
     auth: {
       createAccount: 'Create your account',
@@ -1407,6 +1417,11 @@ export const dictionaries = {
       primaryCta: 'Создать гардероб',
       secondaryCta: 'У меня есть аккаунт',
       footer: 'Vestra - одевайтесь умнее с тем, что у вас уже есть.',
+    },
+    privacy: {
+      title: 'Политика конфиденциальности',
+      cookiePreferences: 'Настройки cookies',
+      cookiesTitle: 'Политика cookies',
     },
     auth: {
       createAccount: 'Создайте аккаунт',

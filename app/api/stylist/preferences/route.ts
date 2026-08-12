@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { apiError } from '@/lib/api/errors'
 import { auth } from '@/lib/auth'
+import { trackServerEvent } from '@/lib/analytics/server'
 import { requireVerifiedEmailSession } from '@/lib/auth-email-verification'
 import { db } from '@/lib/db'
 import { stylistPreferenceProfile } from '@/lib/db/schema'
@@ -68,6 +69,16 @@ export async function PATCH(request: Request) {
       set: { ...parsed.data, updatedAt: new Date() },
     })
     .returning()
+
+  void trackServerEvent({
+    eventName: 'stylist_preferences_updated',
+    userId,
+    properties: {
+      preferredStyleCount: row.preferredStyles.length,
+      preferredColorCount: row.preferredColors.length,
+    },
+    dedupeKey: `stylist-preferences:${userId}:${row.updatedAt.toISOString()}`,
+  })
 
   return NextResponse.json({ preferences: serializePreference(row) })
 }

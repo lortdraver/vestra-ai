@@ -1,5 +1,6 @@
 import { desc, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
+import { trackServerEvent } from '@/lib/analytics/server'
 import { requireVerifiedEmailSession } from '@/lib/auth-email-verification'
 import { db } from '@/lib/db'
 import {
@@ -410,6 +411,7 @@ export async function POST(request: Request) {
   let currentRequest: StylistRequest | null = null
   let duplicateRequestState = 'not_checked'
   let failureDetails = buildStylistGenerateFailureDetails()
+  let analyticsUserId: string | null = null
 
   const getRequestTypeForDiagnostics = () =>
     getStylistRequestType(currentRequest)
@@ -422,6 +424,7 @@ export async function POST(request: Request) {
       return verifiedSession.response
     }
     const userId = verifiedSession.userId
+    analyticsUserId = userId
 
     stage = 'AUTHENTICATED'
     logStylistStage(stage)
@@ -654,6 +657,17 @@ export async function POST(request: Request) {
 
     let result
     try {
+      void trackServerEvent({
+        eventName: 'stylist_generation_requested',
+        userId,
+        locale: parsed.data.locale,
+        properties: {
+          eligibleItemCount: weatherRankedWardrobe.length,
+          hasWeatherContext: Boolean(parsed.data.weatherContext),
+          requestType: getStylistRequestType(parsed.data),
+        },
+        dedupeKey: `stylist-request:${activeGenerationKey}`,
+      })
       result = await generateAndValidateStylistBatch({
         userId,
         request: parsed.data,
@@ -669,6 +683,18 @@ export async function POST(request: Request) {
         },
       })
     } catch (error) {
+      void trackServerEvent({
+        eventName: 'stylist_generation_failed',
+        userId,
+        locale: parsed.data.locale,
+        properties: {
+          errorCode:
+            error instanceof StylistProviderRequestError
+              ? error.code
+              : 'invalid_provider_output',
+        },
+        dedupeKey: `stylist-failed:${activeGenerationKey}`,
+      })
       logStylistStageFailure(stage, error)
       if (error instanceof StylistProviderRequestError) {
         return stylistStructuredErrorResponse({
@@ -815,6 +841,29 @@ export async function POST(request: Request) {
       createdOutfits.push(toOutfitDto(outfitRow, itemRows, wardrobeById))
     }
 
+    void trackServerEvent({
+      eventName: 'stylist_generation_completed',
+      userId,
+      locale: parsed.data.locale,
+      properties: {
+        candidateCount: createdOutfits.length,
+        durationMs: result.metadata.durationMs,
+        modelId: result.metadata.modelId ?? 'unknown',
+      },
+      dedupeKey: `stylist-completed:${batchRow.id}`,
+    })
+    for (const createdOutfit of createdOutfits) {
+      void trackServerEvent({
+        eventName: 'outfit_created',
+        userId,
+        properties: {
+          itemCount: createdOutfit.items.length,
+          source: 'stylist',
+        },
+        dedupeKey: `outfit-created:${createdOutfit.id}`,
+      })
+    }
+
     return NextResponse.json({
       result: {
         status: 'success',
@@ -828,6 +877,18 @@ export async function POST(request: Request) {
       candidates: createdOutfits,
     })
   } catch (error) {
+    if (analyticsUserId) {
+      void trackServerEvent({
+        eventName: 'stylist_generation_failed',
+        userId: analyticsUserId,
+        properties: {
+          errorCode: error instanceof Error ? error.name : 'unknown_error',
+        },
+        dedupeKey: activeGenerationKey
+          ? `stylist-failed:${activeGenerationKey}`
+          : undefined,
+      })
+    }
     logStylistStageFailure(stage, error)
     return stylistErrorResponse(stage, error)
   } finally {

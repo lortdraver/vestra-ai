@@ -10,6 +10,7 @@ import {
   Home,
   Images,
   LogOut,
+  Cookie,
   Shield,
   Shirt,
   SlidersHorizontal,
@@ -20,6 +21,7 @@ import { authClient, useSession } from '@/lib/auth-client'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { LanguageSwitcher } from '@/components/language-switcher'
+import { openCookiePreferences } from '@/components/privacy/consent-manager'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -257,6 +259,16 @@ export function AppHeader({
                       </DropdownMenuItem>
                     )
                   })}
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem
+                    onClick={openCookiePreferences}
+                    className="gap-2 px-2.5 py-2"
+                  >
+                    <Cookie className="size-4 text-muted-foreground" />
+                    {dictionary.privacy.cookiePreferences}
+                  </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

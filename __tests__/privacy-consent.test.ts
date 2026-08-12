@@ -1,0 +1,172 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+import { consentCopy, getPrivacyPolicyCopy } from '@/lib/privacy/copy'
+import {
+  buildClearConsentCookie,
+  buildConsentCookie,
+  consentCookieName,
+  consentMaxAgeSeconds,
+  consentPolicyVersion,
+  consentVersion,
+  createConsentPreferences,
+  getConsent,
+  hasAnalyticsConsent,
+  parseConsentCookieValue,
+  serializeConsent,
+} from '@/lib/privacy/consent'
+
+const rootLayoutSource = readFileSync(
+  join(process.cwd(), 'app/layout.tsx'),
+  'utf8',
+)
+const consentManagerSource = readFileSync(
+  join(process.cwd(), 'components/privacy/consent-manager.tsx'),
+  'utf8',
+)
+const privacyPageSource = readFileSync(
+  join(process.cwd(), 'app/privacy/page.tsx'),
+  'utf8',
+)
+const landingPageSource = readFileSync(
+  join(process.cwd(), 'app/page.tsx'),
+  'utf8',
+)
+const appHeaderSource = readFileSync(
+  join(process.cwd(), 'components/app-header.tsx'),
+  'utf8',
+)
+
+describe('privacy consent architecture', () => {
+  it('returns no decision when there is no previous consent', () => {
+    expect(getConsent(null)).toEqual({
+      preferences: null,
+      hasDecision: false,
+      hasAnalyticsConsent: false,
+      requiresRefresh: false,
+    })
+  })
+
+  it('stores accepted analytics consent with necessary always true', () => {
+    const preferences = createConsentPreferences(
+      true,
+      new Date('2026-08-12T00:00:00.000Z'),
+    )
+
+    expect(preferences).toMatchObject({
+      version: consentVersion,
+      necessary: true,
+      analytics: true,
+      policyVersion: consentPolicyVersion,
+    })
+    expect(getConsent(serializeConsent(preferences))).toMatchObject({
+      hasDecision: true,
+      hasAnalyticsConsent: true,
+      requiresRefresh: false,
+    })
+  })
+
+  it('stores rejected analytics consent while preserving necessary cookies', () => {
+    const preferences = createConsentPreferences(false)
+    const parsed = parseConsentCookieValue(serializeConsent(preferences))
+
+    expect(parsed?.necessary).toBe(true)
+    expect(parsed?.analytics).toBe(false)
+    expect(hasAnalyticsConsent(serializeConsent(preferences))).toBe(false)
+    expect(getConsent(serializeConsent(preferences)).hasDecision).toBe(true)
+  })
+
+  it('restores saved consent from the cookie value', () => {
+    const preferences = createConsentPreferences(true)
+    const restored = parseConsentCookieValue(serializeConsent(preferences))
+
+    expect(restored).toEqual(preferences)
+  })
+
+  it('requires a new decision when consent version changes', () => {
+    const preferences = {
+      ...createConsentPreferences(true),
+      version: consentVersion - 1,
+    }
+
+    expect(getConsent(serializeConsent(preferences))).toMatchObject({
+      hasDecision: false,
+      hasAnalyticsConsent: false,
+      requiresRefresh: true,
+    })
+  })
+
+  it('ignores corrupted consent cookies', () => {
+    expect(parseConsentCookieValue('%7Bbad-json')).toBeNull()
+    expect(getConsent('%7Bbad-json')).toMatchObject({
+      hasDecision: false,
+      hasAnalyticsConsent: false,
+    })
+  })
+
+  it('builds secure minimal first-party consent cookies', () => {
+    const cookie = buildConsentCookie(createConsentPreferences(true), true)
+
+    expect(cookie).toContain(`${consentCookieName}=`)
+    expect(cookie).toContain('Path=/')
+    expect(cookie).toContain(`Max-Age=${consentMaxAgeSeconds}`)
+    expect(cookie).toContain('SameSite=Lax')
+    expect(cookie).toContain('Secure')
+    expect(cookie).not.toContain('userId')
+    expect(cookie).not.toContain('email')
+  })
+
+  it('can clear consent without touching auth cookies', () => {
+    const cookie = buildClearConsentCookie(true)
+
+    expect(cookie).toContain(`${consentCookieName}=`)
+    expect(cookie).toContain('Max-Age=0')
+    expect(cookie).not.toContain('better-auth')
+  })
+
+  it('keeps Vercel Analytics behind the consent manager', () => {
+    expect(rootLayoutSource).not.toContain('@vercel/analytics/next')
+    expect(rootLayoutSource).toContain('<ConsentManager')
+    expect(consentManagerSource).toContain('@vercel/analytics/next')
+    expect(consentManagerSource).toContain(
+      'consent.hasAnalyticsConsent && <Analytics />',
+    )
+  })
+
+  it('provides accept, reject, and preference update actions', () => {
+    expect(consentManagerSource).toContain('acceptAnalytics')
+    expect(consentManagerSource).toContain('rejectAnalytics')
+    expect(consentManagerSource).toContain('savePreferences')
+    expect(consentManagerSource).toContain('setAnalyticsEnabled')
+  })
+
+  it('makes the privacy route public and localized', () => {
+    expect(privacyPageSource).not.toContain('auth.api.getSession')
+    expect(privacyPageSource).not.toContain('redirect(')
+    expect(privacyPageSource).toContain('getPrivacyPolicyCopy')
+    expect(getPrivacyPolicyCopy('az').title).toBe('Məxfilik siyasəti')
+    expect(getPrivacyPolicyCopy('en').title).toBe('Privacy Policy')
+    expect(getPrivacyPolicyCopy('ru').title).toBe('Политика конфиденциальности')
+  })
+
+  it('exposes cookie preferences from public and authenticated surfaces', () => {
+    expect(landingPageSource).toContain('href="/privacy"')
+    expect(appHeaderSource).toContain('openCookiePreferences')
+    expect(appHeaderSource).toContain('dictionary.privacy.cookiePreferences')
+  })
+
+  it('keeps the mobile consent layout clear of the bottom navigation', () => {
+    expect(consentManagerSource).toContain(
+      'env(safe-area-inset-bottom)+4.75rem',
+    )
+    expect(consentManagerSource).toContain('max-w-[calc(100vw-1rem)]')
+    expect(consentManagerSource).toContain('100svh')
+    expect(consentManagerSource).toContain('min-[390px]:grid-cols-3')
+  })
+
+  it('ships AZ, EN, and RU consent copy', () => {
+    expect(consentCopy.az.bannerTitle).toBeTruthy()
+    expect(consentCopy.en.analyticsTitle).toBe('Analytics')
+    expect(consentCopy.ru.rejectAnalytics).toBe('Отклонить аналитику')
+  })
+})

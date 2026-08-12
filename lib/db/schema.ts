@@ -747,3 +747,48 @@ export const wearLogItem = pgTable(
     ),
   }),
 )
+
+export const analyticsEvent = pgTable(
+  'analytics_event',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    eventName: text('eventName').notNull(),
+    userId: text('userId'),
+    anonymousId: text('anonymousId'),
+    sessionId: text('sessionId'),
+    occurredAt: timestamp('occurredAt').notNull().defaultNow(),
+    source: text('source').notNull().default('server'),
+    locale: text('locale'),
+    path: text('path'),
+    planKey: text('planKey'),
+    dedupeKey: text('dedupeKey'),
+    properties: jsonb('properties')
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    context: jsonb('context')
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+  },
+  (table) => ({
+    eventOccurredAtIdx: index('analytics_event_name_occurred_at_idx').on(
+      table.eventName,
+      table.occurredAt,
+    ),
+    userOccurredAtIdx: index('analytics_event_user_occurred_at_idx').on(
+      table.userId,
+      table.occurredAt,
+    ),
+    anonymousOccurredAtIdx: index(
+      'analytics_event_anonymous_occurred_at_idx',
+    ).on(table.anonymousId, table.occurredAt),
+    sessionOccurredAtIdx: index('analytics_event_session_occurred_at_idx').on(
+      table.sessionId,
+      table.occurredAt,
+    ),
+    dedupeIdx: uniqueIndex('analytics_event_user_name_dedupe_idx')
+      .on(table.userId, table.eventName, table.dedupeKey)
+      .where(sql`"dedupeKey" is not null`),
+  }),
+)

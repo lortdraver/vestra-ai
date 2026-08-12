@@ -61,8 +61,14 @@ export default async function LandingPage() {
         </div>
       </main>
 
-      <footer className="px-6 py-6 text-center text-sm text-muted-foreground md:px-10">
+      <footer className="grid gap-2 px-6 py-6 text-center text-sm text-muted-foreground md:px-10">
         <p>{dictionary.landing.footer}</p>
+        <Link
+          href="/privacy"
+          className="mx-auto font-medium text-foreground underline-offset-4 hover:underline"
+        >
+          {dictionary.privacy.title}
+        </Link>
       </footer>
     </div>
   )

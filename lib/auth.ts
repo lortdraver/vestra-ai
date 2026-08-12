@@ -17,6 +17,7 @@ import {
   buildPasswordResetUrl,
   passwordResetConfig,
 } from '@/lib/password-reset'
+import { trackServerEvent } from '@/lib/analytics/server'
 
 const appUrl = getAppUrl()
 
@@ -165,6 +166,11 @@ export const auth = betterAuth({
     onPasswordReset: async ({ user }) => {
       console.info('[password-reset] PASSWORD_RESET_COMPLETED', {
         userId: user.id,
+      })
+      void trackServerEvent({
+        eventName: 'password_reset_completed',
+        userId: user.id,
+        dedupeKey: `password-reset:${user.id}:${new Date().toISOString().slice(0, 13)}`,
       })
     },
   },

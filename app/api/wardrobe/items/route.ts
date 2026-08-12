@@ -19,6 +19,7 @@ import { wardrobeItem } from '@/lib/db/schema'
 import { getObjectStorage } from '@/lib/storage'
 import type { ObjectStorage, StoredObject } from '@/lib/storage/types'
 import { getWearStatsForItems } from '@/lib/wear/server'
+import { trackServerEvent } from '@/lib/analytics/server'
 import { toWardrobeItemDto } from '@/lib/wardrobe/serialize'
 import {
   generateWardrobeThumbnail,
@@ -452,6 +453,50 @@ export async function POST(request: Request) {
       databaseInsertMs: Math.round(performance.now() - databaseStartedAt),
       totalDurationMs: Math.round(performance.now() - totalStartedAt),
     })
+
+    void trackServerEvent({
+      eventName: 'wardrobe_item_created',
+      userId,
+      properties: {
+        category: payloadResult.data.category,
+        clothingType: payloadResult.data.clothingType,
+        backgroundRemovalStatus,
+      },
+      dedupeKey: `wardrobe-item:${createdItem.id}`,
+    })
+    if (backgroundRemovalStatus === 'done') {
+      void trackServerEvent({
+        eventName: 'background_removal_completed',
+        userId,
+        properties: { provider: backgroundRemoval?.provider ?? 'unknown' },
+        dedupeKey: `background-removal:${createdItem.id}`,
+      })
+    } else {
+      void trackServerEvent({
+        eventName: 'background_removal_failed',
+        userId,
+        properties: { errorCode: backgroundRemovalError ?? 'unknown' },
+        dedupeKey: `background-removal:${createdItem.id}`,
+      })
+    }
+
+    const [itemCount] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(wardrobeItem)
+      .where(
+        and(
+          eq(wardrobeItem.userId, userId),
+          eq(wardrobeItem.imageDeletionStatus, 'active'),
+        ),
+      )
+    if (Number(itemCount?.count ?? 0) === 1) {
+      void trackServerEvent({
+        eventName: 'first_wardrobe_item_created',
+        userId,
+        properties: { itemCount: 1 },
+        dedupeKey: `first-wardrobe-item:${userId}`,
+      })
+    }
 
     stage = 'SUCCESS'
     logUploadStage(stage, {

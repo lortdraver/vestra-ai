@@ -9,6 +9,7 @@ import {
 import { parseAnalysisCorrections } from '@/lib/ai/analysis-schema'
 import { enhanceClothingAnalysis } from '@/lib/ai/quality'
 import { auth } from '@/lib/auth'
+import { trackServerEvent } from '@/lib/analytics/server'
 import { db } from '@/lib/db'
 import { wardrobeItem } from '@/lib/db/schema'
 import { getObjectStorage } from '@/lib/storage'
@@ -216,6 +217,16 @@ export async function POST(
       fallbackUsed: providerTiming?.fallbackUsed ?? false,
       requestCount: providerTiming?.requestCount ?? null,
     })
+    void trackServerEvent({
+      eventName: 'wardrobe_item_analysis_completed',
+      userId,
+      properties: {
+        modelId,
+        durationMs: totalDurationMs,
+        fallbackUsed: providerTiming?.fallbackUsed ?? false,
+      },
+      dedupeKey: `analysis:${item.id}:${updatedItem.analyzedAt?.toISOString() ?? totalDurationMs}`,
+    })
 
     return NextResponse.json({
       item: await toWardrobeItemDtoWithWear(userId, updatedItem),
@@ -246,6 +257,17 @@ export async function POST(
       })
       .where(and(eq(wardrobeItem.id, id), eq(wardrobeItem.userId, userId)))
       .returning()
+
+    void trackServerEvent({
+      eventName: 'wardrobe_item_analysis_failed',
+      userId,
+      properties: {
+        errorCode,
+        durationMs: totalDurationMs,
+        status: error instanceof AiProviderHttpError ? error.detail.status : 0,
+      },
+      dedupeKey: `analysis-failed:${id}:${totalDurationMs}`,
+    })
 
     return NextResponse.json(
       {

@@ -7,6 +7,9 @@
 - `BETTER_AUTH_URL` - canonical app URL used by Better Auth.
 - `BETTER_AUTH_TRUSTED_ORIGINS` - optional comma-separated local development
   origins, for example `http://192.168.100.8:3000`.
+- `PRIVACY_CONTACT_EMAIL` - optional public privacy contact shown on
+  `/privacy`. Leave empty until a real privacy contact is ready; do not invent
+  a legal contact.
 - `STORAGE_DRIVER` - object storage adapter. Use `local` only for development.
 - `R2_ACCOUNT_ID` - Cloudflare account id for R2.
 - `R2_ACCESS_KEY_ID` - server-only R2 access key id.
@@ -53,6 +56,24 @@
 - `NEXT_PUBLIC_APP_URL` - browser-visible canonical app URL.
 - `NEXT_PUBLIC_DEFAULT_LOCALE` - default locale, currently `az`.
 - `LOCAL_STORAGE_PUBLIC_BASE_URL` - reserved for local storage URL customization.
+
+## Privacy And Consent
+
+Vestra stores analytics consent in the first-party `vestra_consent` cookie. The
+cookie contains only consent version, policy version, timestamp, `necessary:
+true`, and the optional `analytics` decision. It must never contain email,
+user id, Better Auth session id, IP address, image URLs, storage keys, prompts,
+or other personal data.
+
+Necessary cookies remain active regardless of analytics consent because they are
+required for authentication, security, language, and private image access.
+
+Vercel Analytics is treated as optional analytics and only loads after Analytics
+consent. Future GA4, Microsoft Clarity, and first-party client analytics must
+check the same consent helpers before loading or sending client events.
+
+The public Privacy Policy is available at `/privacy` and uses
+`PRIVACY_CONTACT_EMAIL` if configured.
 
 ## Email Verification
 

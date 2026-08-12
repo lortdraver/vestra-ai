@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
+import { trackServerEvent } from '@/lib/analytics/server'
 import {
   outfit,
   outfitItem,
@@ -198,6 +199,17 @@ export async function createWearLogForUser(
   }
 
   const [createdDto] = await serializeWearLogs(userId, [created])
+  if (createdDto.outfitId) {
+    void trackServerEvent({
+      eventName: 'outfit_worn',
+      userId,
+      properties: {
+        source: createdDto.source,
+        itemCount: createdDto.items.length,
+      },
+      dedupeKey: `outfit-worn:${created.id}`,
+    })
+  }
   return createdDto
 }
 

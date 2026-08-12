@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
+import { trackServerEvent } from '@/lib/analytics/server'
 import { db } from '@/lib/db'
 import { outfit } from '@/lib/db/schema'
 
@@ -39,6 +40,15 @@ export async function PATCH(
 
   if (!updated) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  }
+
+  if (parsed.data.isSaved === true) {
+    void trackServerEvent({
+      eventName: 'stylist_outfit_saved',
+      userId,
+      properties: { isFavorite: updated.isFavorite },
+      dedupeKey: `outfit-saved:${updated.id}`,
+    })
   }
 
   return NextResponse.json({ outfit: updated })

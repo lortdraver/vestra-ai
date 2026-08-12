@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, ilike, lte } from 'drizzle-orm'
 import { db } from '@/lib/db'
+import { trackServerEvent } from '@/lib/analytics/server'
 import {
   outfit,
   outfitGenerationBatch,
@@ -158,6 +159,13 @@ export async function createOutfitPlanForUser(
     })
     .returning()
 
+  void trackServerEvent({
+    eventName: 'planner_outfit_scheduled',
+    userId,
+    properties: { status: created.status, source: created.source },
+    dedupeKey: `planner-created:${created.id}`,
+  })
+
   return toOutfitPlanDto(created)
 }
 
@@ -265,5 +273,11 @@ export async function deleteOutfitPlanForUser(userId: string, id: string) {
     .returning()
 
   if (!deleted) throw new OutfitPlanError('not_found')
+  void trackServerEvent({
+    eventName: 'planner_outfit_deleted',
+    userId,
+    properties: { status: deleted.status },
+    dedupeKey: `planner-deleted:${deleted.id}`,
+  })
   return true
 }

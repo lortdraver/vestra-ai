@@ -172,6 +172,21 @@
 - Documented Railway staging, R2 storage, public beta readiness, and migration
   steps.
 
+### Analytics Phase 1: Privacy And Consent Foundation
+
+- Added a public localized Privacy Policy at `/privacy`.
+- Added first-party cookie consent architecture with Necessary and Analytics
+  categories.
+- Kept Necessary cookies always enabled for authentication, security, language,
+  and account protection.
+- Added reusable consent helpers for future GA4, Microsoft Clarity, and
+  first-party client analytics.
+- Classified Vercel Analytics as optional analytics and gated it behind
+  Analytics consent.
+- Added permanent Cookie preferences access from public and authenticated UI.
+- Documented consent lifecycle, policy versioning, cookie design, and privacy
+  protections.
+
 ## Current Architecture
 
 - Production-oriented monolith using Next.js App Router.
@@ -271,7 +286,9 @@
 - Rate limiting is currently in-memory and must be moved to a distributed store before multi-instance production traffic.
 - Account deletion cleanup queue exists, but the asynchronous deletion worker is not implemented.
 - Forgot/reset password and email verification are architecture-ready, but real email delivery is not connected yet.
-- Some product analytics and observability are not yet implemented.
+- GA4, Microsoft Clarity, partner analytics, and public analytics dashboards are
+  intentionally deferred. Phase 2 now includes the first-party server event
+  ledger, privacy sanitizer, and read-only metric helpers.
 
 ## Next Steps
 
@@ -282,6 +299,8 @@
   credentials and Railway deployment remain manual.
 - Decide and verify production background-removal/stylist providers.
 - Run visual QA on real clothing analysis models with representative wardrobe images.
-- Add production error monitoring and analytics.
+- Add production error monitoring and future admin analytics presentation.
+- Add reliable Better Auth/payment lifecycle hooks for currently deferred
+  signup, login, verification, and subscription events.
 - Add wardrobe lifecycle states as real persisted product features.
 - Replace local rate limiting with a production distributed store.
