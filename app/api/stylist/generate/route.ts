@@ -36,7 +36,7 @@ import {
 import {
   getProviderCandidateNormalizationDiagnostics,
   getProviderCandidateCount,
-  getProviderTopLevelKeys,
+  getProviderNormalizationSummary,
   getSanitizedProviderPreview,
   normalizeStylistProviderOutput,
   type StylistProviderEnvelope,
@@ -204,7 +204,7 @@ function logProviderValidationFailure(input: {
     httpStatus: input.metadata?.httpStatus ?? null,
     modelId: input.metadata?.modelId ?? null,
     responseFormatMode: input.metadata?.responseFormatMode ?? null,
-    topLevelKeys: getProviderTopLevelKeys(input.output),
+    ...getProviderNormalizationSummary(input.output),
     candidateCount: getProviderCandidateCount(input.output),
     zodIssues: getValidationIssueDiagnostics(input.error),
     fallbackUsed: input.metadata?.fallbackUsed ?? false,
@@ -367,6 +367,10 @@ async function generateAndValidateStylistBatch(input: {
     normalizationContext,
   )
   console.info('[stylist-generate] provider output normalization', {
+    ...getProviderNormalizationSummary(
+      envelope?.output ?? providerOutput,
+      normalizationContext,
+    ),
     candidateDiagnostics: getProviderCandidateNormalizationDiagnostics(
       envelope?.output ?? providerOutput,
       normalizationContext,
@@ -504,6 +508,10 @@ async function generateAndValidateStylistBatch(input: {
     )
 
     console.info('[stylist-generate] provider output normalization', {
+      ...getProviderNormalizationSummary(
+        retryEnvelope?.output ?? retryProviderOutput,
+        normalizationContext,
+      ),
       candidateDiagnostics: getProviderCandidateNormalizationDiagnostics(
         retryEnvelope?.output ?? retryProviderOutput,
         normalizationContext,

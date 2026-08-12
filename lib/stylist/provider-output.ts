@@ -38,6 +38,21 @@ export type StylistProviderCandidateNormalizationDiagnostic = {
   explanationNormalizedLength: number
 }
 
+export type StylistProviderDetectedShape =
+  'candidates' | 'items_only' | 'outfit' | 'single_candidate' | 'unknown'
+
+export type StylistProviderNormalizationSummary = {
+  topLevelKeys: string[]
+  originalStatus: string | null
+  normalizedStatus:
+    'success' | 'insufficient_wardrobe' | 'generation_failed' | null
+  detectedProviderShape: StylistProviderDetectedShape
+  originalCandidateCount: number | null
+  normalizedCandidateCount: number | null
+  normalizationApplied: boolean
+  normalizationReason: string | null
+}
+
 const providerItemSchema = z.object({
   wardrobeItemId: z.string().uuid(),
   role: z.string().trim().min(1).max(80),
@@ -111,12 +126,26 @@ function normalizeProviderRole(value: unknown) {
 function normalizeProviderItem(value: unknown) {
   if (!isRecord(value)) return value
 
+  const wardrobeItemId = getFirstExistingValue(value, [
+    'wardrobeItemId',
+    'itemId',
+    'id',
+  ])
+  const explanationValue = getFirstExistingValue(value, [
+    'explanation',
+    'reasoning',
+    'why',
+    'note',
+    'notes',
+  ])
+  const roleValue = getFirstExistingValue(value, ['role', 'category'])
+
   return {
-    wardrobeItemId: value.wardrobeItemId,
-    role: normalizeProviderRole(value.role),
+    wardrobeItemId,
+    role: normalizeProviderRole(roleValue),
     explanation:
-      typeof value.explanation === 'string' && value.explanation.trim()
-        ? value.explanation
+      typeof explanationValue === 'string' && explanationValue.trim()
+        ? explanationValue
         : 'Selected from your wardrobe for this outfit.',
   }
 }
@@ -215,6 +244,89 @@ function recoverTitle(value: Record<string, unknown>, locale: Locale) {
   return recoverString(source, locale) ?? titleFallbacks[locale]
 }
 
+function normalizeProviderStatus(
+  value: unknown,
+): StylistProviderNormalizationSummary['normalizedStatus'] {
+  const status = String(value ?? '')
+    .trim()
+    .toLowerCase()
+
+  if (!status) return null
+  if (
+    ['success', 'completed', 'complete', 'ok', 'generated'].includes(status)
+  ) {
+    return 'success'
+  }
+  if (['insufficient_wardrobe', 'insufficient'].includes(status)) {
+    return 'insufficient_wardrobe'
+  }
+  if (['generation_failed', 'failed'].includes(status)) {
+    return 'generation_failed'
+  }
+  return null
+}
+
+function detectProviderShape(
+  value: Record<string, unknown>,
+): StylistProviderDetectedShape {
+  if (Array.isArray(value.candidates)) return 'candidates'
+  if (Array.isArray(value.items)) return 'items_only'
+  if (
+    'outfit' in value &&
+    (Array.isArray(value.outfit) || isRecord(value.outfit))
+  ) {
+    return 'outfit'
+  }
+  if (
+    isRecord(value.candidate) ||
+    (Array.isArray(value.items) &&
+      ('title' in value ||
+        'name' in value ||
+        'heading' in value ||
+        'confidence' in value))
+  ) {
+    return 'single_candidate'
+  }
+  if (
+    Array.isArray(value.items) &&
+    ('title' in value ||
+      'name' in value ||
+      'outfitTitle' in value ||
+      'heading' in value ||
+      'confidence' in value ||
+      'notes' in value ||
+      'reasoning' in value)
+  ) {
+    return 'single_candidate'
+  }
+  return 'unknown'
+}
+
+function getOriginalStatus(value: Record<string, unknown>) {
+  if (typeof value.status !== 'string') return null
+  const trimmed = value.status.trim()
+  return trimmed || null
+}
+
+function getOriginalCandidateCount(
+  value: Record<string, unknown>,
+  shape: StylistProviderDetectedShape,
+) {
+  switch (shape) {
+    case 'candidates':
+      return Array.isArray(value.candidates) ? value.candidates.length : null
+    case 'items_only':
+    case 'single_candidate':
+      return Array.isArray(value.items) ? 1 : null
+    case 'outfit':
+      if (Array.isArray(value.outfit)) return 1
+      if (isRecord(value.outfit)) return 1
+      return null
+    default:
+      return null
+  }
+}
+
 function recoverExplanation(
   value: Record<string, unknown>,
   context: StylistProviderNormalizationContext | undefined,
@@ -239,46 +351,137 @@ function recoverExplanation(
 function normalizeProviderCandidate(
   value: unknown,
   context?: StylistProviderNormalizationContext,
+  parentValue?: Record<string, unknown>,
 ) {
   if (!isRecord(value)) return value
 
   const locale = context?.locale ?? 'en'
-  const title = recoverTitle(value, locale)
-  let description = recoverExplanation(value, context)
+  const mergedValue = parentValue ? { ...parentValue, ...value } : value
+  const title = recoverTitle(mergedValue, locale)
+  let description = recoverExplanation(mergedValue, context)
   if (description.trim().length < 1) {
-    description = buildFallbackExplanation(value, context)
+    description = buildFallbackExplanation(mergedValue, context)
   }
 
   return {
     title,
     occasion:
-      typeof value.occasion === 'string'
-        ? value.occasion
-        : (value.occasion ?? ''),
+      typeof mergedValue.occasion === 'string'
+        ? mergedValue.occasion
+        : (mergedValue.occasion ?? ''),
     styleDirection:
-      typeof value.styleDirection === 'string' ? value.styleDirection : '',
-    seasonLabel: typeof value.season === 'string' ? value.season : '',
-    formalityLabel: typeof value.formality === 'string' ? value.formality : '',
-    items: Array.isArray(value.items)
-      ? value.items.map(normalizeProviderItem)
-      : value.items,
+      typeof mergedValue.styleDirection === 'string'
+        ? mergedValue.styleDirection
+        : '',
+    seasonLabel:
+      typeof mergedValue.seasonLabel === 'string'
+        ? mergedValue.seasonLabel
+        : typeof mergedValue.season === 'string'
+          ? mergedValue.season
+          : '',
+    formalityLabel:
+      typeof mergedValue.formalityLabel === 'string'
+        ? mergedValue.formalityLabel
+        : typeof mergedValue.formality === 'string'
+          ? mergedValue.formality
+          : '',
+    items: Array.isArray(mergedValue.items)
+      ? mergedValue.items.map(normalizeProviderItem)
+      : mergedValue.items,
     overallExplanation: description,
-    confidenceScore: parseFiniteConfidence(value.confidence),
+    confidenceScore: parseFiniteConfidence(
+      getFirstExistingValue(mergedValue, ['confidenceScore', 'confidence']),
+    ),
     alternativeSuggestions: [],
-    missingItems: [],
+    missingItems: Array.isArray(mergedValue.optionalMissingItems)
+      ? mergedValue.optionalMissingItems
+          .map((item) => String(item).trim())
+          .filter(Boolean)
+          .slice(0, 8)
+      : Array.isArray(mergedValue.missingItems)
+        ? mergedValue.missingItems
+            .map((item) => String(item).trim())
+            .filter(Boolean)
+            .slice(0, 8)
+        : [],
   }
 }
 
-function normalizeLegacySingleOutfit(
-  value: Record<string, unknown>,
+function isSingleCandidateRecord(value: Record<string, unknown>) {
+  return (
+    Array.isArray(value.items) &&
+    ('title' in value ||
+      'name' in value ||
+      'outfitTitle' in value ||
+      'outfit_name' in value ||
+      'heading' in value ||
+      'confidence' in value ||
+      'confidenceScore' in value)
+  )
+}
+
+function normalizeSuccessShape(
+  parsed: Record<string, unknown>,
   context?: StylistProviderNormalizationContext,
 ) {
-  if (value.status !== 'success' || !isRecord(value.outfit)) return value
+  const shape = detectProviderShape(parsed)
 
-  return {
-    status: 'success',
-    candidates: [normalizeProviderCandidate(value.outfit, context)],
+  switch (shape) {
+    case 'candidates':
+      return {
+        status: 'success' as const,
+        candidates: (parsed.candidates as unknown[]).map((candidate) =>
+          normalizeProviderCandidate(candidate, context),
+        ),
+      }
+    case 'items_only':
+      return {
+        status: 'success' as const,
+        candidates: [normalizeProviderCandidate(parsed, context)],
+      }
+    case 'outfit': {
+      if (isRecord(parsed.outfit)) {
+        return {
+          status: 'success' as const,
+          candidates: [
+            normalizeProviderCandidate(parsed.outfit, context, parsed),
+          ],
+        }
+      }
+      if (Array.isArray(parsed.outfit)) {
+        return {
+          status: 'success' as const,
+          candidates: [
+            normalizeProviderCandidate(
+              { ...parsed, items: parsed.outfit },
+              context,
+            ),
+          ],
+        }
+      }
+      break
+    }
+    case 'single_candidate':
+      if (isRecord(parsed.candidate)) {
+        return {
+          status: 'success' as const,
+          candidates: [
+            normalizeProviderCandidate(parsed.candidate, context, parsed),
+          ],
+        }
+      }
+      if (isSingleCandidateRecord(parsed)) {
+        return {
+          status: 'success' as const,
+          candidates: [normalizeProviderCandidate(parsed, context)],
+        }
+      }
+      break
+    default:
+      break
   }
+
+  return parsed
 }
 
 export function normalizeStylistProviderOutput(
@@ -288,39 +491,28 @@ export function normalizeStylistProviderOutput(
   const parsed = parseProviderJson(value)
   if (!isRecord(parsed)) return parsed
 
-  if (parsed.status === 'success' && isRecord(parsed.outfit)) {
-    return normalizeLegacySingleOutfit(parsed, context)
+  const normalizedStatus = normalizeProviderStatus(parsed.status)
+
+  if (normalizedStatus === 'success') {
+    return normalizeSuccessShape({ ...parsed, status: 'success' }, context)
   }
 
-  if (
-    parsed.status === 'success' &&
-    !Array.isArray(parsed.candidates) &&
-    isRecord(parsed.candidate)
-  ) {
-    return {
-      status: 'success',
-      candidates: [normalizeProviderCandidate(parsed.candidate, context)],
-    }
-  }
-
-  if (parsed.status === 'success' && Array.isArray(parsed.candidates)) {
-    return {
-      ...parsed,
-      candidates: parsed.candidates.map((candidate) =>
-        normalizeProviderCandidate(candidate, context),
-      ),
-    }
-  }
-
-  if (parsed.status === 'insufficient_wardrobe') {
+  if (normalizedStatus === 'insufficient_wardrobe') {
     return {
       status: 'insufficient_wardrobe',
-      message: parsed.message,
+      message:
+        typeof parsed.message === 'string' && parsed.message.trim()
+          ? parsed.message
+          : 'Not enough wardrobe items to build a complete outfit.',
       missingCategories: Array.isArray(parsed.missingCategories)
         ? parsed.missingCategories.map((category) =>
             normalizeProviderRole(String(category)),
           )
-        : [],
+        : Array.isArray(parsed.optionalMissingItems)
+          ? parsed.optionalMissingItems.map((category) =>
+              normalizeProviderRole(String(category)),
+            )
+          : [],
       availableCategories: Array.isArray(parsed.availableCategories)
         ? parsed.availableCategories.map((category) =>
             normalizeProviderRole(String(category)),
@@ -329,7 +521,89 @@ export function normalizeStylistProviderOutput(
     }
   }
 
+  if (normalizedStatus === 'generation_failed') {
+    return {
+      status: 'generation_failed',
+      message:
+        typeof parsed.message === 'string' && parsed.message.trim()
+          ? parsed.message
+          : 'The provider could not generate a valid outfit.',
+      retryable: Boolean(parsed.retryable ?? true),
+    }
+  }
+
+  if (isSingleCandidateRecord(parsed)) {
+    return {
+      status: 'success',
+      candidates: [normalizeProviderCandidate(parsed, context)],
+    }
+  }
+
   return parsed
+}
+
+export function getProviderNormalizationSummary(
+  value: unknown,
+  context?: StylistProviderNormalizationContext,
+): StylistProviderNormalizationSummary {
+  const parsed = parseProviderJson(value)
+  if (!isRecord(parsed)) {
+    return {
+      topLevelKeys: [],
+      originalStatus: null,
+      normalizedStatus: null,
+      detectedProviderShape: 'unknown',
+      originalCandidateCount: null,
+      normalizedCandidateCount: null,
+      normalizationApplied: false,
+      normalizationReason: null,
+    }
+  }
+
+  const originalStatus = getOriginalStatus(parsed)
+  const normalizedStatus = normalizeProviderStatus(parsed.status)
+  const detectedProviderShape = detectProviderShape(parsed)
+  const originalCandidateCount = getOriginalCandidateCount(
+    parsed,
+    detectedProviderShape,
+  )
+  const normalized = normalizeStylistProviderOutput(value, context)
+  const normalizedCandidateCount =
+    isRecord(normalized) &&
+    normalized.status === 'success' &&
+    Array.isArray(normalized.candidates)
+      ? normalized.candidates.length
+      : null
+  const normalizationApplied =
+    normalizedStatus !== originalStatus ||
+    (detectedProviderShape !== 'unknown' &&
+      (detectedProviderShape !== 'candidates' || originalStatus !== 'success'))
+  let normalizationReason: string | null = null
+
+  if (
+    originalStatus &&
+    normalizedStatus &&
+    originalStatus !== normalizedStatus
+  ) {
+    normalizationReason = `status:${originalStatus}->${normalizedStatus}`
+  } else if (detectedProviderShape === 'items_only') {
+    normalizationReason = 'wrapped_top_level_items_as_candidate'
+  } else if (detectedProviderShape === 'outfit') {
+    normalizationReason = 'converted_outfit_shape_to_candidate_batch'
+  } else if (detectedProviderShape === 'single_candidate') {
+    normalizationReason = 'wrapped_single_candidate_shape'
+  }
+
+  return {
+    topLevelKeys: Object.keys(parsed).sort(),
+    originalStatus,
+    normalizedStatus,
+    detectedProviderShape,
+    originalCandidateCount,
+    normalizedCandidateCount,
+    normalizationApplied,
+    normalizationReason,
+  }
 }
 
 export function getProviderCandidateNormalizationDiagnostics(
@@ -337,15 +611,30 @@ export function getProviderCandidateNormalizationDiagnostics(
   context?: StylistProviderNormalizationContext,
 ): StylistProviderCandidateNormalizationDiagnostic[] {
   const parsed = parseProviderJson(value)
-  if (!isRecord(parsed) || parsed.status !== 'success') return []
+  if (!isRecord(parsed)) return []
 
-  const candidates = Array.isArray(parsed.candidates)
-    ? parsed.candidates
-    : isRecord(parsed.candidate)
-      ? [parsed.candidate]
-      : isRecord(parsed.outfit)
-        ? [parsed.outfit]
-        : []
+  const normalizedStatus = normalizeProviderStatus(parsed.status)
+  if (normalizedStatus !== 'success' && !isSingleCandidateRecord(parsed)) {
+    return []
+  }
+
+  const shape = detectProviderShape(parsed)
+  const candidates =
+    shape === 'candidates' && Array.isArray(parsed.candidates)
+      ? parsed.candidates
+      : shape === 'items_only'
+        ? [parsed]
+        : shape === 'outfit'
+          ? Array.isArray(parsed.outfit)
+            ? [{ ...parsed, items: parsed.outfit }]
+            : isRecord(parsed.outfit)
+              ? [{ ...parsed, ...parsed.outfit }]
+              : []
+          : shape === 'single_candidate'
+            ? isRecord(parsed.candidate)
+              ? [{ ...parsed, ...parsed.candidate }]
+              : [parsed]
+            : []
 
   const normalized = normalizeStylistProviderOutput(value, context)
   const normalizedCandidates =
@@ -402,9 +691,7 @@ export function getProviderTopLevelKeys(value: unknown) {
 }
 
 export function getProviderCandidateCount(value: unknown) {
-  const normalized = normalizeStylistProviderOutput(value)
-  if (!isRecord(normalized) || normalized.status !== 'success') return null
-  return Array.isArray(normalized.candidates) ? normalized.candidates.length : 0
+  return getProviderNormalizationSummary(value).normalizedCandidateCount
 }
 
 export function getSanitizedProviderPreview(value: unknown, maxLength = 700) {

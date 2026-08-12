@@ -18,6 +18,7 @@ import {
 } from '@/lib/stylist/generate-diagnostics'
 import {
   getProviderCandidateNormalizationDiagnostics,
+  getProviderNormalizationSummary,
   normalizeStylistProviderOutput,
   parseProviderJson,
 } from '@/lib/stylist/provider-output'
@@ -1135,6 +1136,104 @@ describe('batch outfit validation', () => {
     expect(result.status).toBe('success')
   })
 
+  it('normalizes a top-level items-only success shape into one candidate', () => {
+    const normalized = normalizeStylistProviderOutput(
+      {
+        status: 'success',
+        title: 'Items only outfit',
+        notes: 'Built from the provided items only.',
+        confidence: 0.72,
+        items: [
+          { itemId: wardrobe[0].id, role: 'tops', explanation: 'Top layer.' },
+          { itemId: wardrobe[1].id, role: 'bottoms' },
+          { itemId: wardrobe[2].id, role: 'shoes' },
+        ],
+      },
+      providerContext,
+    )
+
+    const result = validateStylistBatchResult(normalized, wardrobe)
+    if (result.status !== 'success') throw new Error('expected success')
+
+    expect(result.candidates).toHaveLength(1)
+    expect(result.candidates[0].title).toBe('Items only outfit')
+    expect(
+      result.candidates[0].items.map((item) => item.wardrobeItemId),
+    ).toEqual(wardrobe.map((item) => item.id))
+  })
+
+  it('normalizes a top-level outfit array shape into one candidate', () => {
+    const normalized = normalizeStylistProviderOutput(
+      {
+        status: 'completed',
+        title: 'Array outfit',
+        notes: 'Built from array outfit shape.',
+        confidence: 0.74,
+        outfit: [
+          { id: wardrobe[0].id, role: 'tops', explanation: 'Top.' },
+          { id: wardrobe[1].id, role: 'bottoms', explanation: 'Bottom.' },
+          { id: wardrobe[2].id, role: 'shoes', explanation: 'Shoes.' },
+        ],
+      },
+      providerContext,
+    )
+
+    const result = validateStylistBatchResult(normalized, wardrobe)
+    if (result.status !== 'success') throw new Error('expected success')
+
+    expect(result.candidates[0].title).toBe('Array outfit')
+    expect(result.candidates[0].confidenceScore).toBe(0.74)
+  })
+
+  it('normalizes a top-level outfit object shape into one candidate', () => {
+    const normalized = normalizeStylistProviderOutput(
+      {
+        status: 'ok',
+        confidence: '0.81',
+        notes: 'Resolved from outfit object.',
+        outfit: {
+          heading: 'Outfit object',
+          styleDirection: 'classic',
+          seasonLabel: 'spring',
+          formalityLabel: 'business',
+          items: [
+            { wardrobeItemId: wardrobe[0].id, role: 'tops' },
+            { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+            { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
+          ],
+        },
+      },
+      providerContext,
+    )
+
+    const result = validateStylistBatchResult(normalized, wardrobe)
+    if (result.status !== 'success') throw new Error('expected success')
+
+    expect(result.candidates[0].title).toBe('Outfit object')
+    expect(result.candidates[0].confidenceScore).toBe(0.81)
+  })
+
+  it('wraps a top-level single candidate object without a candidates wrapper', () => {
+    const normalized = normalizeStylistProviderOutput(
+      {
+        title: 'Top-level single outfit',
+        overallExplanation: 'A complete top-level outfit object.',
+        confidenceScore: 0.79,
+        items: [
+          { wardrobeItemId: wardrobe[0].id, role: 'tops' },
+          { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+          { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
+        ],
+      },
+      providerContext,
+    )
+
+    const result = validateStylistBatchResult(normalized, wardrobe)
+    if (result.status !== 'success') throw new Error('expected success')
+
+    expect(result.candidates[0].title).toBe('Top-level single outfit')
+  })
+
   it('normalizes safe role aliases and string confidence', () => {
     const normalized = normalizeStylistProviderOutput({
       status: 'success',
@@ -1189,6 +1288,86 @@ describe('batch outfit validation', () => {
     const result = validateStylistBatchResult(normalized, wardrobe)
 
     expect(result.status).toBe('success')
+  })
+
+  it('normalizes safe success-like status values', () => {
+    for (const status of [
+      'success',
+      'completed',
+      'complete',
+      'ok',
+      'generated',
+    ]) {
+      const normalized = normalizeStylistProviderOutput(
+        {
+          status,
+          items: [
+            { itemId: wardrobe[0].id, role: 'tops' },
+            { itemId: wardrobe[1].id, role: 'bottoms' },
+            { itemId: wardrobe[2].id, role: 'shoes' },
+          ],
+          title: `Status ${status}`,
+          notes: 'Status normalized safely.',
+          confidence: 0.7,
+        },
+        providerContext,
+      )
+
+      const result = validateStylistBatchResult(normalized, wardrobe)
+      expect(result.status).toBe('success')
+    }
+  })
+
+  it('rejects unknown provider statuses after normalization', () => {
+    expect(() =>
+      validateStylistBatchResult(
+        normalizeStylistProviderOutput(
+          {
+            status: 'done_done',
+            outfit: {
+              title: 'Unknown status',
+              description: 'Looks plausible but status is unsupported.',
+              confidence: 0.7,
+              items: [
+                { wardrobeItemId: wardrobe[0].id, role: 'tops' },
+                { wardrobeItemId: wardrobe[1].id, role: 'bottoms' },
+                { wardrobeItemId: wardrobe[2].id, role: 'shoes' },
+              ],
+            },
+          },
+          providerContext,
+        ),
+        wardrobe,
+      ),
+    ).toThrow('invalid_stylist_batch_result')
+  })
+
+  it('reports sanitized provider shape diagnostics without raw response text', () => {
+    const summary = getProviderNormalizationSummary(
+      {
+        status: 'completed',
+        title: 'Items only diagnostic',
+        notes: 'Do not leak this full note body.',
+        confidence: 0.73,
+        items: [
+          { itemId: wardrobe[0].id, role: 'tops' },
+          { itemId: wardrobe[1].id, role: 'bottoms' },
+          { itemId: wardrobe[2].id, role: 'shoes' },
+        ],
+      },
+      providerContext,
+    )
+
+    expect(summary).toEqual({
+      topLevelKeys: ['confidence', 'items', 'notes', 'status', 'title'],
+      originalStatus: 'completed',
+      normalizedStatus: 'success',
+      detectedProviderShape: 'items_only',
+      originalCandidateCount: 1,
+      normalizedCandidateCount: 1,
+      normalizationApplied: true,
+      normalizationReason: 'status:completed->success',
+    })
   })
 
   it('parses markdown code-fenced JSON', () => {
