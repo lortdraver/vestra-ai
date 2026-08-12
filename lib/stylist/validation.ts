@@ -12,11 +12,13 @@ import {
 } from './types'
 import {
   findMissingRequiredCategories,
-  getRequiredCategoriesForStylistRequest,
   normalizeStylistCategory,
   requiredCoreCategories,
   resolveStylistOutfitRole,
 } from './wardrobe'
+import { scoreStylistCandidate } from './scoring'
+import type { StylistResolvedPreferenceSignals } from './preferences'
+import type { WeatherSuitabilitySignal } from '@/lib/weather'
 
 export type StylistValidationIssue = {
   path: string[]
@@ -151,175 +153,6 @@ function getResolvedItemRoleMap(
   return roleDiagnostics
 }
 
-function buildScoreBreakdown(
-  outfit: StylistOutfit,
-  selectedItems: StylistWardrobeItem[],
-  request?: StylistRequest,
-): StylistCandidateScoreBreakdown {
-  const breakdown: StylistCandidateScoreBreakdown = {
-    completeness: 0,
-    occasionMatch: 0,
-    subtypeCompatibility: 0,
-    formalityConsistency: 0,
-    weatherSeason: 0,
-    colorCompatibility: 0,
-    styleConsistency: 0,
-    preferenceMatch: 0,
-    duplicatePenalty: 0,
-  }
-
-  const requiredCategories = request
-    ? getRequiredCategoriesForStylistRequest(request)
-    : [...requiredCoreCategories]
-  const selectedRoles = new Set(selectedItems.map((item) => item.role))
-  const hasAllRequired = requiredCategories.every((role) =>
-    selectedRoles.has(role),
-  )
-  breakdown.completeness = hasAllRequired ? 20 : 6
-
-  const subtypes = selectedItems.map((item) => item.subtype)
-  const styleTags = selectedItems.flatMap((item) => item.styleTags)
-  const formalityValues = selectedItems.map((item) => item.formality)
-  const colorFamilies = selectedItems.flatMap((item) => item.colorFamilies)
-  const message =
-    `${request?.message ?? ''} ${request?.quickRequest ?? ''}`.toLowerCase()
-
-  if (
-    request?.quickRequest === 'wedding' ||
-    request?.quickRequest === 'business' ||
-    /\bformal|wedding|business|office|smart\b/.test(message)
-  ) {
-    breakdown.occasionMatch += 10
-    if (
-      subtypes.some((value) =>
-        ['shorts', 'joggers', 'sweatpants'].includes(value),
-      )
-    ) {
-      breakdown.subtypeCompatibility -= 14
-    } else {
-      breakdown.subtypeCompatibility += 10
-    }
-    if (
-      subtypes.some((value) =>
-        ['shirt', 'trousers', 'blazer', 'dress_shoes', 'loafers'].includes(
-          value,
-        ),
-      )
-    ) {
-      breakdown.occasionMatch += 8
-    }
-  }
-
-  if (
-    request?.quickRequest === 'sport' ||
-    /\bsport|gym|training|workout\b/.test(message)
-  ) {
-    if (
-      subtypes.some((value) =>
-        ['shorts', 'joggers', 'sweatpants'].includes(value),
-      )
-    ) {
-      breakdown.subtypeCompatibility += 10
-    } else {
-      breakdown.subtypeCompatibility -= 10
-    }
-    if (subtypes.includes('sneakers')) {
-      breakdown.occasionMatch += 10
-    } else {
-      breakdown.occasionMatch -= 8
-    }
-  }
-
-  if (request?.quickRequest === 'university') {
-    if (
-      subtypes.some((value) =>
-        ['t_shirt', 'polo', 'shirt', 'hoodie'].includes(value),
-      )
-    ) {
-      breakdown.occasionMatch += 8
-    }
-    if (
-      subtypes.some((value) =>
-        ['jeans', 'chinos', 'shorts', 'joggers'].includes(value),
-      )
-    ) {
-      breakdown.subtypeCompatibility += 8
-    }
-    if (subtypes.includes('sneakers') || subtypes.includes('loafers')) {
-      breakdown.occasionMatch += 4
-    }
-  }
-
-  const uniqueFormality = new Set(formalityValues)
-  breakdown.formalityConsistency =
-    uniqueFormality.size <= 2
-      ? 10
-      : Math.max(-10, 12 - uniqueFormality.size * 6)
-
-  if (request?.weatherContext) {
-    if (request.weatherContext.temperatureC >= 28) {
-      if (
-        subtypes.some((value) =>
-          ['shorts', 'tank_top', 'polo', 't_shirt'].includes(value),
-        )
-      ) {
-        breakdown.weatherSeason += 10
-      }
-      if (
-        subtypes.some((value) =>
-          ['coat', 'hoodie', 'sweater', 'boots'].includes(value),
-        )
-      ) {
-        breakdown.weatherSeason -= 10
-      }
-    }
-    if (request.weatherContext.temperatureC <= 8) {
-      if (
-        subtypes.some((value) =>
-          ['hoodie', 'sweater', 'coat', 'jacket', 'boots'].includes(value),
-        )
-      ) {
-        breakdown.weatherSeason += 10
-      }
-      if (
-        subtypes.some((value) =>
-          ['shorts', 'sandals', 'tank_top'].includes(value),
-        )
-      ) {
-        breakdown.weatherSeason -= 10
-      }
-    }
-  }
-
-  const neutralCount = colorFamilies.filter((value) =>
-    ['black', 'white', 'gray', 'navy', 'beige', 'brown'].includes(value),
-  ).length
-  const brightCount = colorFamilies.filter((value) =>
-    ['red', 'pink', 'yellow', 'orange', 'purple', 'green'].includes(value),
-  ).length
-  breakdown.colorCompatibility =
-    neutralCount >= 2 ? 10 : brightCount >= 3 ? -6 : 4
-
-  const uniqueStyles = new Set(styleTags)
-  breakdown.styleConsistency = uniqueStyles.size <= 3 ? 8 : 3
-
-  return breakdown
-}
-
-function totalCandidateScore(breakdown: StylistCandidateScoreBreakdown) {
-  return (
-    breakdown.completeness +
-    breakdown.occasionMatch +
-    breakdown.subtypeCompatibility +
-    breakdown.formalityConsistency +
-    breakdown.weatherSeason +
-    breakdown.colorCompatibility +
-    breakdown.styleConsistency +
-    breakdown.preferenceMatch +
-    breakdown.duplicatePenalty
-  )
-}
-
 export function validateStylistOutfit(
   output: unknown,
   wardrobeItems: StylistWardrobeItem[],
@@ -327,6 +160,9 @@ export function validateStylistOutfit(
     requiredCategories?: string[]
     lockedItemIds?: string[]
     request?: StylistRequest
+    acceptedCandidates?: StylistCandidate[]
+    preferenceSignals?: StylistResolvedPreferenceSignals | null
+    weatherSignals?: WeatherSuitabilitySignal[]
   },
 ) {
   const parsed = stylistOutfitSchema.safeParse(output)
@@ -416,16 +252,22 @@ export function validateStylistOutfit(
     )
   }
 
-  const scoreBreakdown = buildScoreBreakdown(
-    resolvedOutfit,
+  const scoredCandidate = scoreStylistCandidate({
+    candidate: resolvedOutfit,
     selectedItems,
-    options?.request,
-  )
-  const candidateScore = totalCandidateScore(scoreBreakdown)
-  const minimumScore = requiredCategories.length === 0 ? 25 : 32
-  if (candidateScore < minimumScore) {
+    request: options?.request,
+    preferenceSignals: options?.preferenceSignals,
+    weatherSignals: options?.weatherSignals,
+    acceptedCandidates: options?.acceptedCandidates,
+  })
+  const minimumScore = requiredCategories.length === 0 ? 35 : 50
+  if (
+    scoredCandidate.candidateScore < minimumScore ||
+    scoredCandidate.rejectionReasons.length > 0
+  ) {
     throw new StylistValidationError(
-      `candidate_score_too_low:${candidateScore}`,
+      scoredCandidate.rejectionReasons[0] ??
+        `candidate_score_too_low:${scoredCandidate.candidateScore}`,
     )
   }
 
@@ -442,8 +284,8 @@ export function validateStylistOutfit(
 
   return {
     ...resolvedOutfit,
-    candidateScore,
-    scoreBreakdown,
+    candidateScore: scoredCandidate.candidateScore,
+    scoreBreakdown: scoredCandidate.scoreBreakdown,
   } satisfies StylistOutfit
 }
 
@@ -454,6 +296,9 @@ export function validateStylistResult(
     requiredCategories?: string[]
     lockedItemIds?: string[]
     request?: StylistRequest
+    acceptedCandidates?: StylistCandidate[]
+    preferenceSignals?: StylistResolvedPreferenceSignals | null
+    weatherSignals?: WeatherSuitabilitySignal[]
   },
 ): StylistResult {
   const batchParsed = stylistBatchResultSchema.safeParse(output)
@@ -497,6 +342,8 @@ export function validateStylistBatchResult(
     requiredCategories?: string[]
     lockedItemIds?: string[]
     request?: StylistRequest
+    preferenceSignals?: StylistResolvedPreferenceSignals | null
+    weatherSignals?: WeatherSuitabilitySignal[]
   },
 ): StylistBatchResult {
   const parsed = stylistBatchResultSchema.safeParse(output)
@@ -513,13 +360,68 @@ export function validateStylistBatchResult(
 
   if (parsed.data.status !== 'success') return parsed.data
 
-  const validatedCandidates = parsed.data.candidates.map((candidate) =>
-    validateStylistOutfit(candidate, wardrobeItems, options),
+  const initiallyValidCandidates: StylistCandidate[] = []
+  let firstCandidateError: StylistValidationError | null = null
+
+  for (const candidate of parsed.data.candidates) {
+    try {
+      initiallyValidCandidates.push(
+        validateStylistOutfit(candidate, wardrobeItems, options),
+      )
+    } catch (error) {
+      if (!(error instanceof StylistValidationError)) throw error
+      firstCandidateError ??= error
+      logValidationIssues('[dev] Stylist candidate rejected before ranking', {
+        message: error.message,
+      })
+    }
+  }
+
+  if (initiallyValidCandidates.length === 0) {
+    throw (
+      firstCandidateError ??
+      new StylistValidationError('empty_stylist_candidates')
+    )
+  }
+
+  const sortedCandidates = [...initiallyValidCandidates].sort(
+    (left, right) =>
+      (right.candidateScore ?? 0) - (left.candidateScore ?? 0) ||
+      right.confidenceScore - left.confidenceScore,
   )
-  const diverseCandidates = filterDiverseCandidates(validatedCandidates)
+  const rescoredCandidates: StylistCandidate[] = []
+  let firstRescoringError: StylistValidationError | null = null
+
+  for (const candidate of sortedCandidates) {
+    try {
+      rescoredCandidates.push(
+        validateStylistOutfit(candidate, wardrobeItems, {
+          ...options,
+          acceptedCandidates: rescoredCandidates,
+        }),
+      )
+    } catch (error) {
+      if (!(error instanceof StylistValidationError)) throw error
+      firstRescoringError ??= error
+      logValidationIssues(
+        '[dev] Stylist candidate rejected after diversity scoring',
+        {
+          message: error.message,
+        },
+      )
+    }
+  }
+
+  const diverseCandidates = filterDiverseCandidates(rescoredCandidates).sort(
+    (left, right) => (right.candidateScore ?? 0) - (left.candidateScore ?? 0),
+  )
 
   if (diverseCandidates.length === 0) {
-    throw new StylistValidationError('empty_stylist_candidates')
+    throw (
+      firstRescoringError ??
+      firstCandidateError ??
+      new StylistValidationError('empty_stylist_candidates')
+    )
   }
 
   return {

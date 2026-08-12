@@ -78,8 +78,14 @@ export type StylistWardrobeItem = {
   styles: string[]
   styleTags: string[]
   formality: string
+  formalityLevel: number
   material: string
   brand: string
+  fit: string
+  pattern: string
+  warmthLevel: number
+  wearCount: number
+  lastWornAt: string | null
 }
 
 export const outfitItemSelectionSchema = z.object({
@@ -201,6 +207,7 @@ export type StylistProviderInput = {
   preferenceContext?: string
   wearHistoryMode?: 'include_underused' | 'avoid_recently_worn' | 'none'
   validationFeedback?: string[]
+  weatherSignals?: string[]
 }
 
 export interface StylistProvider {

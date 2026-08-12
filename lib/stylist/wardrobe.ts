@@ -5,8 +5,9 @@ import {
   parseClothingAnalysis,
 } from '@/lib/ai/analysis-schema'
 import {
-  getWardrobeColorFamilyLabel,
   getWardrobeFormalityFromLevel,
+  getWardrobeFormalityLevel,
+  getWardrobeRoleLabel,
   normalizeWardrobeColorFamilies,
   normalizeWardrobeFormality,
   normalizeWardrobeRole,
@@ -21,6 +22,9 @@ import type {
   StylistRequest,
   StylistWardrobeItem,
 } from './types'
+import { resolveOccasionProfile } from './fashion-rules'
+import type { StylistResolvedPreferenceSignals } from './preferences'
+import type { WearStats } from '@/lib/wear'
 
 type WardrobeRow = typeof wardrobeItem.$inferSelect
 
@@ -233,6 +237,8 @@ export function toStylistWardrobeItem(row: WardrobeRow): StylistWardrobeItem {
   const formality =
     effectiveAnalysis?.formality ??
     getWardrobeFormalityFromLevel(effectiveAnalysis?.formalityLevel ?? 2)
+  const formalityLevel =
+    effectiveAnalysis?.formalityLevel ?? getWardrobeFormalityLevel(formality)
 
   return {
     id: row.id,
@@ -255,9 +261,29 @@ export function toStylistWardrobeItem(row: WardrobeRow): StylistWardrobeItem {
     styles: styleTags,
     styleTags,
     formality: normalizeWardrobeFormality(formality) ?? 'casual',
+    formalityLevel,
     material: effectiveAnalysis?.material || row.material,
     brand: effectiveAnalysis?.brandGuess || row.brand,
+    fit: effectiveAnalysis?.fit || '',
+    pattern: effectiveAnalysis?.pattern || '',
+    warmthLevel: effectiveAnalysis?.warmthLevel ?? 2,
+    wearCount: 0,
+    lastWornAt: null,
   }
+}
+
+export function withWearStats(
+  items: StylistWardrobeItem[],
+  wearStats: Map<string, WearStats>,
+) {
+  return items.map((item) => {
+    const stats = wearStats.get(item.id)
+    return {
+      ...item,
+      wearCount: stats?.totalWearCount ?? 0,
+      lastWornAt: stats?.lastWornAt ?? null,
+    }
+  })
 }
 
 export function getStylistWardrobeDiagnostics(rows: WardrobeRow[]) {
@@ -289,6 +315,7 @@ export function getStylistWardrobeDiagnostics(rows: WardrobeRow[]) {
 function scoreItem(item: StylistWardrobeItem, request: StylistRequest) {
   const prompt = buildPromptContext(request)
   const profile = getPreferredProfile(request)
+  const occasionProfile = resolveOccasionProfile(request)
   let score = 0
 
   if (prompt.includes(item.name.toLowerCase())) score += 4
@@ -306,6 +333,20 @@ function scoreItem(item: StylistWardrobeItem, request: StylistRequest) {
   }
   if (profile.preferredFormality?.includes(item.formality)) score += 4
   if (profile.avoidSubtypes?.includes(item.subtype)) score -= 8
+  if (
+    occasionProfile.preferredStyles.some((style) =>
+      item.styleTags.includes(style),
+    )
+  ) {
+    score += 3
+  }
+  if (occasionProfile.preferredTopSubtypes.includes(item.subtype)) score += 2
+  if (occasionProfile.preferredBottomSubtypes.includes(item.subtype)) score += 2
+  if (occasionProfile.preferredShoeSubtypes.includes(item.subtype)) score += 2
+  if (occasionProfile.preferredOuterwearSubtypes.includes(item.subtype))
+    score += 2
+  if (occasionProfile.discouragedSubtypes.includes(item.subtype)) score -= 5
+  if (occasionProfile.hardRejectedSubtypes.includes(item.subtype)) score -= 12
 
   if (
     request.weatherContext &&
@@ -322,6 +363,15 @@ function scoreItem(item: StylistWardrobeItem, request: StylistRequest) {
     score -= 7
   }
 
+  if (request.wearHistoryMode === 'avoid_recently_worn' && item.lastWornAt) {
+    const daysSinceWorn =
+      (Date.now() - new Date(item.lastWornAt).getTime()) / 86_400_000
+    if (daysSinceWorn <= 7) score -= 5
+    else if (daysSinceWorn >= 30) score += 1
+  }
+
+  if ((item.wearCount ?? 0) === 0) score += 1
+
   if (item.role === 'shoes') score += 1
   if (item.role === 'top' || item.role === 'bottom') score += 2
 
@@ -331,16 +381,74 @@ function scoreItem(item: StylistWardrobeItem, request: StylistRequest) {
 export function filterAndRankWardrobe(
   items: StylistWardrobeItem[],
   request: StylistRequest,
+  options?: {
+    preferenceSignals?: StylistResolvedPreferenceSignals | null
+    lockedItemIds?: string[]
+  },
 ) {
   const profile = getPreferredProfile(request)
+  const lockedItemIds = new Set(options?.lockedItemIds ?? [])
   const filtered = items.filter((item) => {
     if (item.role === unresolvedWardrobeRole) return false
     if (profile.avoidSubtypes?.includes(item.subtype)) return false
+    if (
+      options?.preferenceSignals?.dislikedWardrobeItemIds.includes(item.id) &&
+      !lockedItemIds.has(item.id)
+    ) {
+      return false
+    }
     return true
   })
 
   return [...(filtered.length > 0 ? filtered : items)]
-    .map((item) => ({ item, score: scoreItem(item, request) }))
+    .map((item) => {
+      let score = scoreItem(item, request)
+      if (options?.preferenceSignals) {
+        if (
+          options.preferenceSignals.preferredWardrobeItemIds.includes(item.id)
+        ) {
+          score += 4
+        }
+        if (
+          options.preferenceSignals.preferredStyles.some((style) =>
+            item.styleTags.includes(style),
+          )
+        ) {
+          score += 2
+        }
+        if (
+          options.preferenceSignals.dislikedStyles.some((style) =>
+            item.styleTags.includes(style),
+          )
+        ) {
+          score -= 3
+        }
+        if (
+          options.preferenceSignals.preferredColors.some((color) =>
+            item.colorFamilies.includes(color),
+          )
+        ) {
+          score += 2
+        }
+        if (
+          options.preferenceSignals.avoidedColors.some((color) =>
+            item.colorFamilies.includes(color),
+          )
+        ) {
+          score -= 3
+        }
+        if (
+          options.preferenceSignals.preferredSubtypes.includes(item.subtype)
+        ) {
+          score += 2
+        }
+        if (options.preferenceSignals.avoidedSubtypes.includes(item.subtype)) {
+          score -= 4
+        }
+      }
+
+      return { item, score }
+    })
     .sort((a, b) => b.score - a.score)
     .map((entry) => entry.item)
 }
@@ -389,6 +497,6 @@ export function describeAvailableCategories(
   locale: StylistRequest['locale'],
 ) {
   return Array.from(new Set(items.map((item) => item.role))).map((role) =>
-    getWardrobeColorFamilyLabel(locale, role),
+    getWardrobeRoleLabel(locale, role),
   )
 }

@@ -1,10 +1,11 @@
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq, inArray, or } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { requireVerifiedEmailSession } from '@/lib/auth-email-verification'
 import { db } from '@/lib/db'
 import {
   outfit,
+  outfitFeedback,
   outfitGenerationBatch,
   outfitItem,
   outfitRequest,
@@ -20,6 +21,8 @@ import {
 } from '@/lib/stylist'
 import {
   buildPreferenceContext,
+  deriveLearnedPreferenceSignals,
+  mergePreferenceSignals,
   stylistPreferenceSchema,
 } from '@/lib/stylist/preferences'
 import {
@@ -54,9 +57,15 @@ import {
   getRequiredCategoriesForStylistRequest,
   getStylistWardrobeDiagnostics,
   toStylistWardrobeItem,
+  withWearStats,
 } from '@/lib/stylist/wardrobe'
 import { getWardrobeRoleLabel } from '@/lib/wardrobe/taxonomy'
-import { applyWeatherSuitability, type WeatherForecast } from '@/lib/weather'
+import {
+  applyWeatherSuitability,
+  type WeatherForecast,
+  type WeatherSuitabilitySignal,
+} from '@/lib/weather'
+import { getWearStatsForItems } from '@/lib/wear/server'
 import type {
   StylistInsufficientWardrobeResult,
   StylistRequest,
@@ -324,7 +333,9 @@ async function generateAndValidateStylistBatch(input: {
   requiredCategories: string[]
   candidateCount: number
   preferenceContext: string
+  preferenceSignals: ReturnType<typeof mergePreferenceSignals>
   lockedItemIds: string[]
+  weatherSignals: WeatherSuitabilitySignal[]
   onStage?: (
     stage: StylistGenerateStage,
     details?: Record<string, unknown>,
@@ -350,6 +361,7 @@ async function generateAndValidateStylistBatch(input: {
     candidateCount: input.candidateCount,
     preferenceContext: input.preferenceContext,
     lockedItemIds: input.lockedItemIds,
+    weatherSignals: input.weatherSignals,
   })
   const envelope = isStylistProviderEnvelope(providerOutput)
     ? providerOutput
@@ -419,6 +431,8 @@ async function generateAndValidateStylistBatch(input: {
           requiredCategories: input.requiredCategories,
           lockedItemIds: input.lockedItemIds,
           request: input.request,
+          preferenceSignals: input.preferenceSignals,
+          weatherSignals: input.weatherSignals,
         },
       )
       if (batch.status === 'success') {
@@ -446,6 +460,8 @@ async function generateAndValidateStylistBatch(input: {
             requiredCategories: input.requiredCategories,
             lockedItemIds: input.lockedItemIds,
             request: input.request,
+            preferenceSignals: input.preferenceSignals,
+            weatherSignals: input.weatherSignals,
           },
         )
         if (single.status === 'success') {
@@ -460,6 +476,8 @@ async function generateAndValidateStylistBatch(input: {
             requiredCategories: input.requiredCategories,
             lockedItemIds: input.lockedItemIds,
             request: input.request,
+            preferenceSignals: input.preferenceSignals,
+            weatherSignals: input.weatherSignals,
           })
         }
         return single
@@ -496,6 +514,7 @@ async function generateAndValidateStylistBatch(input: {
       candidateCount: input.candidateCount,
       preferenceContext: input.preferenceContext,
       lockedItemIds: input.lockedItemIds,
+      weatherSignals: input.weatherSignals,
       strictRetry: true,
       validationFeedback,
     })
@@ -627,7 +646,82 @@ export async function POST(request: Request) {
         item.imageDeletionStatus === 'active' &&
         (!dislikedWardrobeItemIds.has(item.id) || lockedItemIdSet.has(item.id)),
     )
-    const wardrobe = wardrobeRows.map(toStylistWardrobeItem)
+    const wearStats = await getWearStatsForItems(
+      userId,
+      wardrobeRows.map((item) => item.id),
+    )
+    const wardrobe = withWearStats(
+      wardrobeRows.map(toStylistWardrobeItem),
+      wearStats,
+    )
+    const wardrobeById = new Map(wardrobe.map((item) => [item.id, item]))
+    const [savedFavoriteOutfits, feedbackRows] = await Promise.all([
+      db
+        .select({
+          id: outfit.id,
+          isFavorite: outfit.isFavorite,
+          isSaved: outfit.isSaved,
+        })
+        .from(outfit)
+        .where(
+          and(
+            eq(outfit.userId, userId),
+            or(eq(outfit.isFavorite, true), eq(outfit.isSaved, true)),
+          ),
+        )
+        .limit(40),
+      db
+        .select({
+          outfitId: outfitFeedback.outfitId,
+          rating: outfitFeedback.rating,
+          reasonTags: outfitFeedback.reasonTags,
+        })
+        .from(outfitFeedback)
+        .where(eq(outfitFeedback.userId, userId))
+        .orderBy(desc(outfitFeedback.createdAt))
+        .limit(40),
+    ])
+    const relatedOutfitIds = Array.from(
+      new Set([
+        ...savedFavoriteOutfits.map((entry) => entry.id),
+        ...feedbackRows.map((entry) => entry.outfitId),
+      ]),
+    )
+    const relatedOutfitItems =
+      relatedOutfitIds.length > 0
+        ? await db
+            .select()
+            .from(outfitItem)
+            .where(inArray(outfitItem.outfitId, relatedOutfitIds))
+        : []
+    const outfitItemsByOutfitId = relatedOutfitItems.reduce<
+      Map<string, typeof relatedOutfitItems>
+    >((accumulator, item) => {
+      const items = accumulator.get(item.outfitId) ?? []
+      items.push(item)
+      accumulator.set(item.outfitId, items)
+      return accumulator
+    }, new Map())
+    const learnedPreferenceSignals = deriveLearnedPreferenceSignals({
+      outfits: savedFavoriteOutfits.map((entry) => ({
+        isFavorite: entry.isFavorite,
+        isSaved: entry.isSaved,
+        items: (outfitItemsByOutfitId.get(entry.id) ?? [])
+          .map((item) => wardrobeById.get(item.wardrobeItemId) ?? null)
+          .filter((item): item is StylistWardrobeItem => Boolean(item)),
+      })),
+      feedback: feedbackRows.map((entry) => ({
+        rating: entry.rating,
+        reasonTags: entry.reasonTags,
+        items: (outfitItemsByOutfitId.get(entry.outfitId) ?? [])
+          .map((item) => wardrobeById.get(item.wardrobeItemId) ?? null)
+          .filter((item): item is StylistWardrobeItem => Boolean(item)),
+      })),
+    })
+    const resolvedPreferenceSignals = mergePreferenceSignals(
+      preferenceProfile,
+      learnedPreferenceSignals,
+    )
     const requiredCategories = getRequiredCategoriesForStylistRequest(
       parsed.data,
     )
@@ -657,9 +751,10 @@ export async function POST(request: Request) {
     }
     const rankedWardrobe = [
       ...lockedItems,
-      ...filterAndRankWardrobe(wardrobe, parsed.data).filter(
-        (item) => !lockedItemIdSet.has(item.id),
-      ),
+      ...filterAndRankWardrobe(wardrobe, parsed.data, {
+        preferenceSignals: resolvedPreferenceSignals,
+        lockedItemIds: parsed.data.lockedItemIds,
+      }).filter((item) => !lockedItemIdSet.has(item.id)),
     ].slice(0, 24)
     const weatherSuitability = parsed.data.weatherContext
       ? applyWeatherSuitability(
@@ -732,6 +827,10 @@ export async function POST(request: Request) {
     const availableCategories = Array.from(
       new Set(weatherRankedWardrobe.map((item) => item.category)),
     )
+    const candidateCount =
+      new Set(weatherRankedWardrobe.map((item) => item.subtype)).size >= 5
+        ? 3
+        : 2
     failureDetails = buildStylistGenerateFailureDetails({
       requiredCategories,
       availableCategories,
@@ -744,6 +843,7 @@ export async function POST(request: Request) {
     logStylistStage(stage, {
       activeItemCount: wardrobeRows.length,
       rankedItemCount: weatherRankedWardrobe.length,
+      candidateCount,
       lockedItemCount: lockedItems.length,
       requiredCategories,
       missingCategories: allMissingItems,
@@ -792,9 +892,11 @@ export async function POST(request: Request) {
         rankedWardrobe: weatherRankedWardrobe,
         missingItems: allMissingItems,
         requiredCategories,
-        candidateCount: 3,
+        candidateCount,
         preferenceContext: buildPreferenceContext(preferenceProfile),
+        preferenceSignals: resolvedPreferenceSignals,
         lockedItemIds: parsed.data.lockedItemIds,
+        weatherSignals: weatherSuitability?.signals ?? [],
         onStage: (nextStage, details) => {
           stage = nextStage
           logStylistStage(stage, details)
@@ -894,14 +996,12 @@ export async function POST(request: Request) {
           rankedItemCount: weatherRankedWardrobe.length,
           missingItems: allMissingItems,
           weatherSignals: weatherSuitability?.signals ?? [],
-          candidateTarget: 3,
+          candidateTarget: candidateCount,
         },
         status: 'completed',
         missingItems,
       })
       .returning()
-
-    const wardrobeById = new Map(wardrobe.map((item) => [item.id, item]))
     const [batchRow] = await db
       .insert(outfitGenerationBatch)
       .values({

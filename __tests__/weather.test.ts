@@ -48,8 +48,26 @@ const forecast: WeatherForecast = {
   stale: false,
 }
 
+const wardrobeDefaults = {
+  formalityLevel: 2,
+  fit: 'regular',
+  pattern: 'solid',
+  warmthLevel: 2,
+  wearCount: 0,
+  lastWornAt: null,
+} satisfies Pick<
+  StylistWardrobeItem,
+  | 'formalityLevel'
+  | 'fit'
+  | 'pattern'
+  | 'warmthLevel'
+  | 'wearCount'
+  | 'lastWornAt'
+>
+
 const wardrobe: StylistWardrobeItem[] = [
   {
+    ...wardrobeDefaults,
     id: '11111111-1111-4111-8111-111111111111',
     name: 'Cotton tee',
     role: 'top',
@@ -68,6 +86,7 @@ const wardrobe: StylistWardrobeItem[] = [
     imageUrl: '/tee.webp',
   },
   {
+    ...wardrobeDefaults,
     id: '22222222-2222-4222-8222-222222222222',
     name: 'Linen trousers',
     role: 'bottom',
@@ -86,6 +105,7 @@ const wardrobe: StylistWardrobeItem[] = [
     imageUrl: '/pants.webp',
   },
   {
+    ...wardrobeDefaults,
     id: '33333333-3333-4333-8333-333333333333',
     name: 'Waterproof boots',
     role: 'shoes',

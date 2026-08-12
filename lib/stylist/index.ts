@@ -122,6 +122,8 @@ export function getStylistProvider(): StylistProvider {
 
 export * from './types'
 export * from './batch'
+export * from './fashion-rules'
+export * from './scoring'
 export {
   StylistProviderRequestError,
   getStylistModelCapability,

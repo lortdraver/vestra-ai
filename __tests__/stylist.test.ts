@@ -4,6 +4,7 @@ import {
   getStylistProvider,
   getStylistProviderDiagnostics,
   getStylistRequestTimeoutMs,
+  scoreStylistCandidate,
 } from '@/lib/stylist'
 import { ApiStylistProvider } from '@/lib/stylist/api-provider'
 import {
@@ -46,8 +47,26 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+const wardrobeDefaults = {
+  formalityLevel: 3,
+  fit: 'regular',
+  pattern: 'solid',
+  warmthLevel: 2,
+  wearCount: 0,
+  lastWornAt: null,
+} satisfies Pick<
+  StylistWardrobeItem,
+  | 'formalityLevel'
+  | 'fit'
+  | 'pattern'
+  | 'warmthLevel'
+  | 'wearCount'
+  | 'lastWornAt'
+>
+
 const wardrobe: StylistWardrobeItem[] = [
   {
+    ...wardrobeDefaults,
     id: '11111111-1111-4111-8111-111111111111',
     name: 'White shirt',
     role: 'top',
@@ -66,6 +85,7 @@ const wardrobe: StylistWardrobeItem[] = [
     imageUrl: '/shirt.webp',
   },
   {
+    ...wardrobeDefaults,
     id: '22222222-2222-4222-8222-222222222222',
     name: 'Dark trousers',
     role: 'bottom',
@@ -84,6 +104,7 @@ const wardrobe: StylistWardrobeItem[] = [
     imageUrl: '/trousers.webp',
   },
   {
+    ...wardrobeDefaults,
     id: '33333333-3333-4333-8333-333333333333',
     name: 'Leather sneakers',
     role: 'shoes',
@@ -138,6 +159,25 @@ const extraWardrobe: StylistWardrobeItem[] = [
     name: 'Black loafers',
   },
 ]
+
+function buildCandidateFromItems(items: StylistWardrobeItem[]) {
+  return {
+    title: 'Scored outfit',
+    occasion: 'test',
+    styleDirection: 'classic',
+    seasonLabel: items.flatMap((item) => item.seasons)[0] ?? 'spring',
+    formalityLabel: items[0]?.formality ?? 'casual',
+    items: items.map((item) => ({
+      wardrobeItemId: item.id,
+      role: item.role,
+      explanation: `Uses ${item.name}.`,
+    })),
+    overallExplanation: 'Scored outfit explanation.',
+    confidenceScore: 0.82,
+    alternativeSuggestions: [],
+    missingItems: [],
+  }
+}
 
 describe('stylist provider behavior', () => {
   it('allows the mock provider only when explicitly selected in development', async () => {
@@ -520,6 +560,242 @@ describe('stylist provider behavior', () => {
 })
 
 describe('outfit validation', () => {
+  it('scores black, white, and gray combinations highly', () => {
+    const scored = scoreStylistCandidate({
+      candidate: buildCandidateFromItems(wardrobe),
+      selectedItems: wardrobe,
+      request: {
+        message: 'A clean business outfit',
+        locale: 'en',
+        lockedItemIds: [],
+        quickRequest: 'business',
+        wearHistoryMode: 'none',
+      },
+    })
+
+    expect(scored.scoreBreakdown.colorCompatibility).toBeGreaterThanOrEqual(8)
+    expect(scored.candidateScore).toBeGreaterThanOrEqual(60)
+  })
+
+  it('scores navy, beige, and white combinations highly', () => {
+    const tonalWardrobe: StylistWardrobeItem[] = [
+      { ...wardrobe[0], colorFamilies: ['white'], colors: ['white'] },
+      {
+        ...wardrobe[1],
+        colorFamilies: ['beige'],
+        colors: ['beige'],
+        subtype: 'chinos',
+        clothingType: 'chinos',
+      },
+      {
+        ...wardrobe[2],
+        colorFamilies: ['navy'],
+        colors: ['navy'],
+        subtype: 'loafers',
+        clothingType: 'loafers',
+      },
+    ]
+
+    const scored = scoreStylistCandidate({
+      candidate: buildCandidateFromItems(tonalWardrobe),
+      selectedItems: tonalWardrobe,
+      request: {
+        message: 'A refined dinner outfit',
+        locale: 'en',
+        lockedItemIds: [],
+        quickRequest: 'restaurant',
+        wearHistoryMode: 'none',
+      },
+    })
+
+    expect(scored.scoreBreakdown.colorCompatibility).toBeGreaterThanOrEqual(8)
+  })
+
+  it('penalizes excessive bright color combinations', () => {
+    const brightWardrobe: StylistWardrobeItem[] = [
+      { ...wardrobe[0], colorFamilies: ['red'], colors: ['red'] },
+      { ...wardrobe[1], colorFamilies: ['orange'], colors: ['orange'] },
+      { ...wardrobe[2], colorFamilies: ['yellow'], colors: ['yellow'] },
+    ]
+
+    const scored = scoreStylistCandidate({
+      candidate: buildCandidateFromItems(brightWardrobe),
+      selectedItems: brightWardrobe,
+      request: {
+        message: 'A polished business look',
+        locale: 'en',
+        lockedItemIds: [],
+        quickRequest: 'business',
+        wearHistoryMode: 'none',
+      },
+    })
+
+    expect(scored.scoreBreakdown.colorCompatibility).toBeLessThan(0)
+  })
+
+  it('scores polo, chinos, and loafers as strong smart casual', () => {
+    const smartCasualWardrobe: StylistWardrobeItem[] = [
+      {
+        ...wardrobe[0],
+        name: 'Navy polo',
+        subtype: 'polo',
+        clothingType: 'polo',
+        formality: 'smart_casual',
+        styleTags: ['smart_casual', 'classic'],
+        styles: ['smart_casual', 'classic'],
+      },
+      {
+        ...wardrobe[1],
+        name: 'Stone chinos',
+        subtype: 'chinos',
+        clothingType: 'chinos',
+        formality: 'smart_casual',
+        styleTags: ['smart_casual', 'classic'],
+        styles: ['smart_casual', 'classic'],
+      },
+      {
+        ...wardrobe[2],
+        name: 'Brown loafers',
+        subtype: 'loafers',
+        clothingType: 'loafers',
+        formality: 'smart_casual',
+        styleTags: ['smart_casual', 'classic'],
+        styles: ['smart_casual', 'classic'],
+      },
+    ]
+
+    const scored = scoreStylistCandidate({
+      candidate: buildCandidateFromItems(smartCasualWardrobe),
+      selectedItems: smartCasualWardrobe,
+      request: {
+        message: 'Smart casual dinner outfit',
+        locale: 'en',
+        lockedItemIds: [],
+        quickRequest: 'restaurant',
+        wearHistoryMode: 'none',
+      },
+    })
+
+    expect(scored.scoreBreakdown.subtypeCompatibility).toBeGreaterThanOrEqual(8)
+    expect(scored.scoreBreakdown.formalityConsistency).toBeGreaterThan(0)
+  })
+
+  it('penalizes shirt, sweatpants, and dress shoes mismatch', () => {
+    const mismatchedWardrobe: StylistWardrobeItem[] = [
+      { ...wardrobe[0], subtype: 'shirt', clothingType: 'shirt' },
+      {
+        ...wardrobe[1],
+        subtype: 'sweatpants',
+        clothingType: 'sweatpants',
+        formality: 'relaxed',
+        styleTags: ['sport'],
+        styles: ['sport'],
+      },
+      {
+        ...wardrobe[2],
+        subtype: 'dress_shoes',
+        clothingType: 'dress_shoes',
+        formality: 'formal',
+      },
+    ]
+
+    const scored = scoreStylistCandidate({
+      candidate: buildCandidateFromItems(mismatchedWardrobe),
+      selectedItems: mismatchedWardrobe,
+      request: {
+        message: 'Formal office outfit',
+        locale: 'en',
+        lockedItemIds: [],
+        quickRequest: 'business',
+        wearHistoryMode: 'none',
+      },
+    })
+
+    expect(scored.candidateScore).toBeLessThan(50)
+    expect(scored.rejectionReasons[0]).toMatch(
+      /occasion_violation:business|formality_mismatch/,
+    )
+  })
+
+  it('uses weather suitability and wear history in scoring', () => {
+    const weatherWardrobe: StylistWardrobeItem[] = [
+      {
+        ...wardrobe[0],
+        subtype: 'hoodie',
+        clothingType: 'hoodie',
+        warmthLevel: 4,
+        wearCount: 6,
+        lastWornAt: '2026-08-10T10:00:00.000Z',
+      },
+      {
+        ...wardrobe[1],
+        subtype: 'jeans',
+        clothingType: 'jeans',
+        warmthLevel: 3,
+      },
+      {
+        ...wardrobe[2],
+        subtype: 'boots',
+        clothingType: 'boots',
+        warmthLevel: 4,
+      },
+    ]
+
+    const scored = scoreStylistCandidate({
+      candidate: buildCandidateFromItems(weatherWardrobe),
+      selectedItems: weatherWardrobe,
+      request: {
+        message: 'Cold weather campus outfit',
+        locale: 'en',
+        lockedItemIds: [],
+        quickRequest: 'cold_weather',
+        wearHistoryMode: 'avoid_recently_worn',
+        weatherContext: {
+          locationName: 'Baku',
+          temperatureC: 5,
+          feelsLikeC: 2,
+          minTemperatureC: 3,
+          maxTemperatureC: 7,
+          precipitationProbability: 20,
+          rainMm: 0,
+          snowMm: 0,
+          windKph: 12,
+          humidity: 60,
+          uvIndex: 2,
+          condition: 'cloudy',
+          time: '2026-08-12T08:00:00.000Z',
+          timezone: 'Asia/Baku',
+        },
+      },
+      weatherSignals: ['cold'],
+    })
+
+    expect(scored.scoreBreakdown.weatherSeason).toBeGreaterThan(0)
+    expect(scored.scoreBreakdown.preferenceMatch).toBeLessThanOrEqual(0)
+  })
+
+  it('penalizes duplicate-like candidates for diversity', () => {
+    const baseCandidate = buildCandidateFromItems(wardrobe)
+    const previousCandidate = {
+      ...baseCandidate,
+      title: 'First option',
+    }
+    const scored = scoreStylistCandidate({
+      candidate: { ...baseCandidate, title: 'Second option' },
+      selectedItems: wardrobe,
+      request: {
+        message: 'Work outfit',
+        locale: 'en',
+        lockedItemIds: [],
+        quickRequest: 'work',
+        wearHistoryMode: 'none',
+      },
+      acceptedCandidates: [previousCandidate],
+    })
+
+    expect(scored.scoreBreakdown.duplicatePenalty).toBeLessThan(0)
+  })
+
   it('returns insufficient wardrobe for a completely empty wardrobe', () => {
     const result = validateStylistResult(
       {
