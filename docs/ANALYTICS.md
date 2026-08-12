@@ -1,8 +1,9 @@
 # Vestra First-Party Analytics
 
 Phase 2 added a server-side product event ledger in PostgreSQL. Phase 3 adds
-consent-aware GA4 and Microsoft Clarity loaders. It does not add advertising
-pixels, partner dashboards, or a public analytics page.
+consent-aware GA4 and Microsoft Clarity loaders. Admin Analytics v1 adds an
+internal dashboard at `/dashboard/admin` for authorized admins. It does not add
+advertising pixels, partner dashboards, or a public analytics page.
 
 GA4 and Clarity are optional browser integrations and remain separate from the
 first-party event ledger. They load only after the `vestra_consent` Analytics
@@ -29,6 +30,19 @@ The `analytics_event` table is intentionally not foreign-keyed to `user` or
 product entities. This keeps account deletion and operational cleanup from
 being blocked by historical analytics rows. Events carry internal identifiers
 only where needed for product metrics; they are not exposed to partners.
+
+## Where analytics live
+
+- First-party product analytics are viewed inside Vestra at
+  `/dashboard/admin`.
+- GA4 remains the acquisition and traffic layer for marketing/realtime site
+  visibility.
+- Microsoft Clarity remains the UX/session-behavior layer for consented browser
+  sessions.
+
+The admin dashboard is intentionally focused on product usage, activation,
+retention, wardrobe growth, stylist usage, and aggregate fashion insights. It
+does not attempt to mirror all GA4 or Clarity reporting.
 
 ## Event taxonomy
 
@@ -80,6 +94,33 @@ they are collected server-side to operate, secure, and improve Vestra. They
 are not used for advertising or sold as individual-user data. Any future
 partner insight must be aggregated and privacy-reviewed.
 
+## Admin Analytics v1
+
+The internal admin dashboard currently includes:
+
+- user overview cards
+- DAU / WAU / MAU and DAU/MAU ratio
+- activation metrics
+- wardrobe, stylist, planner, outfit, and wear-log metrics
+- Free / Premium / Trial user mix
+- selectable periods: Today, 7 days, 30 days, 90 days
+- lightweight charts for new users, active users, stylist generations, and
+  wardrobe item creation
+- activation funnel: Registered -> Email verified -> First wardrobe item ->
+  First stylist generation -> First saved outfit
+- D1 / D7 / D30 retention states
+- aggregate fashion insights for categories, subtypes, colors, styles, and
+  seasons
+- system health rates for stylist, AI analysis, and background removal
+- an admin user table with verified state, plan, wardrobe size, last meaningful
+  activity, and stylist generation count
+- shortcut cards to GA4 and Clarity
+
+The current implementation computes multiple admin metrics from one bounded
+analytics-event load plus operational table reads. As Vestra grows, some of
+these metrics should move to daily aggregate tables rather than always being
+derived on demand.
+
 ## Metrics and definitions
 
 `countEventsByRange`, `countActiveUsersByRange`,
@@ -89,14 +130,40 @@ read-only helpers for a future admin surface.
 
 - DAU, WAU, and MAU are distinct authenticated `userId` values with at least
   one meaningful product event in the respective UTC day/7-day/30-day window.
-- Activation is a verified account with at least one successful
-  `wardrobe_item_created` event. Until reliable verification-completion hooks
-  are available, the user table's current `emailVerified` value is the
-  verification source of truth.
+- Activation is a verified account with at least one first wardrobe-item
+  creation signal. Vestra prefers the first-party `wardrobe_item_created` /
+  `first_wardrobe_item_created` event, with an operational wardrobe-item
+  fallback when older rows predate reliable event capture.
 - Retention is the percentage of an activation cohort with a meaningful event
   on D1, D7, or D30. Page views do not count as activity.
 - Meaningful events include wardrobe changes, analysis, stylist activity,
   outfit/wear activity, planner activity, and account completion actions.
+
+The admin funnel uses a documented approximation:
+
+- `Registered`: total user rows
+- `Email verified`: current `user.emailVerified = true`
+- `First wardrobe item`: verified users with at least one active wardrobe item
+- `First stylist generation`: verified users with at least one stylist request
+- `First saved outfit`: verified users with a saved-outfit analytics signal or a
+  current saved outfit row
+
+## Early-stage limitations
+
+Vestra is still early-stage, so the dashboard is designed to handle:
+
+- zero or one user
+- sparse analytics history
+- incomplete D7 or D30 cohorts
+- no Premium or no Trial users
+- partially backfilled historical product rows
+
+When there is not enough cohort age for retention, the dashboard shows
+`Not enough data` rather than implying the rate is zero.
+
+Because Vestra still uses a live event ledger instead of precomputed daily
+rollups, analytics should be treated as operational product guidance rather
+than finance-grade reporting.
 
 ## Migration
 

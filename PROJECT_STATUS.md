@@ -187,6 +187,34 @@
 - Documented consent lifecycle, policy versioning, cookie design, and privacy
   protections.
 
+### Analytics Phase 2: First-Party Product Analytics
+
+- Added a first-party `analytics_event` ledger for privacy-safe product events.
+- Added typed server-side event taxonomy and sanitization boundaries.
+- Added read-only helpers for DAU, WAU, MAU, activation, retention, wardrobe
+  creation, stylist activity, planner usage, outfits, and wear metrics.
+- Kept analytics writes best-effort so product flows do not fail if analytics
+  storage is temporarily unavailable.
+
+### Analytics Phase 3: Consent-Aware GA4 And Clarity
+
+- Added consent-gated GA4 loading for acquisition and traffic measurement.
+- Added consent-gated Microsoft Clarity loading for UX/session behavior.
+- Added sanitized page-view tracking and URL/path protections.
+- Added sensitive-form masking and consent withdrawal handling.
+
+### UX/Admin Improvements: Mobile Account Access And Admin Analytics v1
+
+- Restored full authenticated mobile account access from the avatar button.
+- Added mobile-safe access to account, AZ/EN/RU language switching, cookie
+  preferences, and sign out without changing desktop navigation behavior.
+- Added Admin Analytics v1 at `/dashboard/admin` for authorized admins only.
+- Added admin overview cards, date ranges, charts, activation funnel,
+  retention states, fashion insights, system health, and improved user table
+  reporting.
+- Added GA4 and Clarity shortcut cards so internal product analytics and
+  external traffic/session tools remain clearly separated.
+
 ## Current Architecture
 
 - Production-oriented monolith using Next.js App Router.
@@ -196,10 +224,13 @@
 - Domain modules live under `lib`.
 - UI components live under `components`.
 - Localized copy lives in `lib/i18n/dictionaries.ts`.
+- Admin analytics copy lives in `lib/analytics/admin-copy.ts`.
 - Tests live in `__tests__`.
 - SQL migrations live in `drizzle`.
 - Request rate limiting for auth, stylist, wardrobe upload, and admin routes is
   handled through Next.js `proxy.ts`.
+- Admin Analytics v1 is rendered through `/dashboard/admin` using first-party
+  analytics helpers plus operational wardrobe/subscription tables.
 
 ## Authentication
 
@@ -290,6 +321,9 @@
   includes the first-party server event ledger, privacy sanitizer, and metric
   helpers. Phase 3 adds consent-aware GA4, Microsoft Clarity, page views, and a
   sanitized client event bridge.
+- Admin Analytics v1 currently computes live metrics from bounded event windows
+  and operational tables; larger-scale production should introduce daily
+  aggregate tables for heavier reporting.
 
 ## Next Steps
 
@@ -301,6 +335,8 @@
 - Decide and verify production background-removal/stylist providers.
 - Run visual QA on real clothing analysis models with representative wardrobe images.
 - Add production error monitoring and future admin analytics presentation.
+- Add daily aggregate analytics tables once traffic volume outgrows live
+  on-demand admin calculations.
 - Add reliable Better Auth/payment lifecycle hooks for currently deferred
   signup, login, verification, and subscription events.
 - Add wardrobe lifecycle states as real persisted product features.

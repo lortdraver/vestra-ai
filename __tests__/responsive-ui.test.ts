@@ -28,6 +28,10 @@ const appHeaderSource = readFileSync(
   join(process.cwd(), 'components/app-header.tsx'),
   'utf8',
 )
+const languageSwitcherSource = readFileSync(
+  join(process.cwd(), 'components/language-switcher.tsx'),
+  'utf8',
+)
 const wardrobeImageRouteSource = readFileSync(
   join(process.cwd(), 'app/api/wardrobe/images/[...key]/route.ts'),
   'utf8',
@@ -81,6 +85,22 @@ describe('responsive UI contracts', () => {
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('md:hidden')
     expect(appHeaderSource).toContain('h-14')
     expect(appHeaderSource).toContain('md:h-16')
+  })
+
+  it('restores account, language, cookie, and sign-out access on mobile', () => {
+    expect(appHeaderSource).toContain('mobile-account-menu-title')
+    expect(appHeaderSource).toContain('aria-expanded={mobileMenuOpen}')
+    expect(appHeaderSource).toContain('setMobileMenuOpen(false)')
+    expect(appHeaderSource).toContain('openCookiePreferences')
+    expect(appHeaderSource).toContain('dictionary.dashboard.signOut')
+    expect(appHeaderSource).toContain('LanguageSwitcher')
+    expect(appHeaderSource).toContain(
+      'top-[calc(env(safe-area-inset-top)+3.9rem)]',
+    )
+    expect(languageSwitcherSource).toContain("variant?: 'compact' | 'menu'")
+    expect(languageSwitcherSource).toContain('onLocaleChange?.(locale)')
+    expect(languageSwitcherSource).toContain("variant === 'compact'")
+    expect(languageSwitcherSource).toContain('min-h-11 min-w-11')
   })
 
   it('keeps wardrobe card actions touch friendly', () => {

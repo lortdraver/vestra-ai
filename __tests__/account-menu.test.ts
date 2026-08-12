@@ -29,10 +29,10 @@ describe('account menu helpers', () => {
     expect(keys).not.toContain('profile')
   })
 
-  it('shows admin dashboard for moderators and admins', () => {
+  it('shows admin dashboard only for admins', () => {
     expect(
       getAccountMenuItems('moderator').some((item) => item.key === 'admin'),
-    ).toBe(true)
+    ).toBe(false)
     expect(
       getAccountMenuItems('admin').some((item) => item.key === 'admin'),
     ).toBe(true)

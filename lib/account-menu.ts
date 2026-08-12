@@ -1,4 +1,4 @@
-import { canModerate } from '@/lib/roles'
+import { canAccessAdmin } from '@/lib/roles'
 
 export type AccountMenuUser = {
   name?: string | null
@@ -43,7 +43,7 @@ export function getAccountMenuItems(
     { key: 'privacy', href: '/dashboard/account#privacy' },
   ]
 
-  if (canModerate(role)) {
+  if (canAccessAdmin(role)) {
     items.push({ key: 'admin', href: '/dashboard/admin' })
   }
 
