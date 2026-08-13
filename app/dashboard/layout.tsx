@@ -31,17 +31,20 @@ export default async function DashboardLayout({
   ])
   const currentUser = userRows[0]
 
-  console.info('[mobile-header] DASHBOARD_LAYOUT_RENDERED', {
+  console.log('[runtime-tree] REAL_DASHBOARD_LAYOUT_RENDERED', {
     authenticated: Boolean(session.user),
     serverUserPresent: Boolean(session.user),
     rolePresent: Boolean(currentUser?.role),
     hasName: Boolean(session.user.name),
     hasImage: Boolean(session.user.image),
-    mobileHeaderVersion: 3,
+    runtimeTreeVersion: 4,
   })
 
   return (
     <div className="flex min-h-svh flex-col bg-background">
+      <div className="w-full bg-red-600 px-4 py-1 text-center text-xs font-bold text-white">
+        RUNTIME-V4
+      </div>
       <AppHeader
         user={{
           name: session.user.name,
