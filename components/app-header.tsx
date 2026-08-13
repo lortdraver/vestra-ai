@@ -124,12 +124,14 @@ export function AppHeader({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const mobileMenuRef = useRef<HTMLDivElement>(null)
   const sessionUser = session.data?.user
-  const activeUser = user
+  const serverUser = user ?? null
+  const topBarUser = serverUser
+  const activeUser = serverUser
     ? {
-        ...user,
-        name: sessionUser?.name ?? user.name ?? null,
-        email: sessionUser?.email ?? user.email ?? null,
-        image: sessionUser?.image ?? user.image ?? null,
+        ...serverUser,
+        name: sessionUser?.name ?? serverUser.name ?? null,
+        email: sessionUser?.email ?? serverUser.email ?? null,
+        image: sessionUser?.image ?? serverUser.image ?? null,
       }
     : sessionUser
       ? {
@@ -139,6 +141,7 @@ export function AppHeader({
         }
       : null
   const isSessionLoading = session.isPending && !activeUser
+  const topBarAvatarFallback = getUserAvatarFallback(topBarUser)
   const avatarFallback = getUserAvatarFallback(activeUser)
   const planLabel =
     activeUser?.planKey === 'premium'
@@ -190,6 +193,24 @@ export function AppHeader({
     </Avatar>
   )
 
+  const topBarAvatar = (
+    <Avatar className="size-8">
+      {topBarUser?.image ? (
+        <AvatarImage
+          src={topBarUser.image}
+          alt={topBarUser.name ?? topBarUser.email ?? ''}
+        />
+      ) : null}
+      <AvatarFallback className="bg-primary text-xs font-medium text-primary-foreground">
+        {topBarAvatarFallback.kind === 'initials' ? (
+          topBarAvatarFallback.value
+        ) : (
+          <User className="size-4" aria-hidden="true" />
+        )}
+      </AvatarFallback>
+    </Avatar>
+  )
+
   const headerDiagnostic = {
     authenticated: Boolean(activeUser),
     serverUserPresent: Boolean(user),
@@ -197,7 +218,7 @@ export function AppHeader({
     hasName: Boolean(activeUser?.name),
     hasImage: Boolean(activeUser?.image),
     currentPathname: pathname,
-    mobileHeaderVersion: 3,
+    mobileHeaderVersion: 5,
   }
 
   console.info('[mobile-header] APP_HEADER_RENDERED', headerDiagnostic)
@@ -210,7 +231,7 @@ export function AppHeader({
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
       <div
         data-testid="mobile-app-header"
-        data-mobile-header-version="3"
+        data-mobile-header-version="5"
         className={MOBILE_TOP_BAR_CLASS}
       >
         <Link
@@ -223,27 +244,23 @@ export function AppHeader({
           data-testid="mobile-header-debug-marker"
           className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white"
         >
-          MH3
+          TOPBAR-V5
         </span>
 
-        {isSessionLoading ? (
-          <div
-            aria-label={dictionary.common.loading}
-            className="size-11 shrink-0 animate-pulse rounded-full bg-muted"
-          />
-        ) : activeUser ? (
-          <Button
+        {topBarUser ? (
+          <button
             type="button"
-            variant="ghost"
-            size="icon-lg"
             data-testid="mobile-account-trigger"
-            className="size-11 shrink-0 rounded-full border border-transparent hover:border-border aria-expanded:border-border aria-expanded:bg-muted"
+            className={cn(
+              buttonVariants({ variant: 'ghost', size: 'icon-lg' }),
+              'size-11 shrink-0 rounded-full border border-transparent hover:border-border aria-expanded:border-border aria-expanded:bg-muted',
+            )}
             aria-label={dictionary.common.accountMenu}
             aria-expanded={mobileMenuOpen}
             onClick={() => setMobileMenuOpen((current) => !current)}
           >
-            {accountAvatar}
-          </Button>
+            {topBarAvatar}
+          </button>
         ) : (
           <div className="flex shrink-0 items-center gap-2">
             <Link

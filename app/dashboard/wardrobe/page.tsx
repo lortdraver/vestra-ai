@@ -14,11 +14,5 @@ export default async function WardrobePage() {
   const dictionary = await getDictionary()
   const locale = await getLocale()
 
-  console.log('[runtime-tree] WARDROBE_PAGE_RENDERED', {
-    runtimeTreeVersion: 4,
-    page: '/dashboard/wardrobe',
-    locale,
-  })
-
   return <WardrobePageClient dictionary={dictionary} locale={locale} />
 }
