@@ -56,8 +56,12 @@ describe('AppHeader authenticated mobile shell', () => {
     )
 
     expect(html).toContain('data-testid="mobile-app-header"')
+    expect(html).toContain('data-mobile-header-version="3"')
+    expect(html).toContain('data-testid="mobile-header-debug-marker"')
     expect(html).toContain('data-testid="mobile-account-trigger"')
     expect(html).toContain('Vestra')
+    expect(html).toContain('MH3')
+    expect(html).toContain('hidden md:block')
     expect(html).toContain('Mobile navigation')
     expect(html).toContain('Wardrobe')
     expect(html).toContain('Stylist')
@@ -82,6 +86,7 @@ describe('AppHeader authenticated mobile shell', () => {
     )
 
     expect(html).toContain('data-testid="mobile-account-trigger"')
+    expect(html).toContain('data-testid="mobile-header-debug-marker"')
     expect(html).toContain('>S<')
   })
 
@@ -96,6 +101,7 @@ describe('AppHeader authenticated mobile shell', () => {
 
     expect(html).toContain('data-testid="mobile-app-header"')
     expect(html).toContain('data-testid="mobile-account-trigger"')
+    expect(html).toContain('data-testid="mobile-header-debug-marker"')
     expect(html).not.toContain('/dashboard/admin')
   })
 })

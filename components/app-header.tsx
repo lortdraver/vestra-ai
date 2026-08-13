@@ -190,54 +190,76 @@ export function AppHeader({
     </Avatar>
   )
 
+  const headerDiagnostic = {
+    authenticated: Boolean(activeUser),
+    serverUserPresent: Boolean(user),
+    rolePresent: Boolean(activeUser?.role),
+    hasName: Boolean(activeUser?.name),
+    hasImage: Boolean(activeUser?.image),
+    currentPathname: pathname,
+    mobileHeaderVersion: 3,
+  }
+
+  console.info('[mobile-header] APP_HEADER_RENDERED', headerDiagnostic)
+  console.info(
+    '[mobile-header] MOBILE_HEADER_BRANCH_RENDERED',
+    headerDiagnostic,
+  )
+
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-      <div data-testid="mobile-app-header" className={MOBILE_TOP_BAR_CLASS}>
-        <div className="mx-auto flex min-h-14 w-full max-w-[1680px] items-center justify-between gap-3 px-3 min-[390px]:px-4">
-          <Link
-            href="/dashboard"
-            className="min-w-0 truncate font-serif text-lg font-semibold tracking-tight text-foreground"
-          >
-            {dictionary.common.brand}
-          </Link>
+      <div
+        data-testid="mobile-app-header"
+        data-mobile-header-version="3"
+        className={MOBILE_TOP_BAR_CLASS}
+      >
+        <Link
+          href="/dashboard"
+          className="min-w-0 truncate font-serif text-lg font-semibold tracking-tight text-foreground"
+        >
+          {dictionary.common.brand}
+        </Link>
+        <span
+          data-testid="mobile-header-debug-marker"
+          className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white"
+        >
+          MH3
+        </span>
 
-          {isSessionLoading ? (
-            <div
-              aria-label={dictionary.common.loading}
-              className="size-11 shrink-0 animate-pulse rounded-full bg-muted"
-            />
-          ) : activeUser ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-lg"
-              data-testid="mobile-account-trigger"
-              className="size-11 shrink-0 rounded-full border border-transparent hover:border-border aria-expanded:border-border aria-expanded:bg-muted"
-              aria-label={dictionary.common.accountMenu}
-              aria-expanded={mobileMenuOpen}
-              onClick={() => setMobileMenuOpen((current) => !current)}
+        {isSessionLoading ? (
+          <div
+            aria-label={dictionary.common.loading}
+            className="size-11 shrink-0 animate-pulse rounded-full bg-muted"
+          />
+        ) : activeUser ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-lg"
+            data-testid="mobile-account-trigger"
+            className="size-11 shrink-0 rounded-full border border-transparent hover:border-border aria-expanded:border-border aria-expanded:bg-muted"
+            aria-label={dictionary.common.accountMenu}
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen((current) => !current)}
+          >
+            {accountAvatar}
+          </Button>
+        ) : (
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              href="/sign-in"
+              className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}
             >
-              {accountAvatar}
-            </Button>
-          ) : (
-            <div className="flex shrink-0 items-center gap-2">
-              <Link
-                href="/sign-in"
-                className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}
-              >
-                {dictionary.common.signIn}
-              </Link>
-              <Link
-                href="/sign-up"
-                className={cn(
-                  buttonVariants({ variant: 'default', size: 'sm' }),
-                )}
-              >
-                {dictionary.common.signUp}
-              </Link>
-            </div>
-          )}
-        </div>
+              {dictionary.common.signIn}
+            </Link>
+            <Link
+              href="/sign-up"
+              className={cn(buttonVariants({ variant: 'default', size: 'sm' }))}
+            >
+              {dictionary.common.signUp}
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="hidden md:block">

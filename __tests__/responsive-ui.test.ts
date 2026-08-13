@@ -79,15 +79,26 @@ describe('responsive UI contracts', () => {
   it('keeps mobile and desktop navigation mutually exclusive', () => {
     expect(DESKTOP_NAV_CLASS).toContain('hidden')
     expect(DESKTOP_NAV_CLASS).toContain('md:flex')
-    expect(MOBILE_TOP_BAR_CLASS).toContain('env(safe-area-inset-top)')
     expect(MOBILE_TOP_BAR_CLASS).toContain('md:hidden')
+    expect(MOBILE_TOP_BAR_CLASS).toContain('w-full')
+    expect(MOBILE_TOP_BAR_CLASS).toContain('min-h-14')
+    expect(MOBILE_TOP_BAR_CLASS).toContain('flex')
+    expect(MOBILE_TOP_BAR_CLASS).toContain('items-center')
+    expect(MOBILE_TOP_BAR_CLASS).toContain('justify-between')
+    expect(MOBILE_TOP_BAR_CLASS).toContain('px-4')
+    expect(MOBILE_TOP_BAR_CLASS).toContain('bg-white')
+    expect(MOBILE_TOP_BAR_CLASS).toContain('border-b')
     expect(MOBILE_TOP_BAR_CLASS.split(/\s+/)).not.toContain('hidden')
+    expect(MOBILE_TOP_BAR_CLASS).not.toContain('safe-area')
+    expect(MOBILE_TOP_BAR_CLASS).not.toContain('fixed')
+    expect(MOBILE_TOP_BAR_CLASS).not.toContain('absolute')
+    expect(MOBILE_TOP_BAR_CLASS).not.toContain('sticky')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('fixed')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('w-screen')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('grid-cols-5')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('env(safe-area-inset-bottom)')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('md:hidden')
-    expect(appHeaderSource).toContain('min-h-14')
+    expect(MOBILE_TOP_BAR_CLASS).toContain('min-h-14')
     expect(appHeaderSource).toContain('h-16')
   })
 
@@ -99,7 +110,16 @@ describe('responsive UI contracts', () => {
     expect(appHeaderSource).toContain('dictionary.dashboard.signOut')
     expect(appHeaderSource).toContain('LanguageSwitcher')
     expect(appHeaderSource).toContain('data-testid="mobile-app-header"')
+    expect(appHeaderSource).toContain('data-mobile-header-version="3"')
+    expect(appHeaderSource).toContain(
+      'data-testid="mobile-header-debug-marker"',
+    )
     expect(appHeaderSource).toContain('data-testid="mobile-account-trigger"')
+    expect(appHeaderSource).toContain('MH3')
+    expect(appHeaderSource).toContain('[mobile-header] APP_HEADER_RENDERED')
+    expect(appHeaderSource).toContain(
+      '[mobile-header] MOBILE_HEADER_BRANCH_RENDERED',
+    )
     expect(appHeaderSource).toContain('MOBILE_TOP_BAR_CLASS')
     expect(appHeaderSource).toContain('className="hidden md:block"')
     expect(appHeaderSource).toContain(

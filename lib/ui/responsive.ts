@@ -2,7 +2,7 @@ export const DASHBOARD_CONTENT_CLASS =
   'mx-auto w-full max-w-[1680px] min-w-0 flex-1 px-3 pb-[calc(env(safe-area-inset-bottom)+6.75rem)] pt-5 min-[390px]:px-4 md:px-6 md:py-8 xl:px-8'
 
 export const MOBILE_TOP_BAR_CLASS =
-  'w-full shrink-0 pt-[env(safe-area-inset-top)] md:hidden'
+  'md:hidden w-full min-h-14 flex items-center justify-between px-4 bg-white border-b'
 
 export const WARDROBE_LAYOUT_CLASS =
   'grid gap-5 lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]'

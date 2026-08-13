@@ -31,6 +31,15 @@ export default async function DashboardLayout({
   ])
   const currentUser = userRows[0]
 
+  console.info('[mobile-header] DASHBOARD_LAYOUT_RENDERED', {
+    authenticated: Boolean(session.user),
+    serverUserPresent: Boolean(session.user),
+    rolePresent: Boolean(currentUser?.role),
+    hasName: Boolean(session.user.name),
+    hasImage: Boolean(session.user.image),
+    mobileHeaderVersion: 3,
+  })
+
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <AppHeader
