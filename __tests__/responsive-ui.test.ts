@@ -80,14 +80,15 @@ describe('responsive UI contracts', () => {
     expect(DESKTOP_NAV_CLASS).toContain('hidden')
     expect(DESKTOP_NAV_CLASS).toContain('md:flex')
     expect(MOBILE_TOP_BAR_CLASS).toContain('env(safe-area-inset-top)')
-    expect(MOBILE_TOP_BAR_CLASS).toContain('md:pt-0')
+    expect(MOBILE_TOP_BAR_CLASS).toContain('md:hidden')
+    expect(MOBILE_TOP_BAR_CLASS.split(/\s+/)).not.toContain('hidden')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('fixed')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('w-screen')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('grid-cols-5')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('env(safe-area-inset-bottom)')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('md:hidden')
-    expect(appHeaderSource).toContain('h-14')
-    expect(appHeaderSource).toContain('md:h-16')
+    expect(appHeaderSource).toContain('min-h-14')
+    expect(appHeaderSource).toContain('h-16')
   })
 
   it('restores account, language, cookie, and sign-out access on mobile', () => {
@@ -97,7 +98,10 @@ describe('responsive UI contracts', () => {
     expect(appHeaderSource).toContain('openCookiePreferences')
     expect(appHeaderSource).toContain('dictionary.dashboard.signOut')
     expect(appHeaderSource).toContain('LanguageSwitcher')
+    expect(appHeaderSource).toContain('data-testid="mobile-app-header"')
+    expect(appHeaderSource).toContain('data-testid="mobile-account-trigger"')
     expect(appHeaderSource).toContain('MOBILE_TOP_BAR_CLASS')
+    expect(appHeaderSource).toContain('className="hidden md:block"')
     expect(appHeaderSource).toContain(
       'top-[calc(env(safe-area-inset-top)+3.9rem)]',
     )

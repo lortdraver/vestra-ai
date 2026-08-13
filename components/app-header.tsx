@@ -124,15 +124,20 @@ export function AppHeader({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const mobileMenuRef = useRef<HTMLDivElement>(null)
   const sessionUser = session.data?.user
-  const activeUser =
-    session.data === null
-      ? null
-      : {
-          ...user,
-          name: sessionUser?.name ?? user?.name ?? null,
-          email: sessionUser?.email ?? user?.email ?? null,
-          image: sessionUser?.image ?? user?.image ?? null,
+  const activeUser = user
+    ? {
+        ...user,
+        name: sessionUser?.name ?? user.name ?? null,
+        email: sessionUser?.email ?? user.email ?? null,
+        image: sessionUser?.image ?? user.image ?? null,
+      }
+    : sessionUser
+      ? {
+          name: sessionUser.name ?? null,
+          email: sessionUser.email ?? null,
+          image: sessionUser.image ?? null,
         }
+      : null
   const isSessionLoading = session.isPending && !activeUser
   const avatarFallback = getUserAvatarFallback(activeUser)
   const planLabel =
@@ -167,10 +172,76 @@ export function AppHeader({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [mobileMenuOpen])
 
+  const accountAvatar = (
+    <Avatar className="size-8">
+      {activeUser?.image ? (
+        <AvatarImage
+          src={activeUser.image}
+          alt={activeUser.name ?? activeUser.email ?? ''}
+        />
+      ) : null}
+      <AvatarFallback className="bg-primary text-xs font-medium text-primary-foreground">
+        {avatarFallback.kind === 'initials' ? (
+          avatarFallback.value
+        ) : (
+          <User className="size-4" aria-hidden="true" />
+        )}
+      </AvatarFallback>
+    </Avatar>
+  )
+
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-      <div className={MOBILE_TOP_BAR_CLASS}>
-        <div className="mx-auto flex h-14 max-w-[1680px] items-center justify-between gap-3 px-3 min-[390px]:px-4 md:h-16 md:px-6 xl:px-8">
+      <div data-testid="mobile-app-header" className={MOBILE_TOP_BAR_CLASS}>
+        <div className="mx-auto flex min-h-14 w-full max-w-[1680px] items-center justify-between gap-3 px-3 min-[390px]:px-4">
+          <Link
+            href="/dashboard"
+            className="min-w-0 truncate font-serif text-lg font-semibold tracking-tight text-foreground"
+          >
+            {dictionary.common.brand}
+          </Link>
+
+          {isSessionLoading ? (
+            <div
+              aria-label={dictionary.common.loading}
+              className="size-11 shrink-0 animate-pulse rounded-full bg-muted"
+            />
+          ) : activeUser ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-lg"
+              data-testid="mobile-account-trigger"
+              className="size-11 shrink-0 rounded-full border border-transparent hover:border-border aria-expanded:border-border aria-expanded:bg-muted"
+              aria-label={dictionary.common.accountMenu}
+              aria-expanded={mobileMenuOpen}
+              onClick={() => setMobileMenuOpen((current) => !current)}
+            >
+              {accountAvatar}
+            </Button>
+          ) : (
+            <div className="flex shrink-0 items-center gap-2">
+              <Link
+                href="/sign-in"
+                className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}
+              >
+                {dictionary.common.signIn}
+              </Link>
+              <Link
+                href="/sign-up"
+                className={cn(
+                  buttonVariants({ variant: 'default', size: 'sm' }),
+                )}
+              >
+                {dictionary.common.signUp}
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="hidden md:block">
+        <div className="mx-auto flex h-16 max-w-[1680px] items-center justify-between gap-3 px-6 xl:px-8">
           <div className="flex min-w-0 items-center gap-8">
             <Link
               href="/dashboard"
@@ -207,66 +278,13 @@ export function AppHeader({
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <div className="hidden md:block">
+            <div>
               <LanguageSwitcher
                 currentLocale={locale}
                 label={dictionary.common.language}
               />
             </div>
-            <div className="md:hidden">
-              {isSessionLoading ? (
-                <div
-                  aria-label={dictionary.common.loading}
-                  className="size-11 animate-pulse rounded-full bg-muted"
-                />
-              ) : activeUser ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-lg"
-                  className="size-11 rounded-full border border-transparent hover:border-border aria-expanded:border-border aria-expanded:bg-muted"
-                  aria-label={dictionary.common.accountMenu}
-                  aria-expanded={mobileMenuOpen}
-                  onClick={() => setMobileMenuOpen((current) => !current)}
-                >
-                  <Avatar className="size-8">
-                    {activeUser.image ? (
-                      <AvatarImage
-                        src={activeUser.image}
-                        alt={activeUser.name ?? activeUser.email ?? ''}
-                      />
-                    ) : null}
-                    <AvatarFallback className="bg-primary text-xs font-medium text-primary-foreground">
-                      {avatarFallback.kind === 'initials' ? (
-                        avatarFallback.value
-                      ) : (
-                        <User className="size-4" aria-hidden="true" />
-                      )}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Link
-                    href="/sign-in"
-                    className={cn(
-                      buttonVariants({ variant: 'ghost', size: 'sm' }),
-                    )}
-                  >
-                    {dictionary.common.signIn}
-                  </Link>
-                  <Link
-                    href="/sign-up"
-                    className={cn(
-                      buttonVariants({ variant: 'default', size: 'sm' }),
-                    )}
-                  >
-                    {dictionary.common.signUp}
-                  </Link>
-                </div>
-              )}
-            </div>
-            <div className="hidden md:flex md:items-center md:gap-2">
+            <div className="flex items-center gap-2">
               {isSessionLoading ? (
                 <div
                   aria-label={dictionary.common.loading}
@@ -284,21 +302,7 @@ export function AppHeader({
                       />
                     }
                   >
-                    <Avatar className="size-8">
-                      {activeUser.image ? (
-                        <AvatarImage
-                          src={activeUser.image}
-                          alt={activeUser.name ?? activeUser.email ?? ''}
-                        />
-                      ) : null}
-                      <AvatarFallback className="bg-primary text-xs font-medium text-primary-foreground">
-                        {avatarFallback.kind === 'initials' ? (
-                          avatarFallback.value
-                        ) : (
-                          <User className="size-4" aria-hidden="true" />
-                        )}
-                      </AvatarFallback>
-                    </Avatar>
+                    {accountAvatar}
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="end"
