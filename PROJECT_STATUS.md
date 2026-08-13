@@ -136,12 +136,22 @@
 
 ### M6.3: Weather-Aware Outfit Planner
 
-- Added weather provider abstraction with explicit mock and API modes.
-- Added authenticated weather endpoint with cache/stale fallback behavior.
-- Added outfit planning tables and APIs for date-based outfit planning.
+- Added weather provider abstraction with explicit mock, generic API, and
+  Open-Meteo provider modes.
+- Added authenticated weather endpoint with cache/stale fallback behavior and
+  safe provider diagnostics.
+- Added normalized weather context, fashion weather bands, and forecast-change
+  detection.
+- Added outfit planning APIs for date-based outfit planning using existing
+  `outfit_plan.metadata` for weather snapshots and planner state.
 - Added weather suitability rules without changing wear-log semantics.
-- Added planner UI with today planning, weather context, and wardrobe-aware
-  suggestions.
+- Added planner UI with a responsive month calendar, selected-day panel,
+  location controls, saved-outfit selection, weather-aware generation,
+  suitability warnings, forecast-change warnings, upcoming plans, and
+  mark-as-worn actions.
+- Added privacy-safe first-party analytics events for planner weather loading,
+  generation, scheduling, outfit changes, weather changes, worn plans, and
+  deletion.
 
 ### M6.4: Production Integration Readiness
 
@@ -327,6 +337,9 @@
 
 ## Next Steps
 
+- Planner & Weather Intelligence v1 is implemented with month planning,
+  Open-Meteo-ready forecasts, weather snapshots, saved-outfit suitability,
+  forecast-change warnings, and wear-log integration.
 - M6.4 Production Integration Readiness is implemented with weather/background
   diagnostics, provider contracts, proxy migration, and production environment
   checklist updates.

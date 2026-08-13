@@ -3,6 +3,19 @@ import { normalizeTimezone, parseOptionalDate } from '@/lib/wear/validation'
 
 const uuidSchema = z.string().uuid()
 const statusSchema = z.enum(['planned', 'worn', 'skipped'])
+export const plannerOccasionSchema = z.enum([
+  'everyday',
+  'university',
+  'work',
+  'business',
+  'date',
+  'dinner',
+  'party',
+  'sport',
+  'travel',
+  'outdoor',
+  'formal_event',
+])
 const sourceSchema = z.enum([
   'manual',
   'stylist',
@@ -10,11 +23,57 @@ const sourceSchema = z.enum([
   'calendar_import',
 ])
 
+const weatherSnapshotSchema = z.object({
+  date: z.string().trim().min(1).max(40),
+  locationName: z.string().trim().max(160),
+  timezone: z.string().trim().max(80),
+  temperatureC: z.number(),
+  feelsLikeC: z.number(),
+  minTemperatureC: z.number().nullable(),
+  maxTemperatureC: z.number().nullable(),
+  precipitationProbability: z.number().min(0).max(100),
+  rainExpected: z.boolean(),
+  snowExpected: z.boolean(),
+  condition: z.enum([
+    'clear',
+    'cloudy',
+    'rain',
+    'snow',
+    'storm',
+    'wind',
+    'unknown',
+  ]),
+  temperatureBand: z.enum(['freezing', 'cold', 'cool', 'mild', 'warm', 'hot']),
+  precipitation: z.enum(['none', 'rain', 'snow']),
+})
+
+export const outfitPlanMetadataSchema = z
+  .object({
+    weatherSnapshot: weatherSnapshotSchema.optional().nullable(),
+    weatherChange: z
+      .object({
+        changed: z.boolean(),
+        reasons: z.array(z.string().trim().max(80)).max(8),
+        temperatureDeltaC: z.number().min(0),
+      })
+      .optional()
+      .nullable(),
+    weatherSuitability: z
+      .object({
+        level: z.enum(['good', 'weak', 'too_warm', 'too_light', 'unknown']),
+        message: z.string().trim().max(500),
+      })
+      .optional()
+      .nullable(),
+    wornLoggedAt: z.string().datetime().optional().nullable(),
+  })
+  .passthrough()
+
 export const createOutfitPlanSchema = z.object({
   outfitId: uuidSchema.optional().nullable(),
   generationBatchId: uuidSchema.optional().nullable(),
   title: z.string().trim().min(1).max(160),
-  occasion: z.string().trim().max(120).optional().nullable(),
+  occasion: plannerOccasionSchema.optional().nullable(),
   startAt: z.string().datetime(),
   endAt: z.string().datetime().optional().nullable(),
   allDay: z.boolean().default(false),
@@ -25,6 +84,7 @@ export const createOutfitPlanSchema = z.object({
   note: z.string().trim().max(500).optional().nullable(),
   status: statusSchema.default('planned'),
   source: sourceSchema.default('manual'),
+  metadata: outfitPlanMetadataSchema.optional(),
 })
 
 export const patchOutfitPlanSchema = createOutfitPlanSchema.partial()

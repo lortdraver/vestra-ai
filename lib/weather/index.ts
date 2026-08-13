@@ -1,4 +1,5 @@
 export * from './cache'
+export * from './normalization'
 export * from './provider'
 export * from './suitability'
 export * from './types'

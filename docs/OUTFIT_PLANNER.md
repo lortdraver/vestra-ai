@@ -1,10 +1,21 @@
 # Outfit Planner
 
-Milestone 6.3 introduces Vestra's internal weather-aware outfit planner.
+Vestra's planner is the calendar layer that turns wardrobe items, saved
+outfits, weather, and wear history into daily outfit decisions.
 
-## Database
+## Data Model
 
-The planner uses `outfit_plan` with user-scoped rows, nullable outfit and generation batch links, date range fields, all-day support, location fields, status, source, and metadata.
+The planner uses the existing `outfit_plan` table. No dedicated weather table is
+required for v1 because `outfit_plan.metadata` stores structured planner
+metadata:
+
+- `weatherSnapshot`: normalized weather at the time an outfit was scheduled;
+- `weatherChange`: later forecast-change assessment;
+- `weatherSuitability`: suitability level and message;
+- `wornLoggedAt`: timestamp set after a plan is marked worn.
+
+Planner rows remain user-scoped. Referenced outfits and generation batches are
+validated before a plan is created or changed.
 
 Statuses:
 
@@ -19,6 +30,20 @@ Sources:
 - `weather_suggestion`
 - `calendar_import`
 
+Occasions are canonical and localized in the UI:
+
+- `everyday`
+- `university`
+- `work`
+- `business`
+- `date`
+- `dinner`
+- `party`
+- `sport`
+- `travel`
+- `outdoor`
+- `formal_event`
+
 ## API
 
 ```http
@@ -29,28 +54,96 @@ PATCH /api/outfit-plans/:id
 DELETE /api/outfit-plans/:id
 ```
 
-All routes require authentication and only return plans owned by the current user.
+All routes require authentication and only return plans owned by the current
+user.
 
-## Security
+## Weather Flow
 
-When a plan references an outfit or generation batch, Vestra verifies ownership. Outfit plans reject foreign outfits, unavailable generation batches, deleted wardrobe items, and hallucinated item references. Marking a plan as worn uses M6.1 wear logging with an idempotency key of `plan:{id}` to prevent duplicate wear logs.
+The planner loads weather through the authenticated server route:
 
-## Weather-Aware Recommendations
+```http
+GET /api/weather?locationName=Baku
+GET /api/weather?latitude=40.4093&longitude=49.8671
+```
 
-The stylist request can include weather context. Before provider generation, Vestra applies deterministic suitability rules for hot, mild, cold, rain, snow, strong wind, high UV, and large temperature swings.
+The browser never calls an external weather provider directly and never sees
+weather credentials.
 
-The stylist still receives only authenticated, owned, active wardrobe items.
+The UI supports:
 
-## UI
+- manual city entry;
+- optional geolocation after a user click;
+- month calendar with weather summaries;
+- selected-day detail panel;
+- weather-aware outfit generation;
+- choosing saved outfits with suitability warnings;
+- forecast-change warnings after an outfit was scheduled.
 
-The planner page includes today's recommendation view, manual city entry, browser geolocation after user action, weather-aware candidates, planning for today, a 7-day list, and worn/skipped actions.
+## Stylist Integration
+
+Planner generation sends a normalized `weatherContext` to the existing stylist
+route. The stylist continues to receive only authenticated, owned, active
+wardrobe items. Before the provider call, deterministic weather filtering and
+ranking consider season, rain, snow, heat, cold, wind, and recently worn items.
+
+Vestra does not invent weather-proofing. If no rain-ready wardrobe pieces are
+known, the UI shows a warning instead of claiming the outfit is waterproof.
+
+## Saved Outfits
+
+Users can select an existing saved outfit for a day. Vestra evaluates the outfit
+against the selected day's forecast. If the saved outfit looks too warm, too
+light, or weak for rain/snow, the plan can still be scheduled, but the warning
+is stored in metadata and shown in the UI.
+
+## Mark As Worn
+
+Changing a plan to `worn` creates a wear log through the M6.1 wear service with
+idempotency key `plan:{planId}`. Repeated clicks do not create duplicate wear
+logs. Historical wear statistics remain independent from planner edits.
+
+## Analytics
+
+The planner emits privacy-safe first-party analytics events:
+
+- `planner_weather_loaded`
+- `planner_weather_failed`
+- `planner_outfit_generated`
+- `planner_outfit_scheduled`
+- `planner_outfit_changed`
+- `planner_weather_change_detected`
+- `planner_outfit_adapted`
+- `planner_outfit_marked_worn`
+- `planner_outfit_deleted`
+
+Events do not contain exact addresses, image URLs, storage keys, prompts,
+private notes, or outfit contents.
+
+## Failure Behavior
+
+Weather failures do not block manual planning or saved-outfit selection. The UI
+shows a localized warning and keeps the planner usable. If a weather-aware
+stylist request fails, users can retry or schedule an existing saved outfit.
 
 ## Manual Testing
 
-1. Set `WEATHER_PROVIDER=mock` in development.
-2. Sign in.
-3. Add a complete wardrobe with top, bottoms, and shoes.
-4. Open `/dashboard/planner`.
-5. Generate today's outfit.
-6. Save one candidate as today's plan.
-7. Mark the plan worn and verify repeated clicks do not create duplicate wear logs.
+1. Configure weather mode. For production-like local testing use:
+
+   ```env
+   WEATHER_PROVIDER="open_meteo"
+   WEATHER_API_BASE_URL="https://api.open-meteo.com/v1"
+   WEATHER_GEOCODING_API_BASE_URL="https://geocoding-api.open-meteo.com/v1"
+   WEATHER_REQUEST_TIMEOUT_MS="8000"
+   WEATHER_CACHE_TTL_SECONDS="900"
+   ```
+
+2. Sign in with a verified account.
+3. Add a complete wardrobe with a top, bottoms, and shoes.
+4. Save at least one stylist outfit.
+5. Open `/dashboard/planner`.
+6. Change the city and reload weather.
+7. Generate weather-aware outfits for a selected day.
+8. Schedule one candidate.
+9. Change weather data or wait for a materially different forecast and confirm
+   the warning appears.
+10. Mark the plan worn and verify repeated clicks do not duplicate wear logs.

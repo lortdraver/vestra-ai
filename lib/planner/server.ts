@@ -10,7 +10,11 @@ import {
 } from '@/lib/db/schema'
 import { createWearLogForUser } from '@/lib/wear/server'
 import type { CreateOutfitPlanInput, PatchOutfitPlanInput } from './validation'
-import { normalizePlanTimezone, toPlanDate } from './validation'
+import {
+  normalizePlanTimezone,
+  outfitPlanMetadataSchema,
+  toPlanDate,
+} from './validation'
 import type { OutfitPlanDto } from './types'
 
 type PlanRow = typeof outfitPlan.$inferSelect
@@ -34,7 +38,13 @@ function numberOrNull(value: string | null) {
   return Number.isFinite(number) ? number : null
 }
 
+function parseMetadata(row: PlanRow) {
+  const parsed = outfitPlanMetadataSchema.safeParse(row.metadata)
+  return parsed.success ? parsed.data : {}
+}
+
 export function toOutfitPlanDto(row: PlanRow): OutfitPlanDto {
+  const metadata = parseMetadata(row)
   return {
     id: row.id,
     outfitId: row.outfitId,
@@ -51,6 +61,9 @@ export function toOutfitPlanDto(row: PlanRow): OutfitPlanDto {
     note: row.note,
     status: row.status as OutfitPlanDto['status'],
     source: row.source as OutfitPlanDto['source'],
+    weatherSnapshot: metadata.weatherSnapshot ?? null,
+    weatherChange: metadata.weatherChange ?? null,
+    wornLoggedAt: metadata.wornLoggedAt ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }
@@ -156,13 +169,18 @@ export async function createOutfitPlanForUser(
       note: input.note ?? null,
       status: input.status,
       source: input.source,
+      metadata: input.metadata ?? {},
     })
     .returning()
 
   void trackServerEvent({
     eventName: 'planner_outfit_scheduled',
     userId,
-    properties: { status: created.status, source: created.source },
+    properties: {
+      status: created.status,
+      source: created.source,
+      hasWeatherSnapshot: Boolean(input.metadata?.weatherSnapshot),
+    },
     dedupeKey: `planner-created:${created.id}`,
   })
 
@@ -238,6 +256,7 @@ export async function updateOutfitPlanForUser(
         : input.longitude == null
           ? undefined
           : String(input.longitude),
+    metadata: input.metadata,
     updatedAt: new Date(),
   }
 
@@ -260,6 +279,57 @@ export async function updateOutfitPlanForUser(
       note: updated.note ?? undefined,
       timezone: updated.timezone,
       idempotencyKey: `plan:${updated.id}`,
+    })
+    const metadata = {
+      ...parseMetadata(updated),
+      wornLoggedAt: new Date().toISOString(),
+    }
+    const [withWearMetadata] = await db
+      .update(outfitPlan)
+      .set({ metadata, updatedAt: new Date() })
+      .where(and(eq(outfitPlan.id, id), eq(outfitPlan.userId, userId)))
+      .returning()
+    void trackServerEvent({
+      eventName: 'planner_outfit_marked_worn',
+      userId,
+      properties: { source: updated.source },
+      dedupeKey: `planner-worn:${updated.id}`,
+    })
+    return toOutfitPlanDto(withWearMetadata)
+  }
+
+  if (input.outfitId && input.outfitId !== existing.outfitId) {
+    void trackServerEvent({
+      eventName: 'planner_outfit_changed',
+      userId,
+      properties: { source: updated.source },
+      dedupeKey: `planner-changed:${updated.id}:${input.outfitId}`,
+    })
+    if (existing.weatherChange?.changed) {
+      void trackServerEvent({
+        eventName: 'planner_outfit_adapted',
+        userId,
+        properties: {
+          source: updated.source,
+          reasonCount: existing.weatherChange.reasons.length,
+        },
+        dedupeKey: `planner-adapted:${updated.id}:${input.outfitId}`,
+      })
+    }
+  }
+
+  if (
+    input.metadata?.weatherChange?.changed &&
+    !existing.weatherChange?.changed
+  ) {
+    void trackServerEvent({
+      eventName: 'planner_weather_change_detected',
+      userId,
+      properties: {
+        reasonCount: input.metadata.weatherChange.reasons.length,
+        temperatureDeltaC: input.metadata.weatherChange.temperatureDeltaC,
+      },
+      dedupeKey: `planner-weather-change:${updated.id}`,
     })
   }
 

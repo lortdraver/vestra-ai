@@ -1,5 +1,6 @@
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { trackServerEvent } from '@/lib/analytics/server'
 import { auth } from '@/lib/auth'
 import {
   createOutfitPlanForUser,
@@ -75,6 +76,14 @@ export async function GET(request: Request) {
     ...range,
     status: parsed.data.status,
     occasion: parsed.data.occasion,
+  })
+  void trackServerEvent({
+    eventName: 'planner_day_opened',
+    userId,
+    properties: {
+      hasDateRange: Boolean(range.startDate && range.endDate),
+      planCount: plans.length,
+    },
   })
 
   return NextResponse.json({ plans })

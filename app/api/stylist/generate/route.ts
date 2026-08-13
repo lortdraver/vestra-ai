@@ -1082,6 +1082,18 @@ export async function POST(request: Request) {
         dedupeKey: `outfit-created:${createdOutfit.id}`,
       })
     }
+    if (parsed.data.weatherContext) {
+      void trackServerEvent({
+        eventName: 'planner_outfit_generated',
+        userId,
+        locale: parsed.data.locale,
+        properties: {
+          candidateCount: createdOutfits.length,
+          requestType: getStylistRequestType(parsed.data),
+        },
+        dedupeKey: `planner-weather-generation:${batchRow.id}`,
+      })
+    }
 
     return NextResponse.json({
       result: {

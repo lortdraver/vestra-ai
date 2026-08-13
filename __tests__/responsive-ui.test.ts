@@ -17,6 +17,10 @@ const wardrobeClientSource = readFileSync(
   join(process.cwd(), 'components/wardrobe/wardrobe-page-client.tsx'),
   'utf8',
 )
+const plannerClientSource = readFileSync(
+  join(process.cwd(), 'components/planner/planner-page-client.tsx'),
+  'utf8',
+)
 const rootLayoutSource = readFileSync(
   join(process.cwd(), 'app/layout.tsx'),
   'utf8',
@@ -164,6 +168,18 @@ describe('responsive UI contracts', () => {
   it('keeps mobile wardrobe form controls at iOS-safe text size', () => {
     expect(wardrobeClientSource).toContain('text-base md:text-sm')
     expect(wardrobeClientSource).toContain('h-10')
+  })
+
+  it('keeps planner calendar mobile-first and weather-aware', () => {
+    expect(plannerClientSource).toContain('grid grid-cols-7')
+    expect(plannerClientSource).toContain('min-h-20')
+    expect(plannerClientSource).toContain('overflow-x-auto')
+    expect(plannerClientSource).toContain('normalizeWeatherForDate')
+    expect(plannerClientSource).toContain('toWeatherSnapshot')
+    expect(plannerClientSource).toContain('assessWeatherChange')
+    expect(plannerClientSource).toContain('weatherContextForStylist')
+    expect(plannerClientSource).toContain('saved=true')
+    expect(plannerClientSource).toContain('wornLoggedAt')
   })
 
   it('keeps existing wardrobe item actions wired', () => {

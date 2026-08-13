@@ -51,9 +51,15 @@
 - `BACKGROUND_REMOVAL_MODEL_ID` - model identifier sent to the background-removal API.
 - `BACKGROUND_REMOVAL_REQUEST_TIMEOUT_MS` - timeout for background-removal API calls.
 - `BACKGROUND_REMOVAL_SIZE` - remove.bg output size, defaults to `auto`.
-- `WEATHER_PROVIDER` - `mock` for explicit local development or `api` for a real provider.
-- `WEATHER_API_KEY` - required when `WEATHER_PROVIDER=api`.
-- `WEATHER_API_BASE_URL` - required weather API base URL. Vestra calls `/forecast`.
+- `WEATHER_PROVIDER` - `open_meteo` for the built-in production weather
+  adapter, `api` for a generic normalized-response adapter, or `mock` only for
+  explicit local development.
+- `WEATHER_API_KEY` - optional for `WEATHER_PROVIDER=open_meteo`; required when
+  `WEATHER_PROVIDER=api`.
+- `WEATHER_API_BASE_URL` - weather forecast API base URL. For Open-Meteo use
+  `https://api.open-meteo.com/v1`.
+- `WEATHER_GEOCODING_API_BASE_URL` - optional geocoding base URL for
+  `open_meteo`. Defaults to `https://geocoding-api.open-meteo.com/v1`.
 - `WEATHER_REQUEST_TIMEOUT_MS` - timeout for weather provider calls.
 - `WEATHER_CACHE_TTL_SECONDS` - in-memory weather cache TTL.
 
@@ -256,15 +262,17 @@ blocked in production and must not be used for public launch.
 Weather-aware planning uses server-only weather credentials:
 
 ```env
-WEATHER_PROVIDER="mock"
+WEATHER_PROVIDER="open_meteo"
 WEATHER_API_KEY=""
-WEATHER_API_BASE_URL=""
-WEATHER_REQUEST_TIMEOUT_MS="7000"
+WEATHER_API_BASE_URL="https://api.open-meteo.com/v1"
+WEATHER_GEOCODING_API_BASE_URL="https://geocoding-api.open-meteo.com/v1"
+WEATHER_REQUEST_TIMEOUT_MS="8000"
 WEATHER_CACHE_TTL_SECONDS="900"
 ```
 
 Use `WEATHER_PROVIDER=mock` only for explicit local development. Production
-weather mode requires a real provider and never falls back to fake weather.
+weather mode requires `open_meteo` or another real provider and never falls
+back to fake weather.
 
 Run a server-only sanitized connectivity check with:
 
@@ -293,8 +301,11 @@ Before public deployment, manually configure and verify:
   set `STYLIST_AI_API_KEY`, `STYLIST_AI_API_URL`, and `STYLIST_AI_MODEL_ID` only
   when stylist generation needs separate credentials.
 - `STYLIST_AI_REQUEST_TIMEOUT_MS=20000` for a bounded OpenRouter request.
-- `WEATHER_PROVIDER=api` with valid `WEATHER_API_KEY`,
-  `WEATHER_API_BASE_URL`, and timeout/cache values.
+- `WEATHER_PROVIDER=open_meteo` with
+  `WEATHER_API_BASE_URL=https://api.open-meteo.com/v1`,
+  `WEATHER_GEOCODING_API_BASE_URL=https://geocoding-api.open-meteo.com/v1`,
+  and timeout/cache values. If using `WEATHER_PROVIDER=api`, provide the
+  vendor's server-only `WEATHER_API_KEY` and normalized forecast endpoint.
 - `BACKGROUND_REMOVAL_PROVIDER=api` with valid background-removal credentials.
 - `STORAGE_DRIVER` uses a production cloud/object storage adapter. Local file
   storage is for development only and is not recommended for public deployment.

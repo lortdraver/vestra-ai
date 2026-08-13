@@ -1,89 +1,97 @@
-# Weather Provider
+# Weather Intelligence
 
-Milestone 6.3 adds a server-side weather abstraction for weather-aware outfit planning.
+Vestra weather is server-side only. Browser code never receives provider
+credentials and never calls the external weather API directly.
 
 ## Provider Modes
 
-- `WEATHER_PROVIDER=mock` enables deterministic development weather. It is blocked in production.
-- `WEATHER_PROVIDER=api` enables the real provider adapter and requires credentials.
-- Missing provider configuration returns `weather_credentials_missing`; Vestra does not silently fake weather when real mode is expected.
+- `WEATHER_PROVIDER=open_meteo` uses the production Open-Meteo adapter.
+- `WEATHER_PROVIDER=api` keeps the generic bearer-token adapter for another
+  vendor that already returns Vestra's normalized response shape.
+- `WEATHER_PROVIDER=mock` is allowed only for explicit local development and is
+  blocked in production.
 
-## Environment
+Recommended production variables:
 
 ```env
-WEATHER_PROVIDER="mock"
-WEATHER_API_KEY=""
-WEATHER_API_BASE_URL=""
-WEATHER_REQUEST_TIMEOUT_MS="7000"
+WEATHER_PROVIDER="open_meteo"
+WEATHER_API_BASE_URL="https://api.open-meteo.com/v1"
+WEATHER_GEOCODING_API_BASE_URL="https://geocoding-api.open-meteo.com/v1"
+WEATHER_REQUEST_TIMEOUT_MS="8000"
 WEATHER_CACHE_TTL_SECONDS="900"
 ```
 
-Weather credentials are server-only and are never exposed to the browser.
+`WEATHER_API_KEY` is intentionally optional for Open-Meteo. If Vestra switches
+to a paid weather vendor later, keep the key server-only and use a dedicated
+provider adapter or the existing generic `api` adapter.
 
-Run a server-only sanitized connectivity check with:
+## Normalized Model
+
+Provider responses are converted into a normalized `WeatherForecast` with:
+
+- location name, coordinates, and timezone;
+- current weather;
+- hourly forecast;
+- daily forecast;
+- temperature, feels-like, min/max temperature;
+- precipitation probability, rain, snow, wind, humidity;
+- condition and condition code.
+
+Planner and stylist logic consume `NormalizedWeatherContext`, not provider raw
+JSON. The context includes:
+
+- `temperatureBand`: `freezing`, `cold`, `cool`, `mild`, `warm`, `hot`;
+- `precipitation`: `none`, `rain`, `snow`;
+- `wind`: `calm`, `windy`.
+
+## Location
+
+Users set weather location explicitly in the planner. They can type a city such
+as Baku, Vienna, or Klagenfurt. Optional browser geolocation is only requested
+after the user clicks the location action. Vestra does not request continuous
+background location.
+
+The selected location is stored in browser localStorage for convenience and on
+individual outfit plans when scheduled. Coordinates are not sent to analytics.
+
+## Cache
+
+Forecasts are cached in memory by normalized city name or rounded coordinates.
+Default TTL is 900 seconds. Fresh cache hits avoid provider calls. If the
+provider fails but stale data exists, the weather API can return the stale
+forecast with `cache.stale=true`.
+
+## Diagnostics
+
+Safe logs:
+
+- `WEATHER_REQUEST_STARTED`
+- `WEATHER_REQUEST_COMPLETED`
+- `WEATHER_REQUEST_FAILED`
+- `WEATHER_CACHE_HIT`
+
+Logs may include provider, duration, cache state, status/code, date count, and
+whether a request used a city or coordinates. Logs must never include API keys,
+auth headers, exact unnecessary personal location data, or analytics payloads
+containing raw location text.
+
+Run:
 
 ```bash
 pnpm weather:diagnose
 ```
 
-The diagnostic reports provider mode, whether credentials are present, the
-request URL without secrets, HTTP status, timeout/rate-limit/invalid-location
-errors, and a short provider message. It never prints the API key.
+## Failure Behavior
 
-## Real Provider Contract
+Stable errors:
 
-Vestra intentionally does not hard-code a specific weather vendor. A real
-provider adapter must satisfy this request contract:
+- `weather_not_configured`
+- `weather_credentials_missing`
+- `weather_invalid_location`
+- `weather_location_not_found`
+- `weather_rate_limited`
+- `weather_timeout`
+- `weather_provider_unavailable`
 
-- endpoint: `GET ${WEATHER_API_BASE_URL}/forecast`;
-- auth: `Authorization: Bearer <WEATHER_API_KEY>`;
-- query by coordinates: `latitude`, `longitude`, `units=metric`;
-- query by manual location: `q`, `units=metric`;
-- timeout: `WEATHER_REQUEST_TIMEOUT_MS`.
-
-The response must be normalized or proxied into this shape:
-
-```json
-{
-  "location": {
-    "name": "Baku",
-    "latitude": 40.4093,
-    "longitude": 49.8671,
-    "timezone": "Asia/Baku"
-  },
-  "current": {
-    "time": "2026-07-12T10:00:00.000Z",
-    "temperatureC": 28,
-    "feelsLikeC": 30,
-    "precipitationProbability": 10,
-    "rainMm": 0,
-    "snowMm": 0,
-    "windKph": 14,
-    "humidity": 55,
-    "uvIndex": 7,
-    "condition": "clear"
-  },
-  "hourly": [],
-  "daily": []
-}
-```
-
-Supported `condition` values are `clear`, `cloudy`, `rain`, `snow`, `storm`,
-`wind`, and `unknown`. Provider errors are mapped to:
-
-- `weather_invalid_location` for invalid or unknown locations;
-- `weather_rate_limited` for HTTP 429;
-- `weather_timeout` for request timeout;
-- `weather_provider_unavailable` for other provider failures.
-
-## Cache
-
-Forecasts are cached in memory by rounded coordinates or city name. Fresh cache hits avoid provider calls. If the provider fails and stale cached data exists, the API returns the stale forecast with `cache.stale=true`.
-
-## Privacy
-
-Browser geolocation is requested only after the user clicks the location action. Coordinates are sent to the server for that request only and are not continuously tracked. The planner can also use manual city entry or a browser-local preferred location.
-
-## Normalization
-
-The app normalizes temperature, feels-like, rain/snow, precipitation probability, wind, humidity, UV, condition, sunrise/sunset, forecast time, and timezone. Celsius is used initially.
+Planner remains usable when weather fails. Users can still choose saved outfits
+and schedule manually; weather-aware generation falls back with a clear message.

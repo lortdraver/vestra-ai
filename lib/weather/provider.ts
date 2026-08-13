@@ -1,5 +1,6 @@
 import { ApiWeatherProvider } from './api-provider'
 import { MockWeatherProvider } from './mock-provider'
+import { OpenMeteoWeatherProvider } from './open-meteo-provider'
 import { WeatherProviderError, type WeatherProvider } from './types'
 
 export function getWeatherProvider(): WeatherProvider {
@@ -16,5 +17,13 @@ export function getWeatherProvider(): WeatherProvider {
     return new ApiWeatherProvider()
   }
 
-  throw new WeatherProviderError('weather_credentials_missing')
+  if (provider === 'open_meteo') {
+    return new OpenMeteoWeatherProvider()
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new WeatherProviderError('weather_not_configured')
+  }
+
+  return new MockWeatherProvider()
 }

@@ -6,6 +6,9 @@ import {
   getWeatherCacheKey,
   getWeatherProvider,
   getWeatherSignals,
+  normalizeWeatherForDate,
+  assessWeatherChange,
+  toWeatherSnapshot,
   setCachedForecast,
   WeatherProviderError,
   type WeatherForecast,
@@ -143,6 +146,7 @@ describe('weather provider selection', () => {
   })
 
   it('throws a structured missing credentials error without provider mode', () => {
+    vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('WEATHER_PROVIDER', '')
 
     expect(() => getWeatherProvider()).toThrow(WeatherProviderError)
@@ -153,6 +157,111 @@ describe('weather provider selection', () => {
     vi.stubEnv('WEATHER_PROVIDER', 'mock')
 
     expect(() => getWeatherProvider()).toThrow('weather_credentials_missing')
+  })
+
+  it('selects the Open-Meteo production provider explicitly', async () => {
+    vi.stubEnv('WEATHER_PROVIDER', 'open_meteo')
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      const value = String(url)
+      if (value.includes('geocoding')) {
+        return Response.json({
+          results: [
+            {
+              name: 'Baku',
+              country: 'Azerbaijan',
+              latitude: 40.4093,
+              longitude: 49.8671,
+              timezone: 'Asia/Baku',
+            },
+          ],
+        })
+      }
+      return Response.json({
+        current: {
+          time: '2026-07-12T08:00',
+          temperature_2m: 18,
+          apparent_temperature: 16,
+          precipitation: 1,
+          rain: 1,
+          snowfall: 0,
+          weather_code: 61,
+          relative_humidity_2m: 72,
+          wind_speed_10m: 20,
+        },
+        daily: {
+          time: ['2026-07-12'],
+          weather_code: [61],
+          temperature_2m_max: [20],
+          temperature_2m_min: [14],
+          precipitation_probability_max: [70],
+          rain_sum: [2],
+          snowfall_sum: [0],
+          wind_speed_10m_max: [24],
+          sunrise: ['2026-07-12T06:00'],
+          sunset: ['2026-07-12T20:00'],
+        },
+        hourly: { time: [], temperature_2m: [], precipitation_probability: [] },
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await getWeatherProvider().getForecast({
+      locationName: 'Baku',
+    })
+
+    expect(result.provider).toBe('open_meteo')
+    expect(result.current.condition).toBe('rain')
+    expect(result.daily[0].minTemperatureC).toBe(14)
+  })
+
+  it('maps Open-Meteo geocoding misses to location-not-found', async () => {
+    vi.stubEnv('WEATHER_PROVIDER', 'open_meteo')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ results: [] })),
+    )
+
+    await expect(
+      getWeatherProvider().getForecast({ locationName: 'Unknown place' }),
+    ).rejects.toMatchObject({ code: 'weather_location_not_found' })
+  })
+
+  it('maps Open-Meteo rate limits to weather_rate_limited', async () => {
+    vi.stubEnv('WEATHER_PROVIDER', 'open_meteo')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 429 })),
+    )
+
+    await expect(
+      getWeatherProvider().getForecast({ locationName: 'Baku' }),
+    ).rejects.toMatchObject({ code: 'weather_rate_limited' })
+  })
+
+  it('maps Open-Meteo provider failures to weather_provider_unavailable', async () => {
+    vi.stubEnv('WEATHER_PROVIDER', 'open_meteo')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 503 })),
+    )
+
+    await expect(
+      getWeatherProvider().getForecast({ locationName: 'Baku' }),
+    ).rejects.toMatchObject({ code: 'weather_provider_unavailable' })
+  })
+
+  it('maps Open-Meteo aborted requests to weather_timeout', async () => {
+    vi.stubEnv('WEATHER_PROVIDER', 'open_meteo')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new DOMException('The operation was aborted.', 'AbortError')
+      }),
+    )
+
+    await expect(
+      getWeatherProvider().getForecast({ locationName: 'Baku' }),
+    ).rejects.toMatchObject({ code: 'weather_timeout' })
   })
 })
 
@@ -194,5 +303,64 @@ describe('weather suitability', () => {
       wardrobe.map((item) => item.id),
     )
     expect(result.missingCategories).toContain('outerwear')
+  })
+})
+
+describe('weather normalization and forecast change detection', () => {
+  it('normalizes weather into fashion context bands', () => {
+    const context = normalizeWeatherForDate(forecast, '2026-07-12')
+
+    expect(context.temperatureBand).toBe('hot')
+    expect(context.precipitation).toBe('rain')
+    expect(context.wind).toBe('windy')
+    expect(context.rainExpected).toBe(true)
+  })
+
+  it('ignores small weather changes', () => {
+    const previous = toWeatherSnapshot(
+      normalizeWeatherForDate(forecast, '2026-07-12'),
+    )
+    const current = { ...previous, feelsLikeC: previous.feelsLikeC + 2 }
+
+    expect(assessWeatherChange(previous, current).changed).toBe(false)
+  })
+
+  it('flags material temperature changes and introduced rain', () => {
+    const dryForecast: WeatherForecast = {
+      ...forecast,
+      current: {
+        ...forecast.current,
+        temperatureC: 14,
+        feelsLikeC: 14,
+        precipitationProbability: 0,
+        rainMm: 0,
+        condition: 'cloudy',
+      },
+      daily: [
+        {
+          ...forecast.daily[0],
+          temperatureC: 14,
+          feelsLikeC: 14,
+          minTemperatureC: 12,
+          maxTemperatureC: 16,
+          precipitationProbability: 0,
+          rainMm: 0,
+          snowMm: 0,
+          windKph: 10,
+          condition: 'cloudy',
+        },
+      ],
+    }
+    const previous = toWeatherSnapshot(
+      normalizeWeatherForDate(dryForecast, '2026-07-12'),
+    )
+    const current = toWeatherSnapshot(
+      normalizeWeatherForDate(forecast, '2026-07-12'),
+    )
+
+    const assessment = assessWeatherChange(previous, current)
+    expect(assessment.changed).toBe(true)
+    expect(assessment.reasons).toContain('temperature_changed')
+    expect(assessment.reasons).toContain('rain_introduced')
   })
 })
