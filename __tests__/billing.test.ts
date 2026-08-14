@@ -12,6 +12,7 @@ import {
   switchPaddleSubscriptionPlan,
   verifyPaddleSignature,
 } from '@/lib/billing'
+import { isSubscriptionLifecycleEvent } from '@/lib/billing/paddle-events'
 import {
   getSubscriptionPageState,
   getSubscriptionSwitchTarget,
@@ -218,6 +219,31 @@ describe('subscription lifecycle policy', () => {
 
     expect(state.isPro).toBe(false)
     expect(state.entitlementReason).toBe('paused')
+  })
+
+  it('does not grant Paddle Pro without a provider subscription id', () => {
+    const state = evaluateSubscriptionLifecycle(
+      row({
+        status: 'past_due',
+        providerSubscriptionId: null,
+      }),
+      new Date('2026-08-15T00:00:00.000Z'),
+    )
+
+    expect(state.isPro).toBe(false)
+    expect(state.paymentIssue).toBe(false)
+    expect(state.entitlementReason).toBe('inactive')
+  })
+})
+
+describe('Paddle webhook event policy', () => {
+  it('only lets subscription lifecycle events update subscription snapshots', () => {
+    expect(isSubscriptionLifecycleEvent('subscription.created')).toBe(true)
+    expect(isSubscriptionLifecycleEvent('subscription.past_due')).toBe(true)
+    expect(isSubscriptionLifecycleEvent('transaction.completed')).toBe(false)
+    expect(isSubscriptionLifecycleEvent('transaction.payment_failed')).toBe(
+      false,
+    )
   })
 })
 

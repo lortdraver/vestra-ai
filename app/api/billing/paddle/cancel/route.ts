@@ -3,7 +3,10 @@ import { NextResponse } from 'next/server'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { auth } from '@/lib/auth'
 import { cancelPaddleSubscription, PaddleApiError } from '@/lib/billing'
-import { getLatestPaddleSubscriptionForUser } from '@/lib/billing/server'
+import {
+  getLatestPaddleSubscriptionForUser,
+  markPaddleSubscriptionOrphaned,
+} from '@/lib/billing/server'
 
 export async function POST() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -46,6 +49,12 @@ export async function POST() {
     })
   } catch (error) {
     if (error instanceof PaddleApiError) {
+      if (error.code === 'paddle_subscription_not_found') {
+        await markPaddleSubscriptionOrphaned(
+          row,
+          'provider_subscription_not_found',
+        )
+      }
       return NextResponse.json(
         { error: error.code, code: error.code },
         { status: error.status },

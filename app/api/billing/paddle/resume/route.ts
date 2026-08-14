@@ -6,7 +6,10 @@ import {
   PaddleApiError,
   resumePaddleScheduledCancellation,
 } from '@/lib/billing'
-import { getLatestPaddleSubscriptionForUser } from '@/lib/billing/server'
+import {
+  getLatestPaddleSubscriptionForUser,
+  markPaddleSubscriptionOrphaned,
+} from '@/lib/billing/server'
 
 export async function POST() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -41,6 +44,12 @@ export async function POST() {
     return NextResponse.json({ ok: true, status: 'pending_webhook' })
   } catch (error) {
     if (error instanceof PaddleApiError) {
+      if (error.code === 'paddle_subscription_not_found') {
+        await markPaddleSubscriptionOrphaned(
+          row,
+          'provider_subscription_not_found',
+        )
+      }
       return NextResponse.json(
         { error: error.code, code: error.code },
         { status: error.status },

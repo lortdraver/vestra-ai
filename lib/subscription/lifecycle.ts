@@ -62,6 +62,21 @@ export function evaluateSubscriptionLifecycle(
     }
   }
 
+  if (
+    row.providerKey === 'paddle' &&
+    row.planKey === 'premium' &&
+    !row.providerSubscriptionId
+  ) {
+    return {
+      status: 'inactive',
+      isPro: false,
+      paymentIssue: false,
+      graceUntil: null,
+      accessUntil: null,
+      entitlementReason: 'inactive',
+    }
+  }
+
   const status = toSubscriptionStatus(row.status)
   if (status === 'active') {
     const accessUntil = row.cancelAtPeriodEnd

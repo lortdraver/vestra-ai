@@ -11,6 +11,10 @@ import {
   getIntervalForPaddlePriceId,
   getPaddleWebhookConfig,
 } from './paddle-config'
+import {
+  isSubscriptionLifecycleEvent,
+  supportedPaddleWebhookEvents,
+} from './paddle-events'
 import { verifyPaddleSignature } from './paddle-signature'
 
 export type PaddleWebhookProcessResult = {
@@ -31,19 +35,6 @@ export class PaddleWebhookError extends Error {
     super(code)
   }
 }
-
-const supportedEvents = new Set([
-  'transaction.completed',
-  'transaction.payment_failed',
-  'subscription.created',
-  'subscription.activated',
-  'subscription.updated',
-  'subscription.canceled',
-  'subscription.past_due',
-  'subscription.paused',
-  'subscription.resumed',
-  'subscription.trialing',
-])
 
 function toDate(value: unknown) {
   if (!value || typeof value !== 'string') return null
@@ -396,7 +387,7 @@ export async function processPaddleWebhook(
         })
         .returning()
 
-  if (!supportedEvents.has(data.eventType)) {
+  if (!supportedPaddleWebhookEvents.has(data.eventType)) {
     await db
       .update(billingWebhookEvent)
       .set({
@@ -413,7 +404,9 @@ export async function processPaddleWebhook(
     }
   }
 
-  const upsertStatus = await upsertPaddleSubscription(data)
+  const upsertStatus = isSubscriptionLifecycleEvent(data.eventType)
+    ? await upsertPaddleSubscription(data)
+    : 'processed'
   await recordPaddleTransaction(data)
   const status =
     upsertStatus === 'stale'

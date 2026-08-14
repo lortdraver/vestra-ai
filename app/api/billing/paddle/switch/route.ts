@@ -4,7 +4,10 @@ import { z } from 'zod'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { auth } from '@/lib/auth'
 import { PaddleApiError, switchPaddleSubscriptionPlan } from '@/lib/billing'
-import { getLatestPaddleSubscriptionForUser } from '@/lib/billing/server'
+import {
+  getLatestPaddleSubscriptionForUser,
+  markPaddleSubscriptionOrphaned,
+} from '@/lib/billing/server'
 
 const switchSchema = z.object({
   interval: z.enum(['monthly', 'annual']),
@@ -65,6 +68,12 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     if (error instanceof PaddleApiError) {
+      if (error.code === 'paddle_subscription_not_found') {
+        await markPaddleSubscriptionOrphaned(
+          row,
+          'provider_subscription_not_found',
+        )
+      }
       return NextResponse.json(
         { error: error.code, code: error.code },
         { status: error.status },

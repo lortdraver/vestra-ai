@@ -47,6 +47,47 @@ function intervalFor(priceId) {
   return null
 }
 
+async function markOrphaned(client, local, reason, apply) {
+  if (apply) {
+    await client.query(
+      `update "subscription"
+       set "planKey" = 'free', "status" = 'inactive',
+           "currentPeriodStart" = null, "currentPeriodEnd" = null,
+           "cancelAtPeriodEnd" = false, "scheduledChangeAction" = null,
+           "scheduledChangeAt" = null, "lastProviderEventAt" = now(),
+           "metadata" = coalesce("metadata", '{}'::jsonb) || $1::jsonb,
+           "updatedAt" = now()
+       where id = $2`,
+      [
+        JSON.stringify({
+          reconciliation: {
+            reason,
+            confirmedAt: new Date().toISOString(),
+          },
+        }),
+        local.id,
+      ],
+    )
+  }
+
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        dryRun: !apply,
+        userFound: true,
+        providerSubscriptionFound: false,
+        localSubscriptionStatus: local.status,
+        driftDetected: true,
+        repaired: Boolean(apply),
+        reason,
+      },
+      null,
+      2,
+    ),
+  )
+}
+
 loadEnv()
 
 const email = getArg('--email')
@@ -89,7 +130,7 @@ try {
     [currentUser.id, 'paddle'],
   )
   const local = localResult.rows[0]
-  if (!local?.providerSubscriptionId) {
+  if (!local) {
     console.log(
       JSON.stringify(
         { ok: false, code: 'provider_mapping_missing', userFound: true },
@@ -98,6 +139,11 @@ try {
       ),
     )
     process.exit(1)
+  }
+
+  if (!local.providerSubscriptionId) {
+    await markOrphaned(client, local, 'missing_provider_subscription_id', apply)
+    return
   }
 
   const response = await fetch(
@@ -109,6 +155,11 @@ try {
       },
     },
   )
+  if (response.status === 404) {
+    await markOrphaned(client, local, 'provider_subscription_not_found', apply)
+    return
+  }
+
   if (!response.ok) {
     console.log(
       JSON.stringify(
