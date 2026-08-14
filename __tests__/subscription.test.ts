@@ -19,6 +19,13 @@ describe('subscription plans and feature flags', () => {
     expect(getSubscriptionPlan('unknown').key).toBe('free')
   })
 
+  it('matches the Paddle Sandbox EUR catalog currency', () => {
+    const premium = getSubscriptionPlan('premium')
+
+    expect(premium.priceMonthlyCents).toBe(499)
+    expect(premium.currency).toBe('EUR')
+  })
+
   it('identifies Premium plans and features', () => {
     const premium = getSubscriptionPlan('premium')
 

@@ -12,6 +12,7 @@ import {
   switchPaddleSubscriptionPlan,
   verifyPaddleSignature,
 } from '@/lib/billing'
+import { getBillingCopy } from '@/lib/billing/copy'
 import { isSubscriptionLifecycleEvent } from '@/lib/billing/paddle-events'
 import {
   getSubscriptionPageState,
@@ -116,6 +117,15 @@ describe('Paddle config', () => {
     expect(monthly.customData).toEqual({ vestraUserId: 'user_1' })
     expect(getIntervalForPaddlePriceId('pri_annual')).toBe('annual')
     expect(getIntervalForPaddlePriceId('client_supplied_bad_id')).toBeNull()
+  })
+})
+
+describe('billing copy', () => {
+  it('displays the Paddle Sandbox EUR catalog prices', () => {
+    const copy = getBillingCopy('en')
+
+    expect(copy.monthlyPrice).toBe('€4.99/month')
+    expect(copy.annualPrice).toBe('€39.99/year')
   })
 })
 

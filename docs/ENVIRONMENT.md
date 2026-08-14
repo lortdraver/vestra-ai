@@ -68,8 +68,10 @@
 - `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` - Paddle client-side token used by
   Paddle.js.
 - `PADDLE_WEBHOOK_SECRET` - server-only webhook signing secret.
-- `PADDLE_PRO_MONTHLY_PRICE_ID` - trusted Paddle sandbox monthly price id.
-- `PADDLE_PRO_ANNUAL_PRICE_ID` - trusted Paddle sandbox annual price id.
+- `PADDLE_PRO_MONTHLY_PRICE_ID` - trusted Paddle sandbox monthly price id for
+  the active EUR 4.99/month Vestra Pro price.
+- `PADDLE_PRO_ANNUAL_PRICE_ID` - trusted Paddle sandbox annual price id for the
+  active EUR 39.99/year Vestra Pro price.
 - `PADDLE_REQUEST_TIMEOUT_MS` - timeout for Paddle API calls.
 - `PADDLE_PAST_DUE_GRACE_DAYS` - dynamic grace period for `past_due`
   subscription access. Defaults to `3`, clamped between 0 and 30.

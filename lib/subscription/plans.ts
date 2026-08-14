@@ -31,7 +31,7 @@ export const subscriptionPlans = {
     key: 'free',
     name: 'Free',
     priceMonthlyCents: 0,
-    currency: 'USD',
+    currency: 'EUR',
     trialDays: 0,
     features: ['wardrobe_core', 'basic_ai_analysis', 'basic_stylist'],
     limits: freeLimits,
@@ -40,7 +40,7 @@ export const subscriptionPlans = {
     key: 'premium',
     name: 'Vestra Pro',
     priceMonthlyCents: 499,
-    currency: 'USD',
+    currency: 'EUR',
     trialDays: premiumTrialDays,
     features: [
       'wardrobe_core',

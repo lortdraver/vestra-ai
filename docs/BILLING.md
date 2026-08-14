@@ -17,9 +17,9 @@ Public product name:
 
 Pricing:
 
-- Free: `$0`
-- Vestra Pro Monthly: `$4.99/month`
-- Vestra Pro Annual: `$39.99/year`
+- Free: `€0`
+- Vestra Pro Monthly: `€4.99/month`
+- Vestra Pro Annual: `€39.99/year`
 
 ## Entitlements
 
@@ -80,6 +80,11 @@ PADDLE_PRO_ANNUAL_PRICE_ID=""
 PADDLE_REQUEST_TIMEOUT_MS="10000"
 PADDLE_PAST_DUE_GRACE_DAYS="3"
 ```
+
+`PADDLE_PRO_MONTHLY_PRICE_ID` and `PADDLE_PRO_ANNUAL_PRICE_ID` must point to
+the active Paddle Sandbox Vestra Pro prices. The current sandbox catalog is
+EUR 4.99 monthly and EUR 39.99 annual; do not put API keys, webhook secrets, or
+client tokens in committed files.
 
 Optional:
 
