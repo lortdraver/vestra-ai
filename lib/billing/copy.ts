@@ -13,17 +13,36 @@ export const billingCopy = {
     annualSavings: 'Aylıq plana nisbətən təxminən 33% qənaət',
     upgrade: 'Pro-ya keç',
     manage: 'Abunəliyi idarə et',
+    cancel: 'Abunəliyi ləğv et',
+    resume: 'Abunəliyi bərpa et',
+    switchToMonthly: 'Aylıq plana keç',
+    switchToAnnual: 'İllik plana keç',
+    updatePaymentMethod: 'Ödəniş üsulunu yenilə',
     signIn: 'Daxil olun və checkout-a davam edin',
     currentPlan: 'Cari plan',
+    cancellationScheduled: 'Ləğv etmə planlaşdırılıb',
+    accessUntil: 'Pro girişi {date} tarixinədək aktivdir',
+    paymentIssue: 'Ödəniş problemi',
+    graceUntil: 'Güzəşt müddəti {date} tarixinədək aktivdir',
+    previousProEnded: 'Əvvəlki Pro abunəliyi bitib',
+    subscriptionPaused: 'Abunəlik dayandırılıb',
+    sandboxBadge: 'Paddle Sandbox',
     processing: 'Checkout hazırlanır...',
+    actionPending:
+      'Dəyişiklik Paddle tərəfindən təsdiqləndikdən sonra status yenilənəcək.',
     configuredLater:
       'Paddle sandbox dəyişənləri tamamlandıqdan sonra checkout açılacaq.',
     checkoutFailed: 'Checkout başlatmaq olmadı.',
     portalFailed: 'Billing portalını açmaq olmadı.',
+    lifecycleActionFailed: 'Abunəlik əməliyyatını tamamlamaq olmadı.',
+    alreadyActive:
+      'Pro abunəliyiniz artıq aktivdir. Planı dəyişmək üçün ayrıca keçid əməliyyatından istifadə edin.',
     ends: 'Bitmə tarixi {date}',
     nextBilling: 'Növbəti ödəniş {date}',
     processingWebhook:
       'Ödənişdən sonra Pro statusu təsdiqlənmiş webhook gələndə aktiv olacaq.',
+    confirmCancel:
+      'Abunəliyi ləğv etmək istəyirsiniz? Pro girişi ödənilmiş müddətin sonuna qədər qalacaq.',
     features: {
       free: ['30 geyim', 'Həftədə 5 stilist sorğusu', '10 saxlanılan kombin'],
       pro: [
@@ -46,17 +65,36 @@ export const billingCopy = {
     annualSavings: 'Save about 33% compared with monthly',
     upgrade: 'Upgrade to Pro',
     manage: 'Manage subscription',
+    cancel: 'Cancel subscription',
+    resume: 'Resume subscription',
+    switchToMonthly: 'Switch to Monthly',
+    switchToAnnual: 'Switch to Annual',
+    updatePaymentMethod: 'Update payment method',
     signIn: 'Sign in to continue to checkout',
     currentPlan: 'Current plan',
+    cancellationScheduled: 'Cancellation scheduled',
+    accessUntil: 'Pro access remains active until {date}',
+    paymentIssue: 'Payment issue',
+    graceUntil: 'Grace access remains active until {date}',
+    previousProEnded: 'Previous Pro subscription ended',
+    subscriptionPaused: 'Subscription paused',
+    sandboxBadge: 'Paddle Sandbox',
     processing: 'Preparing checkout...',
+    actionPending:
+      'Your status updates after Paddle confirms the change by webhook.',
     configuredLater:
       'Checkout will open after Paddle sandbox variables are configured.',
     checkoutFailed: 'Unable to start checkout.',
     portalFailed: 'Unable to open the billing portal.',
+    lifecycleActionFailed: 'Unable to complete the subscription action.',
+    alreadyActive:
+      'Your Pro subscription is already active. Use plan switching instead of opening a new checkout.',
     ends: 'Ends {date}',
     nextBilling: 'Next billing {date}',
     processingWebhook:
       'After payment, Pro activates only after Vestra receives the verified webhook.',
+    confirmCancel:
+      'Cancel your subscription? Your Pro access remains active until the end of the paid period.',
     features: {
       free: [
         '30 wardrobe items',
@@ -83,17 +121,36 @@ export const billingCopy = {
     annualSavings: 'Экономия около 33% по сравнению с помесячной оплатой',
     upgrade: 'Перейти на Pro',
     manage: 'Управлять подпиской',
+    cancel: 'Отменить подписку',
+    resume: 'Возобновить подписку',
+    switchToMonthly: 'Перейти на месячный план',
+    switchToAnnual: 'Перейти на годовой план',
+    updatePaymentMethod: 'Обновить способ оплаты',
     signIn: 'Войдите, чтобы перейти к оплате',
     currentPlan: 'Текущий план',
+    cancellationScheduled: 'Отмена запланирована',
+    accessUntil: 'Доступ Pro активен до {date}',
+    paymentIssue: 'Проблема с оплатой',
+    graceUntil: 'Льготный доступ активен до {date}',
+    previousProEnded: 'Предыдущая подписка Pro завершилась',
+    subscriptionPaused: 'Подписка приостановлена',
+    sandboxBadge: 'Paddle Sandbox',
     processing: 'Готовим checkout...',
+    actionPending:
+      'Статус обновится после подтверждения изменения через webhook Paddle.',
     configuredLater:
-      'Checkout откроется после настройки Paddle sandbox переменных.',
+      'Checkout откроется после настройки переменных Paddle sandbox.',
     checkoutFailed: 'Не удалось запустить checkout.',
     portalFailed: 'Не удалось открыть billing portal.',
+    lifecycleActionFailed: 'Не удалось выполнить действие с подпиской.',
+    alreadyActive:
+      'Ваша подписка Pro уже активна. Используйте смену плана вместо новой оплаты.',
     ends: 'Закончится {date}',
     nextBilling: 'Следующее списание {date}',
     processingWebhook:
       'После оплаты Pro активируется только после проверенного webhook в Vestra.',
+    confirmCancel:
+      'Отменить подписку? Доступ Pro останется активным до конца оплаченного периода.',
     features: {
       free: [
         '30 вещей',
@@ -108,7 +165,7 @@ export const billingCopy = {
       ],
     },
   },
-} satisfies Record<Locale, Record<string, unknown>>
+}
 
 export function getBillingCopy(locale: Locale) {
   return billingCopy[locale]

@@ -18,7 +18,10 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { AccountActions } from '@/components/account/account-actions'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { ManageBillingButton } from '@/components/billing/pricing-client'
+import {
+  BillingActionButton,
+  ManageBillingButton,
+} from '@/components/billing/pricing-client'
 import Link from 'next/link'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -73,7 +76,7 @@ export default async function AccountPage() {
         .where(eq(subscriptionUsage.userId, session.user.id)),
     ])
 
-  const initials = currentUser.name
+  const initials = (currentUser.name || currentUser.email)
     .split(' ')
     .map((part) => part[0])
     .join('')
@@ -184,10 +187,21 @@ export default async function AccountPage() {
         </AccountCard>
 
         <AccountCard title={dictionary.account.currentPlan}>
+          {subscription.paymentIssue ? (
+            <p className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {billingCopy.paymentIssue}
+            </p>
+          ) : null}
           <p className="text-sm text-muted-foreground">
-            {subscription.isPremium
-              ? dictionary.subscription.premiumActive
-              : dictionary.subscription.freeActive}
+            {subscription.paymentIssue
+              ? billingCopy.paymentIssue
+              : subscription.status === 'paused'
+                ? billingCopy.subscriptionPaused
+                : subscription.status === 'canceled' && !subscription.isPremium
+                  ? billingCopy.previousProEnded
+                  : subscription.isPremium
+                    ? dictionary.subscription.premiumActive
+                    : dictionary.subscription.freeActive}
           </p>
           {subscription.billingInterval ? (
             <p className="text-sm">
@@ -209,11 +223,48 @@ export default async function AccountPage() {
                   )}
             </p>
           ) : null}
+          {subscription.graceUntil ? (
+            <p className="text-sm text-muted-foreground">
+              {billingCopy.graceUntil.replace(
+                '{date}',
+                subscription.graceUntil.toLocaleDateString(),
+              )}
+            </p>
+          ) : null}
+          {subscription.cancelAtPeriodEnd && subscription.accessUntil ? (
+            <p className="rounded-lg border border-accent/20 bg-accent/10 px-3 py-2 text-sm text-accent">
+              {billingCopy.accessUntil.replace(
+                '{date}',
+                subscription.accessUntil.toLocaleDateString(),
+              )}
+            </p>
+          ) : null}
           {subscription.isPremium ? (
-            <ManageBillingButton
-              label={billingCopy.manage}
-              copy={billingCopy}
-            />
+            <div className="grid gap-2 sm:grid-cols-2">
+              <ManageBillingButton
+                label={
+                  subscription.paymentIssue
+                    ? billingCopy.updatePaymentMethod
+                    : billingCopy.manage
+                }
+                copy={billingCopy}
+              />
+              {subscription.cancelAtPeriodEnd ? (
+                <BillingActionButton
+                  endpoint="/api/billing/paddle/resume"
+                  label={billingCopy.resume}
+                  copy={billingCopy}
+                />
+              ) : (
+                <BillingActionButton
+                  endpoint="/api/billing/paddle/cancel"
+                  label={billingCopy.cancel}
+                  copy={billingCopy}
+                  variant="destructive"
+                  confirmMessage={billingCopy.confirmCancel}
+                />
+              )}
+            </div>
           ) : (
             <Link
               href="/pricing"

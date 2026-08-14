@@ -71,6 +71,8 @@
 - `PADDLE_PRO_MONTHLY_PRICE_ID` - trusted Paddle sandbox monthly price id.
 - `PADDLE_PRO_ANNUAL_PRICE_ID` - trusted Paddle sandbox annual price id.
 - `PADDLE_REQUEST_TIMEOUT_MS` - timeout for Paddle API calls.
+- `PADDLE_PAST_DUE_GRACE_DAYS` - dynamic grace period for `past_due`
+  subscription access. Defaults to `3`, clamped between 0 and 30.
 
 ## Public Variables
 
@@ -301,6 +303,7 @@ PADDLE_WEBHOOK_SECRET=""
 PADDLE_PRO_MONTHLY_PRICE_ID=""
 PADDLE_PRO_ANNUAL_PRICE_ID=""
 PADDLE_REQUEST_TIMEOUT_MS="10000"
+PADDLE_PAST_DUE_GRACE_DAYS="3"
 ```
 
 The webhook URL is:
@@ -341,8 +344,8 @@ Before public deployment, manually configure and verify:
   vendor's server-only `WEATHER_API_KEY` and normalized forecast endpoint.
 - `PADDLE_ENVIRONMENT=sandbox`, `PADDLE_API_KEY`,
   `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`, `PADDLE_WEBHOOK_SECRET`,
-  `PADDLE_PRO_MONTHLY_PRICE_ID`, and `PADDLE_PRO_ANNUAL_PRICE_ID` are set for
-  Paddle sandbox testing.
+  `PADDLE_PRO_MONTHLY_PRICE_ID`, `PADDLE_PRO_ANNUAL_PRICE_ID`, and
+  `PADDLE_PAST_DUE_GRACE_DAYS` are set for Paddle sandbox testing.
 - `BACKGROUND_REMOVAL_PROVIDER=api` with valid background-removal credentials.
 - `STORAGE_DRIVER` uses a production cloud/object storage adapter. Local file
   storage is for development only and is not recommended for public deployment.

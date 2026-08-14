@@ -9,6 +9,7 @@ import { getLocale } from '@/lib/i18n/server'
 import { getSubscriptionSnapshot } from '@/lib/subscription/server'
 import { buttonVariants } from '@/components/ui/button'
 import {
+  BillingActionButton,
   ManageBillingButton,
   PaddleCheckoutButton,
 } from '@/components/billing/pricing-client'
@@ -69,8 +70,31 @@ export default async function PricingPage() {
           features={copy.features.pro}
           action={
             session?.user ? (
-              subscription?.isPremium ? (
-                <ManageBillingButton label={copy.manage} copy={copy} />
+              subscription?.paymentIssue ? (
+                <ManageBillingButton
+                  label={copy.updatePaymentMethod}
+                  copy={copy}
+                />
+              ) : subscription?.isPremium &&
+                subscription.billingInterval === 'monthly' ? (
+                <CurrentPlanNote
+                  copy={copy}
+                  note={
+                    subscription.cancelAtPeriodEnd && subscription.accessUntil
+                      ? copy.accessUntil.replace(
+                          '{date}',
+                          subscription.accessUntil.toLocaleDateString(),
+                        )
+                      : null
+                  }
+                />
+              ) : subscription?.isPremium ? (
+                <BillingActionButton
+                  endpoint="/api/billing/paddle/switch"
+                  label={copy.switchToMonthly}
+                  copy={copy}
+                  body={{ interval: 'monthly' }}
+                />
               ) : (
                 <PaddleCheckoutButton
                   interval="monthly"
@@ -92,8 +116,31 @@ export default async function PricingPage() {
           features={copy.features.pro}
           action={
             session?.user ? (
-              subscription?.isPremium ? (
-                <ManageBillingButton label={copy.manage} copy={copy} />
+              subscription?.paymentIssue ? (
+                <ManageBillingButton
+                  label={copy.updatePaymentMethod}
+                  copy={copy}
+                />
+              ) : subscription?.isPremium &&
+                subscription.billingInterval === 'annual' ? (
+                <CurrentPlanNote
+                  copy={copy}
+                  note={
+                    subscription.cancelAtPeriodEnd && subscription.accessUntil
+                      ? copy.accessUntil.replace(
+                          '{date}',
+                          subscription.accessUntil.toLocaleDateString(),
+                        )
+                      : null
+                  }
+                />
+              ) : subscription?.isPremium ? (
+                <BillingActionButton
+                  endpoint="/api/billing/paddle/switch"
+                  label={copy.switchToAnnual}
+                  copy={copy}
+                  body={{ interval: 'annual' }}
+                />
               ) : (
                 <PaddleCheckoutButton
                   interval="annual"
@@ -110,6 +157,23 @@ export default async function PricingPage() {
         />
       </section>
     </main>
+  )
+}
+
+function CurrentPlanNote({
+  copy,
+  note,
+}: {
+  copy: ReturnType<typeof getBillingCopy>
+  note: string | null
+}) {
+  return (
+    <div className="grid gap-2">
+      <p className="text-sm font-medium text-muted-foreground">
+        {copy.currentPlan}
+      </p>
+      {note ? <p className="text-xs text-muted-foreground">{note}</p> : null}
+    </div>
   )
 }
 

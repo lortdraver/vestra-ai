@@ -19,6 +19,8 @@
     "user:role": "node scripts/set-user-role.mjs",
     "auth:diagnose-user": "node scripts/diagnose-auth-user.mjs",
     "auth:diagnose-origin": "node scripts/diagnose-auth-origin.mjs",
+    "billing:diagnose": "node scripts/diagnose-billing.mjs",
+    "billing:reconcile": "node scripts/reconcile-billing.mjs",
     "ai:diagnose:openrouter": "node scripts/diagnose-openrouter.mjs",
     "weather:diagnose": "node scripts/diagnose-weather.mjs",
     "background-removal:diagnose": "node scripts/diagnose-background-removal.mjs",

@@ -297,6 +297,8 @@ export const subscription = pgTable(
     currentPeriodStart: timestamp('currentPeriodStart'),
     currentPeriodEnd: timestamp('currentPeriodEnd'),
     cancelAtPeriodEnd: boolean('cancelAtPeriodEnd').notNull().default(false),
+    scheduledChangeAction: text('scheduledChangeAction'),
+    scheduledChangeAt: timestamp('scheduledChangeAt'),
     canceledAt: timestamp('canceledAt'),
     lastProviderEventAt: timestamp('lastProviderEventAt'),
     metadata: jsonb('metadata')
@@ -320,6 +322,29 @@ export const subscription = pgTable(
       table.providerKey,
       table.providerCustomerId,
     ),
+  }),
+)
+
+export const billingTransaction = pgTable(
+  'billing_transaction',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('userId').notNull(),
+    provider: text('provider').notNull(),
+    providerTransactionId: text('providerTransactionId').notNull(),
+    providerSubscriptionId: text('providerSubscriptionId'),
+    status: text('status').notNull(),
+    currency: text('currency'),
+    amount: integer('amount'),
+    occurredAt: timestamp('occurredAt'),
+    createdAt: timestamp('createdAt').notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+  },
+  (table) => ({
+    providerTransactionIdx: uniqueIndex(
+      'billing_transaction_provider_transaction_idx',
+    ).on(table.provider, table.providerTransactionId),
+    userIdx: index('billing_transaction_user_idx').on(table.userId),
   }),
 )
 

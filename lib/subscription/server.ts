@@ -2,9 +2,9 @@ import { and, desc, eq, gte, lt } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { subscription, subscriptionUsage } from '@/lib/db/schema'
 import { getSubscriptionPlan, isPremiumPlan, isTrialActive } from './plans'
+import { evaluateSubscriptionLifecycle } from './lifecycle'
 import type {
   SubscriptionSnapshot,
-  SubscriptionStatus,
   SubscriptionUsageKey,
   SubscriptionUsageSnapshot,
 } from './types'
@@ -24,39 +24,6 @@ function createEmptyUsage(): SubscriptionUsageSnapshot {
     background_removals_monthly: 0,
     saved_outfits: 0,
   }
-}
-
-function toSubscriptionStatus(status: string | null | undefined) {
-  return [
-    'active',
-    'trialing',
-    'past_due',
-    'paused',
-    'canceled',
-    'inactive',
-    'expired',
-  ].includes(status ?? '')
-    ? (status as SubscriptionStatus)
-    : 'active'
-}
-
-function isSubscriptionEntitled(
-  row: typeof subscription.$inferSelect | undefined,
-  now: Date,
-) {
-  if (!row) return false
-  const status = toSubscriptionStatus(row.status)
-  if (status === 'active' || status === 'trialing') return true
-  if (status === 'past_due') return true
-  if (
-    status === 'canceled' &&
-    row.cancelAtPeriodEnd &&
-    row.currentPeriodEnd &&
-    row.currentPeriodEnd.getTime() > now.getTime()
-  ) {
-    return true
-  }
-  return false
 }
 
 export async function getSubscriptionSnapshot(
@@ -91,13 +58,14 @@ export async function getSubscriptionSnapshot(
   }
 
   const trialActive = isTrialActive(subscriptionRow?.trialEndsAt, now)
-  const entitled = isSubscriptionEntitled(subscriptionRow, now)
+  const lifecycle = evaluateSubscriptionLifecycle(subscriptionRow, now)
 
   return {
     plan,
-    status: toSubscriptionStatus(subscriptionRow?.status),
+    status: lifecycle.status,
     isPremium:
-      (isPremiumPlan(subscriptionRow?.planKey) && entitled) || trialActive,
+      (isPremiumPlan(subscriptionRow?.planKey) && lifecycle.isPro) ||
+      trialActive,
     isTrialActive: trialActive,
     trialEndsAt: subscriptionRow?.trialEndsAt ?? null,
     billingInterval:
@@ -106,6 +74,10 @@ export async function getSubscriptionSnapshot(
         ? subscriptionRow.billingInterval
         : null,
     currentPeriodEnd: subscriptionRow?.currentPeriodEnd ?? null,
+    accessUntil: lifecycle.accessUntil,
+    graceUntil: lifecycle.graceUntil,
+    paymentIssue: lifecycle.paymentIssue,
+    entitlementReason: lifecycle.entitlementReason,
     cancelAtPeriodEnd: subscriptionRow?.cancelAtPeriodEnd ?? false,
     usage,
   }
@@ -120,6 +92,10 @@ export function getFallbackSubscriptionSnapshot(): SubscriptionSnapshot {
     trialEndsAt: null,
     billingInterval: null,
     currentPeriodEnd: null,
+    accessUntil: null,
+    graceUntil: null,
+    paymentIssue: false,
+    entitlementReason: 'free',
     cancelAtPeriodEnd: false,
     usage: createEmptyUsage(),
   }

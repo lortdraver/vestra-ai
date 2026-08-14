@@ -54,6 +54,7 @@ Tables:
 - `subscription`
 - `subscription_usage`
 - `billing_webhook_event`
+- `billing_transaction`
 
 Migration:
 
@@ -61,7 +62,45 @@ Migration:
 pnpm db:apply
 ```
 
-This includes `drizzle/0015_paddle_billing.sql`.
+This includes `drizzle/0015_paddle_billing.sql` and
+`drizzle/0016_billing_lifecycle.sql`.
+
+## Lifecycle
+
+The canonical lifecycle policy lives in `lib/subscription/lifecycle.ts`.
+
+- `active`: Pro.
+- `trialing`: Pro.
+- `past_due`: Pro only during `PADDLE_PAST_DUE_GRACE_DAYS`.
+- `paused`: Free.
+- `canceled`: Pro until `currentPeriodEnd` only when cancellation was scheduled
+  at period end.
+- `inactive`: Free.
+
+The policy returns a dynamic entitlement reason, payment issue flag, grace end,
+and access end. Product routes should consume the shared entitlement helpers
+rather than checking subscription status directly.
+
+## Billing Operations
+
+- `POST /api/billing/paddle/cancel` schedules cancellation at period end.
+- `POST /api/billing/paddle/resume` removes the scheduled cancellation through
+  Paddle.
+- `POST /api/billing/paddle/switch` requests a monthly/annual interval change.
+- `POST /api/billing/paddle/portal` opens Paddle-hosted billing management.
+
+All provider mutations wait for verified webhook reconciliation before local
+entitlements change.
+
+## Operations
+
+```bash
+pnpm billing:diagnose -- --email=user@example.com
+pnpm billing:reconcile -- --email=user@example.com
+pnpm billing:reconcile -- --email=user@example.com --apply
+```
+
+Diagnostics are sanitized and reconciliation is dry-run by default.
 
 ## Entitlements
 

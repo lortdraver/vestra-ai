@@ -17,7 +17,8 @@ export class PaddleApiError extends Error {
       | 'paddle_api_unauthorized'
       | 'paddle_api_rate_limited'
       | 'paddle_api_timeout'
-      | 'paddle_subscription_not_found',
+      | 'paddle_subscription_not_found'
+      | 'paddle_subscription_action_failed',
     public status = 500,
   ) {
     super(code)
@@ -40,7 +41,42 @@ function mapPaddleStatus(status: number) {
   if (status === 429) {
     return new PaddleApiError('paddle_api_rate_limited', status)
   }
-  return new PaddleApiError('paddle_checkout_failed', status)
+  return new PaddleApiError('paddle_subscription_action_failed', status)
+}
+
+async function paddleRequest<T>(
+  path: string,
+  init: {
+    method?: 'GET' | 'POST' | 'PATCH'
+    body?: Record<string, unknown>
+  } = {},
+): Promise<T> {
+  const config = getPaddleServerConfig()
+  const timeout = timeoutSignal(config.requestTimeoutMs)
+  let response: Response
+
+  try {
+    response = await fetch(`${config.apiBaseUrl}${path}`, {
+      method: init.method ?? 'GET',
+      signal: timeout.signal,
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: init.body ? JSON.stringify(init.body) : undefined,
+    })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new PaddleApiError('paddle_api_timeout', 504)
+    }
+    throw new PaddleApiError('paddle_subscription_action_failed', 502)
+  } finally {
+    timeout.cancel()
+  }
+
+  if (!response.ok) throw mapPaddleStatus(response.status)
+  return (await response.json()) as T
 }
 
 export function createPaddleCheckoutSession(input: {
@@ -64,42 +100,79 @@ export async function createPaddlePortalSession(input: {
   customerId: string
   subscriptionId?: string | null
 }) {
-  const config = getPaddleServerConfig()
-  const timeout = timeoutSignal(config.requestTimeoutMs)
-  let response: Response
-
-  try {
-    response = await fetch(
-      `${config.apiBaseUrl}/customers/${encodeURIComponent(
-        input.customerId,
-      )}/portal-sessions`,
-      {
-        method: 'POST',
-        signal: timeout.signal,
-        headers: {
-          Authorization: `Bearer ${config.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          subscription_ids: input.subscriptionId ? [input.subscriptionId] : [],
-        }),
-      },
-    )
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new PaddleApiError('paddle_api_timeout', 504)
+  const payload = await paddleRequest<{
+    data?: {
+      urls?: {
+        general?: string | { overview?: string }
+        subscriptions?: Array<{
+          id?: string
+          cancel_subscription?: string
+          update_payment_method?: string
+        }>
+      }
     }
-    throw new PaddleApiError('paddle_checkout_failed', 502)
-  } finally {
-    timeout.cancel()
-  }
-
-  if (!response.ok) throw mapPaddleStatus(response.status)
-
-  const payload = (await response.json()) as {
-    data?: { urls?: { general?: string } }
-  }
-  const url = payload.data?.urls?.general
+  }>(`/customers/${encodeURIComponent(input.customerId)}/portal-sessions`, {
+    method: 'POST',
+    body: {
+      subscription_ids: input.subscriptionId ? [input.subscriptionId] : [],
+    },
+  })
+  const general = payload.data?.urls?.general
+  const url =
+    typeof general === 'string'
+      ? general
+      : (general?.overview ??
+        payload.data?.urls?.subscriptions?.[0]?.update_payment_method ??
+        payload.data?.urls?.subscriptions?.[0]?.cancel_subscription)
   if (!url) throw new PaddleApiError('paddle_checkout_failed', 502)
-  return { url }
+  return {
+    url,
+    cancelUrl: payload.data?.urls?.subscriptions?.[0]?.cancel_subscription,
+    updatePaymentMethodUrl:
+      payload.data?.urls?.subscriptions?.[0]?.update_payment_method,
+  }
+}
+
+export async function cancelPaddleSubscription(subscriptionId: string) {
+  return paddleRequest(
+    `/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`,
+    {
+      method: 'POST',
+      body: { effective_from: 'next_billing_period' },
+    },
+  )
+}
+
+export async function resumePaddleScheduledCancellation(
+  subscriptionId: string,
+) {
+  return paddleRequest(`/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    method: 'PATCH',
+    body: { scheduled_change: null },
+  })
+}
+
+export async function switchPaddleSubscriptionPlan(input: {
+  subscriptionId: string
+  interval: PaddleBillingInterval
+}) {
+  const config = getPaddleServerConfig()
+  const priceId =
+    input.interval === 'annual' ? config.annualPriceId : config.monthlyPriceId
+  return paddleRequest(
+    `/subscriptions/${encodeURIComponent(input.subscriptionId)}`,
+    {
+      method: 'PATCH',
+      body: {
+        proration_billing_mode: 'prorated_immediately',
+        items: [{ price_id: priceId, quantity: 1 }],
+      },
+    },
+  )
+}
+
+export async function fetchPaddleSubscription(subscriptionId: string) {
+  return paddleRequest<{
+    data?: Record<string, unknown>
+  }>(`/subscriptions/${encodeURIComponent(subscriptionId)}`)
 }

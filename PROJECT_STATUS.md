@@ -231,6 +231,22 @@
 - Updated admin analytics to report real internal subscription state by Free,
   Pro, interval, past-due, and canceled/pending-end segments.
 
+### Monetization v2: Billing Lifecycle Readiness
+
+- Centralized subscription lifecycle policy for active, trialing, past-due,
+  paused, canceled, and inactive states.
+- Added configurable past-due grace access with dynamic entitlement evaluation.
+- Added Paddle subscription cancellation, scheduled-cancellation resume, and
+  monthly/annual plan-switch actions.
+- Prevented duplicate checkout for users who already have active or canceling
+  Pro access.
+- Added stale webhook protection using provider event timestamps and
+  `lastProviderEventAt`.
+- Added minimal billing transaction history without storing card data or raw
+  provider payloads.
+- Added `billing:diagnose` and dry-run-first `billing:reconcile` operational
+  scripts.
+
 ### UX/Admin Improvements: Mobile Account Access And Admin Analytics v1
 
 - Restored full authenticated mobile account access from the avatar button.

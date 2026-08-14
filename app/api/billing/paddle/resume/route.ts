@@ -2,7 +2,10 @@ import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { auth } from '@/lib/auth'
-import { createPaddlePortalSession, PaddleApiError } from '@/lib/billing'
+import {
+  PaddleApiError,
+  resumePaddleScheduledCancellation,
+} from '@/lib/billing'
 import { getLatestPaddleSubscriptionForUser } from '@/lib/billing/server'
 
 export async function POST() {
@@ -12,28 +15,30 @@ export async function POST() {
   }
 
   const row = await getLatestPaddleSubscriptionForUser(session.user.id)
-
-  if (!row?.providerCustomerId) {
+  if (!row?.providerSubscriptionId) {
     return NextResponse.json(
-      { error: 'paddle_subscription_not_found' },
+      {
+        error: 'paddle_subscription_not_found',
+        code: 'paddle_subscription_not_found',
+      },
       { status: 404 },
     )
   }
+  if (!row.cancelAtPeriodEnd && row.scheduledChangeAction !== 'cancel') {
+    return NextResponse.json({ ok: true, code: 'subscription_not_canceling' })
+  }
 
   try {
-    const portal = await createPaddlePortalSession({
-      customerId: row.providerCustomerId,
-      subscriptionId: row.providerSubscriptionId,
-    })
+    await resumePaddleScheduledCancellation(row.providerSubscriptionId)
     void trackServerEvent({
-      eventName: 'billing_portal_opened',
+      eventName: 'subscription_cancel_reversed',
       userId: session.user.id,
       properties: {
         provider: 'paddle',
         interval: row.billingInterval ?? 'unknown',
       },
     })
-    return NextResponse.json(portal)
+    return NextResponse.json({ ok: true, status: 'pending_webhook' })
   } catch (error) {
     if (error instanceof PaddleApiError) {
       return NextResponse.json(
@@ -42,7 +47,10 @@ export async function POST() {
       )
     }
     return NextResponse.json(
-      { error: 'paddle_checkout_failed', code: 'paddle_checkout_failed' },
+      {
+        error: 'paddle_subscription_action_failed',
+        code: 'paddle_subscription_action_failed',
+      },
       { status: 502 },
     )
   }

@@ -9,6 +9,7 @@ import {
   PaddleConfigError,
 } from '@/lib/billing'
 import { auth } from '@/lib/auth'
+import { getSubscriptionSnapshot } from '@/lib/subscription/server'
 
 const checkoutSchema = z.object({
   interval: z.enum(['monthly', 'annual']),
@@ -29,6 +30,24 @@ export async function POST(request: Request) {
   }
 
   try {
+    const subscription = await getSubscriptionSnapshot(session.user.id)
+    if (
+      subscription.isPremium &&
+      (subscription.status === 'active' ||
+        subscription.status === 'trialing' ||
+        subscription.entitlementReason === 'canceling_until_period_end')
+    ) {
+      return NextResponse.json(
+        {
+          error: 'subscription_already_active',
+          code: 'subscription_already_active',
+          status: subscription.status,
+          billingInterval: subscription.billingInterval,
+        },
+        { status: 409 },
+      )
+    }
+
     const publicConfig = getPaddlePublicConfig()
     if (!publicConfig.clientToken) {
       return NextResponse.json(

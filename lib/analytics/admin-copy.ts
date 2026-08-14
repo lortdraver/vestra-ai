@@ -51,6 +51,9 @@ export type AdminAnalyticsCopy = {
     annualProUsers: string
     pastDueUsers: string
     canceledUsers: string
+    cancelingUsers: string
+    pausedUsers: string
+    expiredUsers: string
     registered: string
     emailVerified: string
     firstWardrobe: string
@@ -157,6 +160,9 @@ const copy: Record<Locale, AdminAnalyticsCopy> = {
       annualProUsers: '\u0130llik Pro',
       pastDueUsers: '\u00d6d\u0259ni\u015f problemi',
       canceledUsers: 'L\u0259\u011fv edil\u0259nl\u0259r',
+      cancelingUsers: 'L\u0259\u011fv planlan\u0131b',
+      pausedUsers: 'Dayand\u0131r\u0131l\u0131b',
+      expiredUsers: 'Bitmi\u015f',
       registered: 'Qeydiyyat',
       emailVerified: 'E-po\u00e7t t\u0259sdiqi',
       firstWardrobe: '\u0130lk qarderob geyimi',
@@ -261,7 +267,10 @@ const copy: Record<Locale, AdminAnalyticsCopy> = {
       monthlyProUsers: 'Monthly Pro',
       annualProUsers: 'Annual Pro',
       pastDueUsers: 'Past due',
-      canceledUsers: 'Canceled / pending end',
+      canceledUsers: 'Canceled',
+      cancelingUsers: 'Canceling',
+      pausedUsers: 'Paused',
+      expiredUsers: 'Expired',
       registered: 'Registered',
       emailVerified: 'Email verified',
       firstWardrobe: 'First wardrobe item',
@@ -395,8 +404,12 @@ const copy: Record<Locale, AdminAnalyticsCopy> = {
       annualProUsers: 'Pro \u043d\u0430 \u0433\u043e\u0434',
       pastDueUsers:
         '\u041f\u0440\u043e\u0431\u043b\u0435\u043c\u0430 \u0441 \u043e\u043f\u043b\u0430\u0442\u043e\u0439',
-      canceledUsers:
-        '\u041e\u0442\u043c\u0435\u043d\u0435\u043d\u043e / \u0434\u043e \u043a\u043e\u043d\u0446\u0430 \u043f\u0435\u0440\u0438\u043e\u0434\u0430',
+      canceledUsers: '\u041e\u0442\u043c\u0435\u043d\u0435\u043d\u043e',
+      cancelingUsers:
+        '\u041e\u0442\u043c\u0435\u043d\u0430 \u0437\u0430\u043f\u043b\u0430\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0430',
+      pausedUsers:
+        '\u041f\u0440\u0438\u043e\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u044b',
+      expiredUsers: '\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u044b',
       registered:
         '\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f',
       emailVerified:

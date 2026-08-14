@@ -84,6 +84,9 @@ export type AdminAnalyticsSnapshot = {
     annualProUsers: number
     pastDueUsers: number
     canceledUsers: number
+    cancelingUsers: number
+    pausedUsers: number
+    expiredUsers: number
   }
   funnel: {
     stages: Array<{
@@ -603,8 +606,19 @@ export function buildAdminAnalyticsSnapshot(
   const pastDueUsers = latestSubscriptionRows.filter(
     (entry) => entry.status === 'past_due',
   ).length
+  const cancelingUsers = latestSubscriptionRows.filter(
+    (entry) => entry.cancelAtPeriodEnd,
+  ).length
+  const pausedUsers = latestSubscriptionRows.filter(
+    (entry) => entry.status === 'paused',
+  ).length
   const canceledUsers = latestSubscriptionRows.filter(
-    (entry) => entry.status === 'canceled' || entry.cancelAtPeriodEnd,
+    (entry) => entry.status === 'canceled',
+  ).length
+  const expiredUsers = latestSubscriptionRows.filter(
+    (entry) =>
+      entry.status === 'canceled' &&
+      (!entry.currentPeriodEnd || entry.currentPeriodEnd <= now),
   ).length
 
   const recentUsers = [...source.users]
@@ -687,6 +701,9 @@ export function buildAdminAnalyticsSnapshot(
       annualProUsers,
       pastDueUsers,
       canceledUsers,
+      cancelingUsers,
+      pausedUsers,
+      expiredUsers,
     },
     funnel: {
       stages: [

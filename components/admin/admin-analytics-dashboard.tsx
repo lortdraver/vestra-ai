@@ -267,6 +267,20 @@ export function AdminAnalyticsDashboard({
             label: copy.labels.canceledUsers,
             value: numberFormatter.format(snapshot.subscriptions.canceledUsers),
           },
+          {
+            label: copy.labels.cancelingUsers,
+            value: numberFormatter.format(
+              snapshot.subscriptions.cancelingUsers,
+            ),
+          },
+          {
+            label: copy.labels.pausedUsers,
+            value: numberFormatter.format(snapshot.subscriptions.pausedUsers),
+          },
+          {
+            label: copy.labels.expiredUsers,
+            value: numberFormatter.format(snapshot.subscriptions.expiredUsers),
+          },
         ]}
         compact
       />

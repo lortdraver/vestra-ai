@@ -44,6 +44,12 @@ export const analyticsEventNames = [
   'subscription_payment_failed',
   'subscription_resumed',
   'subscription_plan_changed',
+  'subscription_cancel_requested',
+  'subscription_cancel_reversed',
+  'subscription_plan_change_requested',
+  'subscription_grace_started',
+  'subscription_grace_expired',
+  'billing_portal_opened',
 ] as const
 
 export type AnalyticsEventName = (typeof analyticsEventNames)[number]

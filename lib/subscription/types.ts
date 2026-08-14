@@ -8,7 +8,6 @@ export const subscriptionStatuses = [
   'paused',
   'canceled',
   'inactive',
-  'expired',
 ] as const
 export type SubscriptionStatus = (typeof subscriptionStatuses)[number]
 
@@ -55,6 +54,18 @@ export type SubscriptionSnapshot = {
   trialEndsAt: Date | null
   billingInterval?: 'monthly' | 'annual' | null
   currentPeriodEnd?: Date | null
+  accessUntil?: Date | null
+  graceUntil?: Date | null
+  paymentIssue?: boolean
+  entitlementReason?:
+    | 'active'
+    | 'trialing'
+    | 'past_due_grace'
+    | 'canceling_until_period_end'
+    | 'free'
+    | 'paused'
+    | 'canceled'
+    | 'inactive'
   cancelAtPeriodEnd?: boolean
   usage: SubscriptionUsageSnapshot
 }

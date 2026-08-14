@@ -13,6 +13,7 @@ type PaddleCheckoutResponse = {
   customer?: { email: string }
   customData: { vestraUserId: string }
   error?: string
+  code?: string
 }
 
 declare global {
@@ -95,6 +96,10 @@ export function PaddleCheckoutButton({
       })
       const data = (await response.json()) as PaddleCheckoutResponse
       if (!response.ok || data.error) {
+        if (data.code === 'subscription_already_active') {
+          setMessage(copy.alreadyActive)
+          return
+        }
         throw new Error(data.error ?? 'paddle_checkout_failed')
       }
       await initializePaddle(data)
@@ -115,6 +120,67 @@ export function PaddleCheckoutButton({
   return (
     <div className="grid gap-2">
       <Button type="button" onClick={startCheckout} disabled={isLoading}>
+        {isLoading ? copy.processing : label}
+      </Button>
+      {message ? (
+        <p className="text-xs text-muted-foreground" role="status">
+          {message}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+export function BillingActionButton({
+  endpoint,
+  label,
+  copy,
+  body,
+  variant = 'outline',
+  confirmMessage,
+}: {
+  endpoint: string
+  label: string
+  copy: ReturnType<typeof getBillingCopy>
+  body?: Record<string, string>
+  variant?: 'default' | 'outline' | 'destructive'
+  confirmMessage?: string
+}) {
+  const [isLoading, setIsLoading] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  async function runAction() {
+    if (confirmMessage && !window.confirm(confirmMessage)) return
+    setIsLoading(true)
+    setMessage(null)
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      })
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string
+      }
+      if (!response.ok || data.error) {
+        throw new Error(data.error ?? 'billing_action_failed')
+      }
+      setMessage(copy.actionPending)
+    } catch {
+      setMessage(copy.lifecycleActionFailed)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div className="grid gap-2">
+      <Button
+        type="button"
+        variant={variant}
+        onClick={runAction}
+        disabled={isLoading}
+      >
         {isLoading ? copy.processing : label}
       </Button>
       {message ? (

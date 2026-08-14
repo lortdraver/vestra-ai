@@ -1,7 +1,12 @@
 import { and, desc, eq, or } from 'drizzle-orm'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { db } from '@/lib/db'
-import { billingWebhookEvent, subscription, user } from '@/lib/db/schema'
+import {
+  billingTransaction,
+  billingWebhookEvent,
+  subscription,
+  user,
+} from '@/lib/db/schema'
 import {
   getIntervalForPaddlePriceId,
   getPaddleWebhookConfig,
@@ -60,6 +65,15 @@ function getNestedString(record: Record<string, unknown>, keys: string[]) {
   return typeof cursor === 'string' ? cursor : null
 }
 
+function getNestedNumber(record: Record<string, unknown>, keys: string[]) {
+  let cursor: unknown = record
+  for (const key of keys) {
+    cursor = asRecord(cursor)[key]
+  }
+  const value = typeof cursor === 'string' ? Number(cursor) : cursor
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
 function firstPriceId(data: Record<string, unknown>) {
   const items = Array.isArray(data.items) ? data.items : []
   for (const item of items) {
@@ -104,6 +118,12 @@ function extractPaddleData(payload: Record<string, unknown>) {
   const scheduledChange = asRecord(
     data.scheduled_change ?? data.scheduledChange,
   )
+  const details = asRecord(data.details)
+  const totals = asRecord(details.totals)
+  const transactionId =
+    eventType.startsWith('transaction.') && typeof data.id === 'string'
+      ? data.id
+      : null
 
   return {
     eventId,
@@ -136,15 +156,38 @@ function extractPaddleData(payload: Record<string, unknown>) {
       String(period.starts_at ?? period.startsAt ?? ''),
     ),
     currentPeriodEnd: toDate(String(period.ends_at ?? period.endsAt ?? '')),
-    cancelAtPeriodEnd:
-      scheduledChange.action === 'cancel' ||
-      scheduledChange.action === 'pause' ||
-      false,
+    scheduledChangeAction:
+      typeof scheduledChange.action === 'string'
+        ? scheduledChange.action
+        : null,
+    scheduledChangeAt: toDate(
+      String(scheduledChange.effective_at ?? scheduledChange.effectiveAt ?? ''),
+    ),
+    cancelAtPeriodEnd: scheduledChange.action === 'cancel' || false,
     canceledAt:
       eventType === 'subscription.canceled'
         ? (toDate(String(payload.occurred_at ?? payload.occurredAt ?? '')) ??
           new Date())
         : null,
+    transactionId,
+    transactionStatus:
+      eventType === 'transaction.payment_failed'
+        ? 'failed'
+        : eventType === 'transaction.completed'
+          ? 'completed'
+          : null,
+    currency:
+      typeof data.currency_code === 'string'
+        ? data.currency_code
+        : typeof data.currencyCode === 'string'
+          ? data.currencyCode
+          : typeof totals.currency_code === 'string'
+            ? totals.currency_code
+            : null,
+    amount:
+      getNestedNumber(data, ['details', 'totals', 'total']) ??
+      getNestedNumber(data, ['details', 'totals', 'grand_total']) ??
+      null,
   }
 }
 
@@ -188,7 +231,7 @@ async function upsertPaddleSubscription(
   data: ReturnType<typeof extractPaddleData>,
 ) {
   const matchedUserId = await findUserId(data)
-  if (!matchedUserId) return false
+  if (!matchedUserId) return 'unmatched_user' as const
 
   const interval = getIntervalForPaddlePriceId(data.priceId)
   const values = {
@@ -203,6 +246,8 @@ async function upsertPaddleSubscription(
     currentPeriodStart: data.currentPeriodStart,
     currentPeriodEnd: data.currentPeriodEnd,
     cancelAtPeriodEnd: data.cancelAtPeriodEnd,
+    scheduledChangeAction: data.scheduledChangeAction,
+    scheduledChangeAt: data.scheduledChangeAt,
     canceledAt: data.canceledAt,
     lastProviderEventAt: data.occurredAt ?? new Date(),
     metadata: {
@@ -225,6 +270,17 @@ async function upsertPaddleSubscription(
     .limit(1)
 
   if (existing) {
+    const existingEventAt = existing.lastProviderEventAt?.getTime() ?? 0
+    const incomingEventAt = values.lastProviderEventAt.getTime()
+    if (existingEventAt > incomingEventAt) {
+      console.info('[paddle] WEBHOOK_STALE_EVENT_IGNORED', {
+        eventType: data.eventType,
+        eventId: data.eventId.slice(0, 12),
+        existingEventAt: existing.lastProviderEventAt?.toISOString(),
+        incomingEventAt: values.lastProviderEventAt.toISOString(),
+      })
+      return 'stale' as const
+    }
     await db
       .update(subscription)
       .set(values)
@@ -233,7 +289,29 @@ async function upsertPaddleSubscription(
     await db.insert(subscription).values(values)
   }
 
-  return true
+  return 'processed' as const
+}
+
+async function recordPaddleTransaction(
+  data: ReturnType<typeof extractPaddleData>,
+) {
+  if (!data.transactionId || !data.transactionStatus) return
+  const matchedUserId = await findUserId(data)
+  if (!matchedUserId) return
+
+  await db
+    .insert(billingTransaction)
+    .values({
+      userId: matchedUserId,
+      provider: 'paddle',
+      providerTransactionId: data.transactionId,
+      providerSubscriptionId: data.subscriptionId,
+      status: data.transactionStatus,
+      currency: data.currency,
+      amount: data.amount,
+      occurredAt: data.occurredAt,
+    })
+    .onConflictDoNothing()
 }
 
 function analyticsEventForPaddle(eventType: string) {
@@ -246,6 +324,7 @@ function analyticsEventForPaddle(eventType: string) {
       'subscription.past_due': 'subscription_payment_failed',
       'subscription.resumed': 'subscription_resumed',
       'subscription.updated': 'subscription_plan_changed',
+      'subscription.paused': 'subscription_grace_expired',
     } as const
   )[eventType]
 }
@@ -334,15 +413,21 @@ export async function processPaddleWebhook(
     }
   }
 
-  const matched = await upsertPaddleSubscription(data)
-  const status = matched ? 'processed' : 'unmatched_user'
+  const upsertStatus = await upsertPaddleSubscription(data)
+  await recordPaddleTransaction(data)
+  const status =
+    upsertStatus === 'stale'
+      ? 'ignored'
+      : upsertStatus === 'processed'
+        ? 'processed'
+        : 'unmatched_user'
   await db
     .update(billingWebhookEvent)
     .set({ status, processedAt: new Date(), updatedAt: new Date() })
     .where(eq(billingWebhookEvent.id, eventRow.id))
 
   const eventName = analyticsEventForPaddle(data.eventType)
-  if (matched && eventName) {
+  if (status === 'processed' && eventName) {
     const matchedUserId = await findUserId(data)
     void trackServerEvent({
       eventName,
@@ -355,7 +440,7 @@ export async function processPaddleWebhook(
   console.info('[paddle] WEBHOOK_PROCESSED', {
     eventType: data.eventType,
     eventId: data.eventId.slice(0, 12),
-    matched,
+    matched: status === 'processed',
     providerStatus: data.status,
     durationMs: Date.now() - startedAt,
   })
