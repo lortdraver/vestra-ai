@@ -18,13 +18,15 @@ import {
   getSubscriptionPageState,
   getSubscriptionSwitchTarget,
 } from '@/lib/billing/subscription-page-model'
-import { getLocale } from '@/lib/i18n/server'
+import { getDictionary, getLocale } from '@/lib/i18n/server'
 import { getSubscriptionSnapshot } from '@/lib/subscription/server'
+import { getSubscriptionUsageDisplayMeters } from '@/lib/subscription/usage-display'
 import type { SubscriptionSnapshot } from '@/lib/subscription/types'
 import {
   BillingActionButton,
   ManageBillingButton,
 } from '@/components/billing/pricing-client'
+import { SubscriptionUsageCounters } from '@/components/subscription/usage-counters'
 import { buttonVariants } from '@/components/ui/button'
 import {
   Card,
@@ -45,10 +47,15 @@ export default async function SubscriptionPage() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect('/sign-in')
 
-  const [locale, subscription] = await Promise.all([
+  const [locale, dictionary, subscription] = await Promise.all([
     getLocale(),
+    getDictionary(),
     getSubscriptionSnapshot(session.user.id),
   ])
+  const usageMeters = await getSubscriptionUsageDisplayMeters({
+    userId: session.user.id,
+    subscription,
+  }).catch(() => null)
   const copy = getBillingCopy(locale)
   const state = getSubscriptionPageState(subscription)
   const switchTarget = getSubscriptionSwitchTarget(subscription)
@@ -175,6 +182,22 @@ export default async function SubscriptionPage() {
           </CardContent>
         </Card>
       </section>
+
+      <Card className="rounded-3xl border-foreground/10 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-xl">{copy.currentLimits}</CardTitle>
+          <CardDescription>{copy.planDetails}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SubscriptionUsageCounters
+            dictionary={dictionary}
+            locale={locale}
+            meters={usageMeters ?? []}
+            usageUnavailable={subscription.usageUnavailable || !usageMeters}
+            className="sm:grid-cols-2 lg:grid-cols-5"
+          />
+        </CardContent>
+      </Card>
 
       <Card className="rounded-3xl border-foreground/10 shadow-sm">
         <CardHeader>

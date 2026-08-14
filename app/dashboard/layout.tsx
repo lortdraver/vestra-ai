@@ -54,6 +54,8 @@ export default async function DashboardLayout({
       <SubscriptionOverview
         dictionary={dictionary}
         subscription={subscription}
+        userId={session.user.id}
+        locale={locale}
       />
       <main className={DASHBOARD_CONTENT_CLASS}>{children}</main>
     </div>

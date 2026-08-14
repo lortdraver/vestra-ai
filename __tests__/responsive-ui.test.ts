@@ -49,6 +49,22 @@ const subscriptionPageSource = readFileSync(
   join(process.cwd(), 'app/dashboard/subscription/page.tsx'),
   'utf8',
 )
+const dashboardPageSource = readFileSync(
+  join(process.cwd(), 'app/dashboard/page.tsx'),
+  'utf8',
+)
+const dashboardAccountSettingsSource = readFileSync(
+  join(process.cwd(), 'components/dashboard-account-settings-section.tsx'),
+  'utf8',
+)
+const subscriptionOverviewSource = readFileSync(
+  join(process.cwd(), 'components/subscription/subscription-overview.tsx'),
+  'utf8',
+)
+const subscriptionUsageDisplaySource = readFileSync(
+  join(process.cwd(), 'lib/subscription/usage-display.ts'),
+  'utf8',
+)
 
 describe('responsive UI contracts', () => {
   it('exports a Safari-safe mobile viewport', () => {
@@ -140,6 +156,25 @@ describe('responsive UI contracts', () => {
     expect(languageSwitcherSource).toContain('min-h-11 min-w-11')
   })
 
+  it('provides a normal-flow dashboard account and settings fallback', () => {
+    expect(dashboardPageSource).toContain('DashboardAccountSettingsSection')
+    expect(dashboardPageSource).toContain('role={currentUser?.role}')
+    expect(dashboardAccountSettingsSource).toContain(
+      'data-testid="dashboard-account-settings"',
+    )
+    expect(dashboardAccountSettingsSource).toContain(
+      'getAccountMenuItems(role)',
+    )
+    expect(dashboardAccountSettingsSource).toContain('LanguageSwitcher')
+    expect(dashboardAccountSettingsSource).toContain('openCookiePreferences')
+    expect(dashboardAccountSettingsSource).toContain('authClient.signOut')
+    expect(dashboardAccountSettingsSource).toContain(
+      'href="/dashboard/account#support"',
+    )
+    expect(dashboardAccountSettingsSource).not.toContain('fixed')
+    expect(dashboardAccountSettingsSource).not.toContain('sticky')
+  })
+
   it('keeps wardrobe card actions touch friendly', () => {
     expect(WARDROBE_CARD_ACTION_CLASS).toContain('min-h-11')
     expect(WARDROBE_CARD_ACTION_CLASS).toContain('min-w-11')
@@ -163,6 +198,24 @@ describe('responsive UI contracts', () => {
     expect(wardrobeClientSource).toContain('md:hidden')
     expect(wardrobeClientSource).toContain('hidden md:block')
     expect(wardrobeClientSource).toContain('compact')
+  })
+
+  it('keeps wardrobe edit actions before verbose AI details on mobile', () => {
+    expect(wardrobeClientSource).toContain('wardrobe-edit-form')
+    expect(wardrobeClientSource).toContain('wardrobe-create-form')
+    expect(wardrobeClientSource).toContain(
+      'data-testid="wardrobe-edit-primary-fields"',
+    )
+    expect(wardrobeClientSource).toContain(
+      'data-testid="wardrobe-edit-mobile-actions"',
+    )
+    expect(wardrobeClientSource).toContain(
+      'bottom-[calc(env(safe-area-inset-bottom)+0.75rem)]',
+    )
+    expect(wardrobeClientSource).toContain(
+      'data-testid="wardrobe-mobile-ai-details"',
+    )
+    expect(wardrobeClientSource).toContain('<summary')
   })
 
   it('keeps mobile wardrobe form controls at iOS-safe text size', () => {
@@ -206,6 +259,26 @@ describe('responsive UI contracts', () => {
     expect(subscriptionPageSource).toContain('ManageBillingButton')
     expect(subscriptionPageSource).toContain('BillingActionButton')
     expect(subscriptionPageSource).toContain('href="/pricing"')
+  })
+
+  it('shows subscription usage from authoritative product counters', () => {
+    expect(subscriptionOverviewSource).toContain(
+      'getSubscriptionUsageDisplayMeters',
+    )
+    expect(subscriptionPageSource).toContain('SubscriptionUsageCounters')
+    expect(subscriptionUsageDisplaySource).toContain('wardrobeItem')
+    expect(subscriptionUsageDisplaySource).toContain('outfitRequest')
+    expect(subscriptionUsageDisplaySource).toContain('outfit')
+    expect(subscriptionUsageDisplaySource).toContain(
+      "eq(wardrobeItem.imageDeletionStatus, 'active')",
+    )
+    expect(subscriptionUsageDisplaySource).toContain(
+      "eq(wardrobeItem.analysisStatus, 'done')",
+    )
+    expect(subscriptionUsageDisplaySource).toContain(
+      'gte(outfitRequest.createdAt, periodStart)',
+    )
+    expect(subscriptionUsageDisplaySource).toContain('isNull(outfit.deletedAt)')
   })
 
   it('prefers thumbnail wardrobe images for cards while preserving originals', () => {

@@ -1,7 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { headers } from 'next/headers'
+import { eq } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
+import { db } from '@/lib/db'
+import { user } from '@/lib/db/schema'
 import { getDictionary, getLocale } from '@/lib/i18n/server'
 import {
   Card,
@@ -11,6 +14,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
+import { DashboardAccountSettingsSection } from '@/components/dashboard-account-settings-section'
 
 export async function generateMetadata(): Promise<Metadata> {
   const dictionary = await getDictionary()
@@ -70,6 +74,13 @@ export default async function DashboardPage() {
     getLocale(),
   ])
   const firstName = session?.user?.name?.split(' ')[0] ?? ''
+  const [currentUser] = session?.user?.id
+    ? await db
+        .select({ role: user.role })
+        .from(user)
+        .where(eq(user.id, session.user.id))
+        .limit(1)
+    : []
 
   return (
     <div className="flex flex-col gap-8">
@@ -122,6 +133,12 @@ export default async function DashboardPage() {
           )
         })}
       </div>
+
+      <DashboardAccountSettingsSection
+        dictionary={dictionary}
+        locale={locale}
+        role={currentUser?.role}
+      />
     </div>
   )
 }

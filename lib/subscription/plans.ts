@@ -5,6 +5,8 @@ import type {
   SubscriptionPlanKey,
   SubscriptionSnapshot,
   SubscriptionUsageKey,
+  SubscriptionUsageMeter,
+  SubscriptionUsagePeriod,
   UsageCheck,
 } from './types'
 
@@ -98,6 +100,34 @@ export function checkUsage(
     limit,
     remaining: Math.max(limit - used, 0),
   }
+}
+
+export const subscriptionUsagePeriods = {
+  wardrobe_items: 'current',
+  ai_analyses_monthly: 'month',
+  stylist_requests_monthly: 'month',
+  background_removals_monthly: 'month',
+  saved_outfits: 'current',
+} satisfies Record<SubscriptionUsageKey, SubscriptionUsagePeriod>
+
+export function getSubscriptionUsageMeters(
+  snapshot: Pick<SubscriptionSnapshot, 'plan' | 'usage'>,
+  resetAt: Date | null,
+): SubscriptionUsageMeter[] {
+  return Object.keys(snapshot.plan.limits).map((feature) => {
+    const usageKey = feature as SubscriptionUsageKey
+    const usage = checkUsage(snapshot, usageKey)
+    const period = subscriptionUsagePeriods[usageKey]
+
+    return {
+      feature: usageKey,
+      used: usage.used,
+      limit: usage.limit,
+      remaining: usage.remaining,
+      period,
+      resetAt: period === 'month' ? resetAt : null,
+    }
+  })
 }
 
 export function createTrialWindow(start = new Date()) {

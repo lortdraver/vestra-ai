@@ -969,96 +969,90 @@ export function WardrobePageClient({
           onSubmit={handleSubmit}
           className="grid gap-4"
           data-clarity-mask="true"
+          data-testid={
+            editingItem ? 'wardrobe-edit-form' : 'wardrobe-create-form'
+          }
         >
-          <div className="grid gap-2">
-            <Label htmlFor="image">{t.fields.image}</Label>
-            <label className="group grid cursor-pointer place-items-center rounded-xl border border-dashed border-foreground/20 bg-muted/40 px-4 py-6 text-center transition hover:border-foreground/50 hover:bg-muted/70">
-              <Upload className="mb-2 size-7 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:text-foreground" />
-              <span className="text-sm font-medium">{t.upload.dropTitle}</span>
-              <span className="mt-1 text-xs text-muted-foreground">
-                {t.upload.dropSubtitle}
-              </span>
-              <Input
-                id="image"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="sr-only"
-                onChange={(event) =>
-                  void handleImageChange(event.target.files?.[0] ?? null)
-                }
-              />
-            </label>
-            <p className="text-xs text-muted-foreground">
-              {isCompressing
-                ? t.states.compressing
-                : imageFile
-                  ? t.states.imageReady
-                  : t.help.image}
-            </p>
-            {imagePreview && (
-              <div className="overflow-hidden rounded-xl border border-foreground/10 bg-background shadow-sm">
-                <div className="aspect-[4/3] bg-[radial-gradient(circle_at_top,_var(--muted),_transparent_55%),linear-gradient(135deg,_var(--background),_var(--muted))]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={imagePreview.url}
-                    alt={t.preview.alt}
-                    className="size-full object-contain"
-                  />
-                </div>
-                <div className="grid gap-1 px-3 py-2 text-xs text-muted-foreground">
-                  <p className="truncate font-medium text-foreground">
-                    {imagePreview.name}
-                  </p>
-                  <p>
-                    {t.preview.fileSize.replace(
-                      '{size}',
-                      formatBytes(imagePreview.size),
-                    )}
-                  </p>
-                  {formatDimensions(imagePreview) ? (
+          <div
+            data-testid="wardrobe-edit-primary-fields"
+            className="grid gap-4"
+          >
+            <div className="grid gap-2">
+              <Label htmlFor="image">{t.fields.image}</Label>
+              <label className="group grid cursor-pointer place-items-center rounded-xl border border-dashed border-foreground/20 bg-muted/40 px-4 py-6 text-center transition hover:border-foreground/50 hover:bg-muted/70">
+                <Upload className="mb-2 size-7 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:text-foreground" />
+                <span className="text-sm font-medium">
+                  {t.upload.dropTitle}
+                </span>
+                <span className="mt-1 text-xs text-muted-foreground">
+                  {t.upload.dropSubtitle}
+                </span>
+                <Input
+                  id="image"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  onChange={(event) =>
+                    void handleImageChange(event.target.files?.[0] ?? null)
+                  }
+                />
+              </label>
+              <p className="text-xs text-muted-foreground">
+                {isCompressing
+                  ? t.states.compressing
+                  : imageFile
+                    ? t.states.imageReady
+                    : t.help.image}
+              </p>
+              {imagePreview && (
+                <div className="overflow-hidden rounded-xl border border-foreground/10 bg-background shadow-sm">
+                  <div className="aspect-[4/3] bg-[radial-gradient(circle_at_top,_var(--muted),_transparent_55%),linear-gradient(135deg,_var(--background),_var(--muted))]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imagePreview.url}
+                      alt={t.preview.alt}
+                      className="size-full object-contain"
+                    />
+                  </div>
+                  <div className="grid gap-1 px-3 py-2 text-xs text-muted-foreground">
+                    <p className="truncate font-medium text-foreground">
+                      {imagePreview.name}
+                    </p>
                     <p>
-                      {t.preview.dimensions.replace(
-                        '{dimensions}',
-                        formatDimensions(imagePreview) ?? '',
+                      {t.preview.fileSize.replace(
+                        '{size}',
+                        formatBytes(imagePreview.size),
                       )}
                     </p>
-                  ) : (
-                    <div
-                      className="h-3 w-28 animate-pulse rounded bg-muted"
-                      aria-label={t.preview.reading}
-                    />
-                  )}
+                    {formatDimensions(imagePreview) ? (
+                      <p>
+                        {t.preview.dimensions.replace(
+                          '{dimensions}',
+                          formatDimensions(imagePreview) ?? '',
+                        )}
+                      </p>
+                    ) : (
+                      <div
+                        className="h-3 w-28 animate-pulse rounded bg-muted"
+                        aria-label={t.preview.reading}
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-            <Field
-              id="name"
-              label={t.fields.name}
-              placeholder={t.upload.optionalNamePlaceholder}
-              value={form.name}
-              onChange={(value) =>
-                setForm((current) => ({ ...current, name: value }))
-              }
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="notes">{t.fields.notes}</Label>
-            <textarea
-              id="notes"
-              value={form.notes}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  notes: event.target.value,
-                }))
-              }
-              placeholder={t.upload.optionalNotesPlaceholder}
-              className="min-h-20 rounded-lg border border-input bg-background px-2.5 py-2 text-base md:text-sm"
-            />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              <Field
+                id="name"
+                label={t.fields.name}
+                placeholder={t.upload.optionalNamePlaceholder}
+                value={form.name}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, name: value }))
+                }
+              />
+            </div>
           </div>
 
           {!editingItem && (
@@ -1175,13 +1169,33 @@ export function WardrobePageClient({
             </div>
           )}
 
+          <div className="grid gap-2">
+            <Label htmlFor="notes">{t.fields.notes}</Label>
+            <textarea
+              id="notes"
+              value={form.notes}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  notes: event.target.value,
+                }))
+              }
+              placeholder={t.upload.optionalNotesPlaceholder}
+              className="min-h-20 rounded-lg border border-input bg-background px-2.5 py-2 text-base md:text-sm"
+            />
+          </div>
+
           {error && (
             <p className="text-sm text-destructive" role="alert">
               {error}
             </p>
           )}
 
-          <Button type="submit" disabled={isSubmitting || isCompressing}>
+          <Button
+            type="submit"
+            disabled={isSubmitting || isCompressing}
+            className={editingItem ? 'hidden md:inline-flex' : undefined}
+          >
             {editingItem ? <Edit /> : <Sparkles />}
             {isSubmitting
               ? dictionary.common.loading
@@ -1189,6 +1203,31 @@ export function WardrobePageClient({
                 ? t.actions.save
                 : t.upload.analyzeAndSave}
           </Button>
+
+          {editingItem && (
+            <div
+              data-testid="wardrobe-edit-mobile-actions"
+              className="sticky bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-20 -mx-1 grid grid-cols-2 gap-2 rounded-2xl border border-border bg-background/95 p-2 shadow-xl backdrop-blur md:hidden"
+            >
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11"
+                onClick={resetForm}
+              >
+                <X />
+                {t.actions.cancelEdit}
+              </Button>
+              <Button
+                type="submit"
+                className="min-h-11"
+                disabled={isSubmitting || isCompressing}
+              >
+                <Edit />
+                {isSubmitting ? dictionary.common.loading : t.actions.save}
+              </Button>
+            </div>
+          )}
         </form>
       </section>
 
@@ -1541,17 +1580,40 @@ export function WardrobePageClient({
               )}
             </div>
           </div>
-          <AnalysisPanel
-            dictionary={dictionary}
-            locale={locale}
-            item={selectedItem}
-            corrections={corrections}
-            setCorrections={setCorrections}
-            isAnalyzing={analyzingItemId === selectedItem.id}
-            isSavingCorrections={isSavingCorrections}
-            onAnalyze={() => void triggerAnalysis(selectedItem)}
-            onSaveCorrections={() => void saveCorrections(selectedItem)}
-          />
+          <details
+            data-testid="wardrobe-mobile-ai-details"
+            className="mt-4 rounded-xl border border-border bg-muted/20 p-3 md:hidden"
+          >
+            <summary className="cursor-pointer text-sm font-medium">
+              {t.analysis.title}
+            </summary>
+            <div className="mt-3">
+              <AnalysisPanel
+                dictionary={dictionary}
+                locale={locale}
+                item={selectedItem}
+                corrections={corrections}
+                setCorrections={setCorrections}
+                isAnalyzing={analyzingItemId === selectedItem.id}
+                isSavingCorrections={isSavingCorrections}
+                onAnalyze={() => void triggerAnalysis(selectedItem)}
+                onSaveCorrections={() => void saveCorrections(selectedItem)}
+              />
+            </div>
+          </details>
+          <div className="hidden md:block">
+            <AnalysisPanel
+              dictionary={dictionary}
+              locale={locale}
+              item={selectedItem}
+              corrections={corrections}
+              setCorrections={setCorrections}
+              isAnalyzing={analyzingItemId === selectedItem.id}
+              isSavingCorrections={isSavingCorrections}
+              onAnalyze={() => void triggerAnalysis(selectedItem)}
+              onSaveCorrections={() => void saveCorrections(selectedItem)}
+            />
+          </div>
         </aside>
       )}
 

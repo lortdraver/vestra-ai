@@ -4,9 +4,11 @@ import {
   checkUsage,
   createTrialWindow,
   getSubscriptionPlan,
+  getSubscriptionUsageMeters,
   hasFeature,
   isPremiumPlan,
   isTrialActive,
+  subscriptionUsagePeriods,
 } from '@/lib/subscription/plans'
 
 afterEach(() => {
@@ -75,6 +77,40 @@ describe('subscription usage limits', () => {
     expect(result.allowed).toBe(true)
     expect(result.limit).toBe(250)
     expect(result.remaining).toBe(150)
+  })
+
+  it('describes authoritative counter periods consistently for the UI', () => {
+    const resetAt = new Date('2026-08-01T00:00:00.000Z')
+    const meters = getSubscriptionUsageMeters(
+      {
+        plan: getSubscriptionPlan('free'),
+        usage: {
+          wardrobe_items: 3,
+          ai_analyses_monthly: 4,
+          stylist_requests_monthly: 2,
+          background_removals_monthly: 1,
+          saved_outfits: 5,
+        },
+      },
+      resetAt,
+    )
+
+    expect(subscriptionUsagePeriods.wardrobe_items).toBe('current')
+    expect(subscriptionUsagePeriods.stylist_requests_monthly).toBe('month')
+    expect(
+      meters.find((meter) => meter.feature === 'stylist_requests_monthly'),
+    ).toMatchObject({
+      period: 'month',
+      resetAt,
+      used: 2,
+    })
+    expect(
+      meters.find((meter) => meter.feature === 'wardrobe_items'),
+    ).toMatchObject({
+      period: 'current',
+      resetAt: null,
+      used: 3,
+    })
   })
 })
 

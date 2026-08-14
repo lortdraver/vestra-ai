@@ -1,6 +1,9 @@
 import { Crown, Sparkles } from 'lucide-react'
+import type { Locale } from '@/lib/i18n/config'
 import type { Dictionary } from '@/lib/i18n/dictionaries'
-import { checkUsage, type SubscriptionSnapshot } from '@/lib/subscription'
+import type { SubscriptionSnapshot } from '@/lib/subscription'
+import { getSubscriptionUsageDisplayMeters } from '@/lib/subscription/usage-display'
+import { SubscriptionUsageCounters } from './usage-counters'
 
 const usageKeys = [
   'wardrobe_items',
@@ -8,14 +11,23 @@ const usageKeys = [
   'stylist_requests_monthly',
 ] as const
 
-export function SubscriptionOverview({
+export async function SubscriptionOverview({
   dictionary,
   subscription,
+  userId,
+  locale,
 }: {
   dictionary: Dictionary
   subscription: SubscriptionSnapshot
+  userId: string
+  locale: Locale
 }) {
   const t = dictionary.subscription
+  const meters = await getSubscriptionUsageDisplayMeters({
+    userId,
+    subscription,
+    features: usageKeys,
+  }).catch(() => null)
   const planLabel = t.plans[subscription.plan.key]
   const trialLabel =
     subscription.isTrialActive && subscription.trialEndsAt
@@ -51,30 +63,13 @@ export function SubscriptionOverview({
             </p>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[420px]">
-            {usageKeys.map((key) => {
-              const usage = checkUsage(subscription, key)
-              const label = t.usage[key]
-              const value =
-                usage.limit === null
-                  ? t.unlimited.replace('{used}', String(usage.used))
-                  : t.meter
-                      .replace('{used}', String(usage.used))
-                      .replace('{limit}', String(usage.limit))
-
-              return (
-                <div
-                  key={key}
-                  className="rounded-xl border border-border bg-muted/30 p-3"
-                >
-                  <p className="text-xs font-medium text-muted-foreground">
-                    {label}
-                  </p>
-                  <p className="mt-1 text-sm font-medium">{value}</p>
-                </div>
-              )
-            })}
-          </div>
+          <SubscriptionUsageCounters
+            dictionary={dictionary}
+            locale={locale}
+            meters={meters ?? []}
+            usageUnavailable={subscription.usageUnavailable || !meters}
+            className="lg:min-w-[420px]"
+          />
         </div>
       </div>
     </section>

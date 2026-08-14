@@ -46,6 +46,17 @@ export type SubscriptionPlanDefinition = {
 
 export type SubscriptionUsageSnapshot = Record<SubscriptionUsageKey, number>
 
+export type SubscriptionUsagePeriod = 'current' | 'month'
+
+export type SubscriptionUsageMeter = {
+  feature: SubscriptionUsageKey
+  used: number
+  limit: number | null
+  remaining: number | null
+  period: SubscriptionUsagePeriod
+  resetAt: Date | null
+}
+
 export type SubscriptionSnapshot = {
   plan: SubscriptionPlanDefinition
   status: SubscriptionStatus
@@ -68,6 +79,7 @@ export type SubscriptionSnapshot = {
     | 'inactive'
   cancelAtPeriodEnd?: boolean
   usage: SubscriptionUsageSnapshot
+  usageUnavailable?: boolean
 }
 
 export type UsageCheck = {
