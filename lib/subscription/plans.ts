@@ -11,19 +11,19 @@ import type {
 export const premiumTrialDays = 7
 
 const freeLimits: SubscriptionLimits = {
-  wardrobe_items: 50,
+  wardrobe_items: 30,
   ai_analyses_monthly: 20,
-  stylist_requests_monthly: 10,
+  stylist_requests_monthly: 5,
   background_removals_monthly: 20,
   saved_outfits: 10,
 }
 
 const premiumLimits: SubscriptionLimits = {
-  wardrobe_items: null,
-  ai_analyses_monthly: null,
-  stylist_requests_monthly: null,
-  background_removals_monthly: null,
-  saved_outfits: null,
+  wardrobe_items: 300,
+  ai_analyses_monthly: 500,
+  stylist_requests_monthly: 250,
+  background_removals_monthly: 300,
+  saved_outfits: 500,
 }
 
 export const subscriptionPlans = {
@@ -38,8 +38,8 @@ export const subscriptionPlans = {
   },
   premium: {
     key: 'premium',
-    name: 'Premium',
-    priceMonthlyCents: 999,
+    name: 'Vestra Pro',
+    priceMonthlyCents: 499,
     currency: 'USD',
     trialDays: premiumTrialDays,
     features: [

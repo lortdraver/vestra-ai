@@ -213,6 +213,24 @@
 - Added sanitized page-view tracking and URL/path protections.
 - Added sensitive-form masking and consent withdrawal handling.
 
+### Monetization v1: Paddle Billing Sandbox
+
+- Added Paddle Billing sandbox configuration and trusted monthly/annual Pro
+  price mapping.
+- Added authenticated Paddle checkout setup that never trusts arbitrary client
+  price IDs.
+- Added Paddle.js lazy initialization with the client-side token only.
+- Added raw-body Paddle webhook signature verification and idempotent
+  `billing_webhook_event` processing.
+- Extended internal subscription state with Paddle customer, subscription,
+  price, billing interval, period, cancellation, and provider-event metadata.
+- Added server-side entitlement checks for wardrobe creation, stylist
+  generation, saved outfits, and Pro-only weather adaptation.
+- Added localized `/pricing` UI, account billing state, and Manage subscription
+  action.
+- Updated admin analytics to report real internal subscription state by Free,
+  Pro, interval, past-due, and canceled/pending-end segments.
+
 ### UX/Admin Improvements: Mobile Account Access And Admin Analytics v1
 
 - Restored full authenticated mobile account access from the avatar button.

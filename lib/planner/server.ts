@@ -8,6 +8,7 @@ import {
   outfitPlan,
   wardrobeItem,
 } from '@/lib/db/schema'
+import { assertPlannerAdaptationAllowed } from '@/lib/subscription'
 import { createWearLogForUser } from '@/lib/wear/server'
 import type { CreateOutfitPlanInput, PatchOutfitPlanInput } from './validation'
 import {
@@ -231,6 +232,13 @@ export async function updateOutfitPlanForUser(
 ) {
   const existing = await getOutfitPlanForUser(userId, id)
   await assertPlanReferences(userId, input)
+  if (
+    input.outfitId &&
+    input.outfitId !== existing.outfitId &&
+    existing.weatherChange?.changed
+  ) {
+    await assertPlannerAdaptationAllowed(userId)
+  }
 
   const patch = {
     ...input,

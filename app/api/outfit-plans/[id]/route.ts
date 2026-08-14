@@ -8,6 +8,7 @@ import {
   updateOutfitPlanForUser,
 } from '@/lib/planner'
 import { patchOutfitPlanSchema } from '@/lib/planner/validation'
+import { EntitlementError } from '@/lib/subscription'
 
 async function getCurrentUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -15,6 +16,13 @@ async function getCurrentUserId() {
 }
 
 function plannerError(error: unknown) {
+  if (error instanceof EntitlementError) {
+    return NextResponse.json(
+      { error: error.code, code: error.code },
+      { status: 402 },
+    )
+  }
+
   if (error instanceof OutfitPlanError) {
     const status = error.code === 'not_found' ? 404 : 403
     return NextResponse.json({ error: error.code }, { status })

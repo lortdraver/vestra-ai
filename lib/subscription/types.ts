@@ -5,7 +5,9 @@ export const subscriptionStatuses = [
   'active',
   'trialing',
   'past_due',
+  'paused',
   'canceled',
+  'inactive',
   'expired',
 ] as const
 export type SubscriptionStatus = (typeof subscriptionStatuses)[number]
@@ -51,6 +53,9 @@ export type SubscriptionSnapshot = {
   isPremium: boolean
   isTrialActive: boolean
   trialEndsAt: Date | null
+  billingInterval?: 'monthly' | 'annual' | null
+  currentPeriodEnd?: Date | null
+  cancelAtPeriodEnd?: boolean
   usage: SubscriptionUsageSnapshot
 }
 

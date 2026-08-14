@@ -80,6 +80,10 @@ export type AdminAnalyticsSnapshot = {
     freeUsers: number
     premiumUsers: number
     trialUsers: number
+    monthlyProUsers: number
+    annualProUsers: number
+    pastDueUsers: number
+    canceledUsers: number
   }
   funnel: {
     stages: Array<{
@@ -136,6 +140,9 @@ export type AdminAnalyticsSource = {
     userId: string
     planKey: string
     status: string
+    billingInterval: string | null
+    currentPeriodEnd: Date | null
+    cancelAtPeriodEnd: boolean
     updatedAt: Date
   }>
   wardrobeItems: Array<{
@@ -290,7 +297,12 @@ function planForSubscription(
   if (subscriptionEntry?.status === 'trialing') return 'trial'
   if (
     subscriptionEntry?.planKey === 'premium' &&
-    subscriptionEntry.status === 'active'
+    (subscriptionEntry.status === 'active' ||
+      subscriptionEntry.status === 'past_due' ||
+      (subscriptionEntry.status === 'canceled' &&
+        subscriptionEntry.cancelAtPeriodEnd &&
+        subscriptionEntry.currentPeriodEnd &&
+        subscriptionEntry.currentPeriodEnd > new Date()))
   ) {
     return 'premium'
   }
@@ -575,6 +587,25 @@ export function buildAdminAnalyticsSnapshot(
   ).length
   const trialUsers = subscriptionPlans.filter((plan) => plan === 'trial').length
   const freeUsers = Math.max(source.users.length - premiumUsers - trialUsers, 0)
+  const latestSubscriptionRows = Array.from(latestSubscriptionByUser.values())
+  const monthlyProUsers = latestSubscriptionRows.filter(
+    (entry) =>
+      entry.planKey === 'premium' &&
+      entry.billingInterval === 'monthly' &&
+      (entry.status === 'active' || entry.status === 'past_due'),
+  ).length
+  const annualProUsers = latestSubscriptionRows.filter(
+    (entry) =>
+      entry.planKey === 'premium' &&
+      entry.billingInterval === 'annual' &&
+      (entry.status === 'active' || entry.status === 'past_due'),
+  ).length
+  const pastDueUsers = latestSubscriptionRows.filter(
+    (entry) => entry.status === 'past_due',
+  ).length
+  const canceledUsers = latestSubscriptionRows.filter(
+    (entry) => entry.status === 'canceled' || entry.cancelAtPeriodEnd,
+  ).length
 
   const recentUsers = [...source.users]
     .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
@@ -652,6 +683,10 @@ export function buildAdminAnalyticsSnapshot(
       freeUsers,
       premiumUsers,
       trialUsers,
+      monthlyProUsers,
+      annualProUsers,
+      pastDueUsers,
+      canceledUsers,
     },
     funnel: {
       stages: [
@@ -842,6 +877,9 @@ export async function loadAdminAnalyticsSource(
         userId: subscription.userId,
         planKey: subscription.planKey,
         status: subscription.status,
+        billingInterval: subscription.billingInterval,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+        cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
         updatedAt: subscription.updatedAt,
       })
       .from(subscription),
@@ -912,6 +950,9 @@ export async function loadAdminAnalyticsSource(
     })),
     subscriptions: subscriptions.map((entry) => ({
       ...entry,
+      currentPeriodEnd: entry.currentPeriodEnd
+        ? toDate(entry.currentPeriodEnd)
+        : null,
       updatedAt: toDate(entry.updatedAt),
     })),
     wardrobeItems: wardrobeItems.map((entry) => ({

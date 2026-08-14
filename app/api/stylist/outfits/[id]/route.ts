@@ -7,6 +7,7 @@ import { trackServerEvent } from '@/lib/analytics/server'
 import { db } from '@/lib/db'
 import { outfit } from '@/lib/db/schema'
 import { DeleteOutfitError, deleteOutfitForUser } from '@/lib/outfits/delete'
+import { assertSavedOutfitAllowed, EntitlementError } from '@/lib/subscription'
 
 const patchSchema = z.object({
   isSaved: z.boolean().optional(),
@@ -57,6 +58,20 @@ export async function PATCH(
   const parsed = patchSchema.safeParse(await request.json().catch(() => ({})))
   if (!parsed.success) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
+  }
+
+  if (parsed.data.isSaved === true) {
+    try {
+      await assertSavedOutfitAllowed(userId)
+    } catch (error) {
+      if (error instanceof EntitlementError) {
+        return NextResponse.json(
+          { error: error.code, code: error.code },
+          { status: 402 },
+        )
+      }
+      throw error
+    }
   }
 
   const [updated] = await db

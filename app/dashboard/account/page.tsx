@@ -12,11 +12,14 @@ import {
   wardrobeItem,
 } from '@/lib/db/schema'
 import { getDictionary, getLocale } from '@/lib/i18n/server'
+import { getBillingCopy } from '@/lib/billing/copy'
 import { getSubscriptionSnapshot } from '@/lib/subscription/server'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { AccountActions } from '@/components/account/account-actions'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { ManageBillingButton } from '@/components/billing/pricing-client'
+import Link from 'next/link'
 
 export async function generateMetadata(): Promise<Metadata> {
   const dictionary = await getDictionary()
@@ -40,6 +43,7 @@ export default async function AccountPage() {
   ])
   const currentUser = userRows[0]
   if (!currentUser) redirect('/sign-in')
+  const billingCopy = getBillingCopy(locale)
 
   const [wardrobeCount, savedOutfitCount, aiRequestCount, usageRows] =
     await Promise.all([
@@ -177,6 +181,47 @@ export default async function AccountPage() {
           <p className="text-sm text-muted-foreground">
             {dictionary.account.securityBody}
           </p>
+        </AccountCard>
+
+        <AccountCard title={dictionary.account.currentPlan}>
+          <p className="text-sm text-muted-foreground">
+            {subscription.isPremium
+              ? dictionary.subscription.premiumActive
+              : dictionary.subscription.freeActive}
+          </p>
+          {subscription.billingInterval ? (
+            <p className="text-sm">
+              {subscription.billingInterval === 'annual'
+                ? billingCopy.proAnnual
+                : billingCopy.proMonthly}
+            </p>
+          ) : null}
+          {subscription.currentPeriodEnd ? (
+            <p className="text-sm text-muted-foreground">
+              {subscription.cancelAtPeriodEnd
+                ? billingCopy.ends.replace(
+                    '{date}',
+                    subscription.currentPeriodEnd.toLocaleDateString(),
+                  )
+                : billingCopy.nextBilling.replace(
+                    '{date}',
+                    subscription.currentPeriodEnd.toLocaleDateString(),
+                  )}
+            </p>
+          ) : null}
+          {subscription.isPremium ? (
+            <ManageBillingButton
+              label={billingCopy.manage}
+              copy={billingCopy}
+            />
+          ) : (
+            <Link
+              href="/pricing"
+              className="inline-flex h-8 items-center justify-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              {billingCopy.upgrade}
+            </Link>
+          )}
         </AccountCard>
       </section>
     </div>

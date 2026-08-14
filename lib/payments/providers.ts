@@ -3,6 +3,7 @@ import type {
   PaymentProvider,
   PaymentProviderKey,
 } from './types'
+import { getPaddleDiagnostics } from '@/lib/billing'
 
 abstract class AbstractPendingProvider implements PaymentProvider {
   abstract key: PaymentProviderKey
@@ -19,6 +20,26 @@ abstract class AbstractPendingProvider implements PaymentProvider {
 
 export class StripeProvider extends AbstractPendingProvider {
   key = 'stripe' as const
+}
+
+export class PaddleProvider implements PaymentProvider {
+  key = 'paddle' as const
+
+  async createCheckout(): Promise<CheckoutResult> {
+    const diagnostics = getPaddleDiagnostics()
+    return {
+      provider: this.key,
+      status:
+        diagnostics.hasApiKey &&
+        diagnostics.hasClientToken &&
+        diagnostics.hasMonthlyPriceId &&
+        diagnostics.hasAnnualPriceId
+          ? 'configured'
+          : 'not_configured',
+      checkoutUrl: null,
+      message: 'Paddle checkout is handled by the authenticated billing API.',
+    }
+  }
 }
 
 export class PayriffProvider extends AbstractPendingProvider {
@@ -46,6 +67,8 @@ export function getPaymentProvider(
   provider: PaymentProviderKey = 'manual',
 ): PaymentProvider {
   switch (provider) {
+    case 'paddle':
+      return new PaddleProvider()
     case 'stripe':
       return new StripeProvider()
     case 'payriff':

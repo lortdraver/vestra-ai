@@ -247,6 +247,26 @@ export function AdminAnalyticsDashboard({
             label: copy.labels.trialUsers,
             value: numberFormatter.format(snapshot.subscriptions.trialUsers),
           },
+          {
+            label: copy.labels.monthlyProUsers,
+            value: numberFormatter.format(
+              snapshot.subscriptions.monthlyProUsers,
+            ),
+          },
+          {
+            label: copy.labels.annualProUsers,
+            value: numberFormatter.format(
+              snapshot.subscriptions.annualProUsers,
+            ),
+          },
+          {
+            label: copy.labels.pastDueUsers,
+            value: numberFormatter.format(snapshot.subscriptions.pastDueUsers),
+          },
+          {
+            label: copy.labels.canceledUsers,
+            value: numberFormatter.format(snapshot.subscriptions.canceledUsers),
+          },
         ]}
         compact
       />

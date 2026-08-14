@@ -1,162 +1,111 @@
 # Subscription Architecture
 
-## Scope
+Vestra subscriptions use the existing internal subscription model with Paddle
+Billing added in sandbox mode for Monetization v1.
 
-Milestone 5 introduces subscription architecture without real payment
-processing.
+## Source Of Truth
 
-Implemented:
+The database is authoritative:
 
-- Free and Premium plan definitions.
-- Subscription database schema.
-- Usage limit and feature flag helpers.
-- Premium trial support for 7 days.
-- Payment provider abstraction.
-- Dashboard subscription UI.
-- Tests for plan behavior, limits, trials, and provider abstraction.
-
-Not implemented yet:
-
-- real Stripe checkout;
-- real Payriff checkout;
-- real Epoint checkout;
-- webhook processing;
-- billing portal;
-- automatic plan enforcement in product flows;
-- invoices, refunds, tax, or coupons.
+- browser checkout success never grants Pro;
+- verified Paddle webhooks update internal subscription rows;
+- entitlement checks read internal Vestra state.
 
 ## Plans
 
-### Free
+Internal plan keys:
 
-The Free plan keeps Vestra useful without payment.
+- `free`
+- `premium`
 
-Limits:
+`premium` is shown publicly as Vestra Pro.
 
-- wardrobe items: 50;
-- AI analyses per month: 20;
-- stylist requests per month: 10;
-- background removals per month: 20;
-- saved outfits: 10.
+Free limits:
 
-Features:
+- 30 wardrobe items;
+- 5 stylist generations per week;
+- 10 saved outfits;
+- basic planner/weather access.
 
-- wardrobe core;
-- basic AI analysis;
-- basic stylist.
+Pro limits:
 
-### Premium
+- 300 wardrobe items;
+- 250 stylist generations per month;
+- 500 saved outfits;
+- higher fair-use AI/background-removal limits;
+- full weather-aware planner adaptation.
 
-The Premium plan is designed for active users.
+## Status Policy
 
-Limits:
-
-- unlimited wardrobe items;
-- unlimited AI analyses;
-- unlimited stylist requests;
-- unlimited background removals;
-- unlimited saved outfits.
-
-Features:
-
-- wardrobe core;
-- basic and advanced AI analysis;
-- basic and unlimited stylist;
-- wardrobe insights;
-- premium support;
-- virtual try-on readiness.
-
-Trial:
-
-- 7 days.
+- `active`: Pro
+- `trialing`: Pro
+- `past_due`: temporary Pro grace policy
+- `paused`: Free
+- `canceled`: Pro only while `cancelAtPeriodEnd=true` and
+  `currentPeriodEnd` is in the future
+- `inactive` / `expired`: Free
 
 ## Database
 
 Tables:
 
-- `subscription_plan` - available plans, features, limits, pricing metadata,
-  and trial length.
-- `payment_provider` - configured payment provider records.
-- `subscription` - user subscription state and provider metadata.
-- `subscription_usage` - per-user usage counters by feature and period.
+- `subscription_plan`
+- `payment_provider`
+- `subscription`
+- `subscription_usage`
+- `billing_webhook_event`
 
-All user-owned subscription data includes `userId`.
-
-Apply the schema:
+Migration:
 
 ```bash
 pnpm db:apply
 ```
 
-This applies `drizzle/0005_subscription_architecture.sql`.
+This includes `drizzle/0015_paddle_billing.sql`.
 
-## Domain Modules
+## Entitlements
 
-Subscription modules live in `lib/subscription`.
+Reusable server-side helpers live in `lib/subscription/entitlements.ts`.
 
-Key exports:
+Enforced boundaries:
 
-- `subscriptionPlans`
-- `getSubscriptionPlan`
-- `hasFeature`
-- `checkUsage`
-- `isTrialActive`
-- `createTrialWindow`
-- `getSubscriptionSnapshot`
-
-Payment modules live in `lib/payments`.
-
-Providers:
-
-- `StripeProvider`
-- `PayriffProvider`
-- `EpointProvider`
-- `ManualProvider`
-
-Provider responses are intentionally inert until real payment processing is
-approved.
-
-## UI
-
-The dashboard layout renders `SubscriptionOverview`.
-
-It shows:
-
-- current plan badge;
-- upgrade/premium banner;
-- usage counters;
-- trial status;
-- Premium state.
-
-If subscription tables are not available yet, the dashboard falls back to a Free
-snapshot instead of breaking existing development flows.
-
-## Enforcement Strategy
-
-Milestone 5 does not enforce product limits inside wardrobe or stylist flows.
-This preserves M1-M4.5 behavior.
-
-Future enforcement should happen at API boundaries:
-
-- wardrobe create;
-- AI analysis trigger;
-- background removal;
+- wardrobe item creation;
 - stylist generation;
-- save outfit.
+- saved outfit creation;
+- Pro-only weather adaptation for planner outfits.
 
-Each enforcement point should:
+Stable errors:
 
-1. read the authenticated user;
-2. load the subscription snapshot;
-3. call `checkUsage`;
-4. reject with a localized upgrade response when blocked;
-5. increment usage only after successful work.
+- `plan_limit_reached`
+- `pro_required`
+- `stylist_limit_reached`
+- `wardrobe_limit_reached`
+- `saved_outfit_limit_reached`
 
-## Production Notes
+## Paddle
 
-- Do not enable real provider checkout without webhook validation.
-- Do not trust client-side plan state.
-- Store provider customer/subscription IDs only after webhook confirmation.
-- Keep manual activation restricted to admin/internal workflows.
-- Add rate limits before public launch.
-- Add billing audit logs before real payments.
+Paddle configuration and webhook processing live in `lib/billing`.
+
+Routes:
+
+- `POST /api/billing/paddle/checkout`
+- `POST /api/billing/paddle/portal`
+- `POST /api/webhooks/paddle`
+
+Checkout accepts only `monthly` or `annual`. Server config maps those choices to
+trusted Paddle price IDs.
+
+## Admin
+
+Admin analytics reads internal subscription rows and reports:
+
+- Free users;
+- Pro users;
+- trial users;
+- monthly Pro;
+- annual Pro;
+- past-due users;
+- canceled / pending-period-end users.
+
+MRR is intentionally not calculated in v1 because tax, fees, refunds, coupons,
+and multi-currency behavior are not modeled yet.

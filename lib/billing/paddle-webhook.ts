@@ -1,0 +1,364 @@
+import { and, desc, eq, or } from 'drizzle-orm'
+import { trackServerEvent } from '@/lib/analytics/server'
+import { db } from '@/lib/db'
+import { billingWebhookEvent, subscription, user } from '@/lib/db/schema'
+import {
+  getIntervalForPaddlePriceId,
+  getPaddleWebhookConfig,
+} from './paddle-config'
+import { verifyPaddleSignature } from './paddle-signature'
+
+export type PaddleWebhookProcessResult = {
+  ok: true
+  eventId: string
+  eventType: string
+  status: 'processed' | 'ignored' | 'duplicate' | 'unmatched_user'
+}
+
+export class PaddleWebhookError extends Error {
+  constructor(
+    public code:
+      | 'paddle_webhook_invalid_signature'
+      | 'paddle_not_configured'
+      | 'paddle_webhook_processing_failed',
+    public status = 400,
+  ) {
+    super(code)
+  }
+}
+
+const supportedEvents = new Set([
+  'transaction.completed',
+  'transaction.payment_failed',
+  'subscription.created',
+  'subscription.activated',
+  'subscription.updated',
+  'subscription.canceled',
+  'subscription.past_due',
+  'subscription.paused',
+  'subscription.resumed',
+  'subscription.trialing',
+])
+
+function toDate(value: unknown) {
+  if (!value || typeof value !== 'string') return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object'
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
+function getNestedString(record: Record<string, unknown>, keys: string[]) {
+  let cursor: unknown = record
+  for (const key of keys) {
+    cursor = asRecord(cursor)[key]
+  }
+  return typeof cursor === 'string' ? cursor : null
+}
+
+function firstPriceId(data: Record<string, unknown>) {
+  const items = Array.isArray(data.items) ? data.items : []
+  for (const item of items) {
+    const record = asRecord(item)
+    const priceId =
+      getNestedString(record, ['price', 'id']) ||
+      getNestedString(record, ['price', 'price_id']) ||
+      (typeof record.price_id === 'string' ? record.price_id : null)
+    if (priceId) return priceId
+  }
+  return null
+}
+
+function normalizeStatus(eventType: string, providerStatus: string | null) {
+  if (eventType === 'subscription.canceled') return 'canceled'
+  if (eventType === 'subscription.past_due') return 'past_due'
+  if (eventType === 'subscription.paused') return 'paused'
+  if (eventType === 'subscription.resumed') return 'active'
+  if (eventType === 'subscription.trialing') return 'trialing'
+  if (
+    ['active', 'trialing', 'past_due', 'paused', 'canceled'].includes(
+      providerStatus ?? '',
+    )
+  ) {
+    return providerStatus as string
+  }
+  return eventType === 'transaction.payment_failed' ? 'past_due' : 'active'
+}
+
+function extractPaddleData(payload: Record<string, unknown>) {
+  const data = asRecord(payload.data)
+  const eventType = String(payload.event_type ?? payload.eventType ?? '')
+  const eventId = String(payload.event_id ?? payload.id ?? '')
+  const customData = asRecord(data.custom_data ?? data.customData)
+  const priceId =
+    firstPriceId(data) ||
+    getNestedString(data, ['price', 'id']) ||
+    (typeof data.price_id === 'string' ? data.price_id : null)
+  const period = asRecord(
+    data.current_billing_period ?? data.currentBillingPeriod,
+  )
+  const scheduledChange = asRecord(
+    data.scheduled_change ?? data.scheduledChange,
+  )
+
+  return {
+    eventId,
+    eventType,
+    occurredAt: toDate(String(payload.occurred_at ?? payload.occurredAt ?? '')),
+    userId:
+      typeof customData.vestraUserId === 'string'
+        ? customData.vestraUserId
+        : null,
+    customerId:
+      typeof data.customer_id === 'string'
+        ? data.customer_id
+        : typeof data.customerId === 'string'
+          ? data.customerId
+          : null,
+    subscriptionId:
+      typeof data.subscription_id === 'string'
+        ? data.subscription_id
+        : typeof data.subscriptionId === 'string'
+          ? data.subscriptionId
+          : typeof data.id === 'string' && eventType.startsWith('subscription.')
+            ? data.id
+            : null,
+    priceId,
+    status: normalizeStatus(
+      eventType,
+      typeof data.status === 'string' ? data.status : null,
+    ),
+    currentPeriodStart: toDate(
+      String(period.starts_at ?? period.startsAt ?? ''),
+    ),
+    currentPeriodEnd: toDate(String(period.ends_at ?? period.endsAt ?? '')),
+    cancelAtPeriodEnd:
+      scheduledChange.action === 'cancel' ||
+      scheduledChange.action === 'pause' ||
+      false,
+    canceledAt:
+      eventType === 'subscription.canceled'
+        ? (toDate(String(payload.occurred_at ?? payload.occurredAt ?? '')) ??
+          new Date())
+        : null,
+  }
+}
+
+async function findUserId(input: {
+  userId: string | null
+  customerId: string | null
+  subscriptionId: string | null
+}) {
+  if (input.userId) {
+    const [row] = await db
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.id, input.userId))
+      .limit(1)
+    if (row) return row.id
+  }
+
+  const [subscriptionRow] = await db
+    .select({ userId: subscription.userId })
+    .from(subscription)
+    .where(
+      and(
+        eq(subscription.providerKey, 'paddle'),
+        or(
+          input.subscriptionId
+            ? eq(subscription.providerSubscriptionId, input.subscriptionId)
+            : undefined,
+          input.customerId
+            ? eq(subscription.providerCustomerId, input.customerId)
+            : undefined,
+        ),
+      ),
+    )
+    .orderBy(desc(subscription.updatedAt))
+    .limit(1)
+
+  return subscriptionRow?.userId ?? null
+}
+
+async function upsertPaddleSubscription(
+  data: ReturnType<typeof extractPaddleData>,
+) {
+  const matchedUserId = await findUserId(data)
+  if (!matchedUserId) return false
+
+  const interval = getIntervalForPaddlePriceId(data.priceId)
+  const values = {
+    userId: matchedUserId,
+    planKey: 'premium',
+    status: data.status,
+    providerKey: 'paddle',
+    providerCustomerId: data.customerId,
+    providerSubscriptionId: data.subscriptionId,
+    providerPriceId: data.priceId,
+    billingInterval: interval,
+    currentPeriodStart: data.currentPeriodStart,
+    currentPeriodEnd: data.currentPeriodEnd,
+    cancelAtPeriodEnd: data.cancelAtPeriodEnd,
+    canceledAt: data.canceledAt,
+    lastProviderEventAt: data.occurredAt ?? new Date(),
+    metadata: {
+      paddleEnvironment: process.env.PADDLE_ENVIRONMENT ?? 'sandbox',
+    },
+    updatedAt: new Date(),
+  }
+
+  const [existing] = await db
+    .select()
+    .from(subscription)
+    .where(
+      and(
+        eq(subscription.providerKey, 'paddle'),
+        data.subscriptionId
+          ? eq(subscription.providerSubscriptionId, data.subscriptionId)
+          : eq(subscription.userId, matchedUserId),
+      ),
+    )
+    .limit(1)
+
+  if (existing) {
+    await db
+      .update(subscription)
+      .set(values)
+      .where(eq(subscription.id, existing.id))
+  } else {
+    await db.insert(subscription).values(values)
+  }
+
+  return true
+}
+
+function analyticsEventForPaddle(eventType: string) {
+  return (
+    {
+      'transaction.completed': 'checkout_completed_client',
+      'transaction.payment_failed': 'subscription_payment_failed',
+      'subscription.activated': 'subscription_activated',
+      'subscription.canceled': 'subscription_canceled',
+      'subscription.past_due': 'subscription_payment_failed',
+      'subscription.resumed': 'subscription_resumed',
+      'subscription.updated': 'subscription_plan_changed',
+    } as const
+  )[eventType]
+}
+
+export async function processPaddleWebhook(
+  rawBody: string,
+  signature: string | null,
+) {
+  const startedAt = Date.now()
+  const config = getPaddleWebhookConfig()
+  console.info('[paddle] WEBHOOK_RECEIVED', {})
+  if (
+    !verifyPaddleSignature({
+      rawBody,
+      signatureHeader: signature,
+      secret: config.webhookSecret,
+    })
+  ) {
+    console.warn('[paddle] WEBHOOK_FAILED', {
+      code: 'paddle_webhook_invalid_signature',
+      durationMs: Date.now() - startedAt,
+    })
+    throw new PaddleWebhookError('paddle_webhook_invalid_signature', 401)
+  }
+  console.info('[paddle] WEBHOOK_VERIFIED', {})
+
+  const payload = JSON.parse(rawBody) as Record<string, unknown>
+  const data = extractPaddleData(payload)
+  if (!data.eventId || !data.eventType) {
+    throw new PaddleWebhookError('paddle_webhook_processing_failed', 400)
+  }
+
+  const [existingEvent] = await db
+    .select()
+    .from(billingWebhookEvent)
+    .where(
+      and(
+        eq(billingWebhookEvent.provider, 'paddle'),
+        eq(billingWebhookEvent.eventId, data.eventId),
+      ),
+    )
+    .limit(1)
+  if (
+    existingEvent?.status === 'processed' ||
+    existingEvent?.status === 'ignored'
+  ) {
+    console.info('[paddle] WEBHOOK_DUPLICATE', {
+      eventType: data.eventType,
+      eventId: data.eventId.slice(0, 12),
+    })
+    return {
+      ok: true,
+      eventId: data.eventId,
+      eventType: data.eventType,
+      status: 'duplicate',
+    } satisfies PaddleWebhookProcessResult
+  }
+
+  const [eventRow] = existingEvent
+    ? [existingEvent]
+    : await db
+        .insert(billingWebhookEvent)
+        .values({
+          provider: 'paddle',
+          eventId: data.eventId,
+          eventType: data.eventType,
+          occurredAt: data.occurredAt,
+          status: 'received',
+        })
+        .returning()
+
+  if (!supportedEvents.has(data.eventType)) {
+    await db
+      .update(billingWebhookEvent)
+      .set({
+        status: 'ignored',
+        processedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(billingWebhookEvent.id, eventRow.id))
+    return {
+      ok: true,
+      eventId: data.eventId,
+      eventType: data.eventType,
+      status: 'ignored',
+    }
+  }
+
+  const matched = await upsertPaddleSubscription(data)
+  const status = matched ? 'processed' : 'unmatched_user'
+  await db
+    .update(billingWebhookEvent)
+    .set({ status, processedAt: new Date(), updatedAt: new Date() })
+    .where(eq(billingWebhookEvent.id, eventRow.id))
+
+  const eventName = analyticsEventForPaddle(data.eventType)
+  if (matched && eventName) {
+    const matchedUserId = await findUserId(data)
+    void trackServerEvent({
+      eventName,
+      userId: matchedUserId,
+      properties: { provider: 'paddle', status: data.status },
+      dedupeKey: `paddle:${data.eventId}:${eventName}`,
+    })
+  }
+
+  console.info('[paddle] WEBHOOK_PROCESSED', {
+    eventType: data.eventType,
+    eventId: data.eventId.slice(0, 12),
+    matched,
+    providerStatus: data.status,
+    durationMs: Date.now() - startedAt,
+  })
+
+  return { ok: true, eventId: data.eventId, eventType: data.eventType, status }
+}

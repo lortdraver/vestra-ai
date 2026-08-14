@@ -1,6 +1,7 @@
 import type { SubscriptionPlanKey } from '@/lib/subscription'
 
 export const paymentProviderKeys = [
+  'paddle',
   'stripe',
   'payriff',
   'epoint',
@@ -17,7 +18,7 @@ export type CheckoutInput = {
 
 export type CheckoutResult = {
   provider: PaymentProviderKey
-  status: 'not_configured' | 'pending_manual_activation'
+  status: 'not_configured' | 'pending_manual_activation' | 'configured'
   checkoutUrl: string | null
   message: string
 }

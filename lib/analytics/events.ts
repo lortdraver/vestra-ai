@@ -32,11 +32,17 @@ export const analyticsEventNames = [
   'planner_weather_change_detected',
   'planner_outfit_adapted',
   'planner_outfit_marked_worn',
+  'pricing_viewed',
   'upgrade_viewed',
   'checkout_started',
+  'checkout_completed_client',
   'subscription_started',
+  'subscription_activated',
   'subscription_trial_started',
   'subscription_cancelled',
+  'subscription_canceled',
+  'subscription_payment_failed',
+  'subscription_resumed',
   'subscription_plan_changed',
 ] as const
 

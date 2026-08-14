@@ -290,11 +290,15 @@ export const subscription = pgTable(
     providerKey: text('providerKey').notNull().default('manual'),
     providerCustomerId: text('providerCustomerId'),
     providerSubscriptionId: text('providerSubscriptionId'),
+    providerPriceId: text('providerPriceId'),
+    billingInterval: text('billingInterval'),
     trialStartedAt: timestamp('trialStartedAt'),
     trialEndsAt: timestamp('trialEndsAt'),
     currentPeriodStart: timestamp('currentPeriodStart'),
     currentPeriodEnd: timestamp('currentPeriodEnd'),
     cancelAtPeriodEnd: boolean('cancelAtPeriodEnd').notNull().default(false),
+    canceledAt: timestamp('canceledAt'),
+    lastProviderEventAt: timestamp('lastProviderEventAt'),
     metadata: jsonb('metadata')
       .$type<Record<string, unknown>>()
       .notNull()
@@ -311,6 +315,38 @@ export const subscription = pgTable(
     providerSubscriptionIdx: index('subscription_provider_subscription_idx').on(
       table.providerKey,
       table.providerSubscriptionId,
+    ),
+    providerCustomerIdx: index('subscription_provider_customer_idx').on(
+      table.providerKey,
+      table.providerCustomerId,
+    ),
+  }),
+)
+
+export const billingWebhookEvent = pgTable(
+  'billing_webhook_event',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    provider: text('provider').notNull(),
+    eventId: text('eventId').notNull(),
+    eventType: text('eventType').notNull(),
+    occurredAt: timestamp('occurredAt'),
+    processedAt: timestamp('processedAt'),
+    status: text('status').notNull().default('received'),
+    metadata: jsonb('metadata')
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp('createdAt').notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+  },
+  (table) => ({
+    providerEventIdx: uniqueIndex(
+      'billing_webhook_event_provider_event_idx',
+    ).on(table.provider, table.eventId),
+    eventTypeIdx: index('billing_webhook_event_type_idx').on(
+      table.provider,
+      table.eventType,
     ),
   }),
 )

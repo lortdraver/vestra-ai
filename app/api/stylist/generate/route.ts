@@ -26,6 +26,10 @@ import {
   stylistPreferenceSchema,
 } from '@/lib/stylist/preferences'
 import {
+  assertStylistGenerationAllowed,
+  EntitlementError,
+} from '@/lib/subscription'
+import {
   finishStylistGeneration,
   getStylistGenerationKey,
   tryStartStylistGeneration,
@@ -562,6 +566,7 @@ export async function POST(request: Request) {
     }
     const userId = verifiedSession.userId
     analyticsUserId = userId
+    await assertStylistGenerationAllowed(userId)
 
     stage = 'AUTHENTICATED'
     logStylistStage(stage)
@@ -1108,6 +1113,19 @@ export async function POST(request: Request) {
       candidates: createdOutfits,
     })
   } catch (error) {
+    if (error instanceof EntitlementError) {
+      return NextResponse.json(
+        {
+          status: 'generation_failed',
+          code: error.code,
+          message: error.code,
+          details: failureDetails,
+          retryable: false,
+        },
+        { status: 402 },
+      )
+    }
+
     if (analyticsUserId) {
       void trackServerEvent({
         eventName: 'stylist_generation_failed',

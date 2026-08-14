@@ -18,6 +18,11 @@ import { db } from '@/lib/db'
 import { wardrobeItem } from '@/lib/db/schema'
 import { getObjectStorage } from '@/lib/storage'
 import type { ObjectStorage, StoredObject } from '@/lib/storage/types'
+import {
+  assertWardrobeItemCreateAllowed,
+  type EntitlementCode,
+  EntitlementError,
+} from '@/lib/subscription'
 import { getWearStatsForItems } from '@/lib/wear/server'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { toWardrobeItemDto } from '@/lib/wardrobe/serialize'
@@ -81,7 +86,7 @@ function logUploadError(stage: UploadStage, error: unknown) {
 }
 
 function uploadJsonError(
-  code: ApiErrorCode | 'upload_unexpected_error',
+  code: ApiErrorCode | EntitlementCode | 'upload_unexpected_error',
   status: number,
   stage: UploadStage,
   message: string,
@@ -169,6 +174,7 @@ export async function POST(request: Request) {
     userId = verifiedSession.userId
     stage = 'AUTHENTICATED'
     logUploadStage(stage, { userId })
+    await assertWardrobeItemCreateAllowed(userId)
 
     const formData = await request.formData()
     stage = 'FORM_PARSED'
@@ -510,6 +516,10 @@ export async function POST(request: Request) {
       { status: 201 },
     )
   } catch (error) {
+    if (error instanceof EntitlementError) {
+      return uploadJsonError(error.code, 402, stage, error.code)
+    }
+
     logUploadError(stage, error)
     const code = getUploadErrorCode(stage, error)
     const message =

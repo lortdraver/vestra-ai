@@ -62,6 +62,15 @@
   `open_meteo`. Defaults to `https://geocoding-api.open-meteo.com/v1`.
 - `WEATHER_REQUEST_TIMEOUT_MS` - timeout for weather provider calls.
 - `WEATHER_CACHE_TTL_SECONDS` - in-memory weather cache TTL.
+- `PADDLE_ENVIRONMENT` - `sandbox` for Monetization v1. Do not use live mode
+  until the live launch checklist is complete.
+- `PADDLE_API_KEY` - server-only Paddle API key.
+- `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` - Paddle client-side token used by
+  Paddle.js.
+- `PADDLE_WEBHOOK_SECRET` - server-only webhook signing secret.
+- `PADDLE_PRO_MONTHLY_PRICE_ID` - trusted Paddle sandbox monthly price id.
+- `PADDLE_PRO_ANNUAL_PRICE_ID` - trusted Paddle sandbox annual price id.
+- `PADDLE_REQUEST_TIMEOUT_MS` - timeout for Paddle API calls.
 
 ## Public Variables
 
@@ -280,6 +289,30 @@ Run a server-only sanitized connectivity check with:
 pnpm weather:diagnose
 ```
 
+## Paddle Billing Sandbox
+
+Monetization v1 uses Paddle Billing in sandbox mode first:
+
+```env
+PADDLE_ENVIRONMENT="sandbox"
+PADDLE_API_KEY=""
+NEXT_PUBLIC_PADDLE_CLIENT_TOKEN=""
+PADDLE_WEBHOOK_SECRET=""
+PADDLE_PRO_MONTHLY_PRICE_ID=""
+PADDLE_PRO_ANNUAL_PRICE_ID=""
+PADDLE_REQUEST_TIMEOUT_MS="10000"
+```
+
+The webhook URL is:
+
+```text
+https://www.vestraapp.uk/api/webhooks/paddle
+```
+
+The server maps `monthly` and `annual` choices to trusted price IDs. The browser
+never receives `PADDLE_API_KEY` or `PADDLE_WEBHOOK_SECRET`, and Pro is granted
+only after verified webhook state is stored in the database.
+
 ## Production Checklist
 
 Before public deployment, manually configure and verify:
@@ -306,6 +339,10 @@ Before public deployment, manually configure and verify:
   `WEATHER_GEOCODING_API_BASE_URL=https://geocoding-api.open-meteo.com/v1`,
   and timeout/cache values. If using `WEATHER_PROVIDER=api`, provide the
   vendor's server-only `WEATHER_API_KEY` and normalized forecast endpoint.
+- `PADDLE_ENVIRONMENT=sandbox`, `PADDLE_API_KEY`,
+  `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`, `PADDLE_WEBHOOK_SECRET`,
+  `PADDLE_PRO_MONTHLY_PRICE_ID`, and `PADDLE_PRO_ANNUAL_PRICE_ID` are set for
+  Paddle sandbox testing.
 - `BACKGROUND_REMOVAL_PROVIDER=api` with valid background-removal credentials.
 - `STORAGE_DRIVER` uses a production cloud/object storage adapter. Local file
   storage is for development only and is not recommended for public deployment.

@@ -47,6 +47,10 @@ export type AdminAnalyticsCopy = {
     freeUsers: string
     premiumUsers: string
     trialUsers: string
+    monthlyProUsers: string
+    annualProUsers: string
+    pastDueUsers: string
+    canceledUsers: string
     registered: string
     emailVerified: string
     firstWardrobe: string
@@ -149,6 +153,10 @@ const copy: Record<Locale, AdminAnalyticsCopy> = {
       freeUsers: 'Free istifad\u0259\u00e7il\u0259r',
       premiumUsers: 'Premium istifad\u0259\u00e7il\u0259r',
       trialUsers: 'S\u0131naq istifad\u0259\u00e7il\u0259ri',
+      monthlyProUsers: 'Ayl\u0131q Pro',
+      annualProUsers: '\u0130llik Pro',
+      pastDueUsers: '\u00d6d\u0259ni\u015f problemi',
+      canceledUsers: 'L\u0259\u011fv edil\u0259nl\u0259r',
       registered: 'Qeydiyyat',
       emailVerified: 'E-po\u00e7t t\u0259sdiqi',
       firstWardrobe: '\u0130lk qarderob geyimi',
@@ -250,6 +258,10 @@ const copy: Record<Locale, AdminAnalyticsCopy> = {
       freeUsers: 'Free users',
       premiumUsers: 'Premium users',
       trialUsers: 'Trial users',
+      monthlyProUsers: 'Monthly Pro',
+      annualProUsers: 'Annual Pro',
+      pastDueUsers: 'Past due',
+      canceledUsers: 'Canceled / pending end',
       registered: 'Registered',
       emailVerified: 'Email verified',
       firstWardrobe: 'First wardrobe item',
@@ -379,6 +391,12 @@ const copy: Record<Locale, AdminAnalyticsCopy> = {
         'Premium \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0438',
       trialUsers:
         '\u041f\u0440\u043e\u0431\u043d\u044b\u0435 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0438',
+      monthlyProUsers: 'Pro \u043d\u0430 \u043c\u0435\u0441\u044f\u0446',
+      annualProUsers: 'Pro \u043d\u0430 \u0433\u043e\u0434',
+      pastDueUsers:
+        '\u041f\u0440\u043e\u0431\u043b\u0435\u043c\u0430 \u0441 \u043e\u043f\u043b\u0430\u0442\u043e\u0439',
+      canceledUsers:
+        '\u041e\u0442\u043c\u0435\u043d\u0435\u043d\u043e / \u0434\u043e \u043a\u043e\u043d\u0446\u0430 \u043f\u0435\u0440\u0438\u043e\u0434\u0430',
       registered:
         '\u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044f',
       emailVerified:

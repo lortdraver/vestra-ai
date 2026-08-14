@@ -27,11 +27,36 @@ function createEmptyUsage(): SubscriptionUsageSnapshot {
 }
 
 function toSubscriptionStatus(status: string | null | undefined) {
-  return ['active', 'trialing', 'past_due', 'canceled', 'expired'].includes(
-    status ?? '',
-  )
+  return [
+    'active',
+    'trialing',
+    'past_due',
+    'paused',
+    'canceled',
+    'inactive',
+    'expired',
+  ].includes(status ?? '')
     ? (status as SubscriptionStatus)
     : 'active'
+}
+
+function isSubscriptionEntitled(
+  row: typeof subscription.$inferSelect | undefined,
+  now: Date,
+) {
+  if (!row) return false
+  const status = toSubscriptionStatus(row.status)
+  if (status === 'active' || status === 'trialing') return true
+  if (status === 'past_due') return true
+  if (
+    status === 'canceled' &&
+    row.cancelAtPeriodEnd &&
+    row.currentPeriodEnd &&
+    row.currentPeriodEnd.getTime() > now.getTime()
+  ) {
+    return true
+  }
+  return false
 }
 
 export async function getSubscriptionSnapshot(
@@ -66,13 +91,22 @@ export async function getSubscriptionSnapshot(
   }
 
   const trialActive = isTrialActive(subscriptionRow?.trialEndsAt, now)
+  const entitled = isSubscriptionEntitled(subscriptionRow, now)
 
   return {
     plan,
     status: toSubscriptionStatus(subscriptionRow?.status),
-    isPremium: isPremiumPlan(subscriptionRow?.planKey) || trialActive,
+    isPremium:
+      (isPremiumPlan(subscriptionRow?.planKey) && entitled) || trialActive,
     isTrialActive: trialActive,
     trialEndsAt: subscriptionRow?.trialEndsAt ?? null,
+    billingInterval:
+      subscriptionRow?.billingInterval === 'monthly' ||
+      subscriptionRow?.billingInterval === 'annual'
+        ? subscriptionRow.billingInterval
+        : null,
+    currentPeriodEnd: subscriptionRow?.currentPeriodEnd ?? null,
+    cancelAtPeriodEnd: subscriptionRow?.cancelAtPeriodEnd ?? false,
     usage,
   }
 }
@@ -84,6 +118,9 @@ export function getFallbackSubscriptionSnapshot(): SubscriptionSnapshot {
     isPremium: false,
     isTrialActive: false,
     trialEndsAt: null,
+    billingInterval: null,
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
     usage: createEmptyUsage(),
   }
 }
