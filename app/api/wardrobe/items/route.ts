@@ -62,7 +62,28 @@ type UploadStage =
   | 'SUCCESS'
 
 function logUploadStage(stage: UploadStage, context?: Record<string, unknown>) {
-  console.info(`[upload] ${stage}`, context ?? {})
+  console.info(`[upload] ${stage}`, sanitizeUploadContext(context))
+}
+
+function sanitizeUploadContext(context?: Record<string, unknown>) {
+  if (!context) return {}
+
+  const safeContext: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(context)) {
+    if (key === 'userId') {
+      safeContext.userPresent = Boolean(value)
+      continue
+    }
+
+    if (key.toLowerCase().includes('storagekey')) {
+      safeContext[`${key}Present`] = Boolean(value)
+      continue
+    }
+
+    safeContext[key] = value
+  }
+
+  return safeContext
 }
 
 function logUploadError(stage: UploadStage, error: unknown) {

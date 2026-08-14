@@ -168,8 +168,8 @@ export function logThumbnailStage(
   context: Record<string, unknown>,
 ) {
   const safeContext = {
-    userId: context.userId,
-    itemId: context.itemId,
+    userPresent: Boolean(context.userId),
+    itemPresent: Boolean(context.itemId),
     source: context.source,
     storageDriver: context.storageDriver,
     width: context.width,

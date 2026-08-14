@@ -118,18 +118,14 @@ describe('responsive UI contracts', () => {
     expect(appHeaderSource).toContain('dictionary.dashboard.signOut')
     expect(appHeaderSource).toContain('LanguageSwitcher')
     expect(appHeaderSource).toContain('data-testid="mobile-app-header"')
-    expect(appHeaderSource).toContain('data-mobile-header-version="5"')
-    expect(appHeaderSource).toContain(
-      'data-testid="mobile-header-debug-marker"',
-    )
     expect(appHeaderSource).toContain('data-testid="mobile-account-trigger"')
-    expect(appHeaderSource).toContain('TOPBAR-V5')
+    expect(appHeaderSource).not.toContain('data-mobile-header-version')
+    expect(appHeaderSource).not.toContain('mobile-header-debug-marker')
+    expect(appHeaderSource).not.toContain('TOPBAR-V5')
+    expect(appHeaderSource).not.toContain('RUNTIME-V4')
     expect(appHeaderSource).toContain('const serverUser = user ?? null')
     expect(appHeaderSource).toContain('const topBarUser = serverUser')
-    expect(appHeaderSource).toContain('[mobile-header] APP_HEADER_RENDERED')
-    expect(appHeaderSource).toContain(
-      '[mobile-header] MOBILE_HEADER_BRANCH_RENDERED',
-    )
+    expect(appHeaderSource).not.toContain('[mobile-header]')
     expect(appHeaderSource).toContain('MOBILE_TOP_BAR_CLASS')
     expect(appHeaderSource).toContain('className="hidden md:block"')
     expect(appHeaderSource).toContain(

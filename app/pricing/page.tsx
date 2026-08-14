@@ -13,6 +13,7 @@ import {
   ManageBillingButton,
   PaddleCheckoutButton,
 } from '@/components/billing/pricing-client'
+import { PublicFooter } from '@/components/public-footer'
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale()
@@ -39,124 +40,127 @@ export default async function PricingPage() {
   }
 
   return (
-    <main className="mx-auto grid min-h-screen w-full max-w-6xl gap-8 px-4 py-10 md:px-6">
-      <section className="grid gap-3">
-        <p className="inline-flex w-fit items-center gap-2 rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
-          <Crown className="size-3.5" aria-hidden="true" />
-          Paddle Sandbox
-        </p>
-        <h1 className="font-serif text-4xl font-medium tracking-tight md:text-5xl">
-          {copy.title}
-        </h1>
-        <p className="max-w-2xl text-muted-foreground">{copy.subtitle}</p>
-      </section>
+    <div className="min-h-screen bg-background">
+      <main className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-10 md:px-6">
+        <section className="grid gap-3">
+          <p className="inline-flex w-fit items-center gap-2 rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
+            <Crown className="size-3.5" aria-hidden="true" />
+            Paddle Sandbox
+          </p>
+          <h1 className="font-serif text-4xl font-medium tracking-tight md:text-5xl">
+            {copy.title}
+          </h1>
+          <p className="max-w-2xl text-muted-foreground">{copy.subtitle}</p>
+        </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <PricingCard
-          title={copy.free}
-          price="$0"
-          features={copy.features.free}
-          action={
-            subscription?.plan.key === 'free' ? (
-              <p className="text-sm font-medium text-muted-foreground">
-                {copy.currentPlan}
-              </p>
-            ) : null
-          }
-        />
-        <PricingCard
-          title={copy.proMonthly}
-          price={copy.monthlyPrice}
-          features={copy.features.pro}
-          action={
-            session?.user ? (
-              subscription?.paymentIssue ? (
-                <ManageBillingButton
-                  label={copy.updatePaymentMethod}
-                  copy={copy}
-                />
-              ) : subscription?.isPremium &&
-                subscription.billingInterval === 'monthly' ? (
-                <CurrentPlanNote
-                  copy={copy}
-                  note={
-                    subscription.cancelAtPeriodEnd && subscription.accessUntil
-                      ? copy.accessUntil.replace(
-                          '{date}',
-                          subscription.accessUntil.toLocaleDateString(),
-                        )
-                      : null
-                  }
-                />
-              ) : subscription?.isPremium ? (
-                <BillingActionButton
-                  endpoint="/api/billing/paddle/switch"
-                  label={copy.switchToMonthly}
-                  copy={copy}
-                  body={{ interval: 'monthly' }}
-                />
+        <section className="grid gap-4 md:grid-cols-3">
+          <PricingCard
+            title={copy.free}
+            price="$0"
+            features={copy.features.free}
+            action={
+              subscription?.plan.key === 'free' ? (
+                <p className="text-sm font-medium text-muted-foreground">
+                  {copy.currentPlan}
+                </p>
+              ) : null
+            }
+          />
+          <PricingCard
+            title={copy.proMonthly}
+            price={copy.monthlyPrice}
+            features={copy.features.pro}
+            action={
+              session?.user ? (
+                subscription?.paymentIssue ? (
+                  <ManageBillingButton
+                    label={copy.updatePaymentMethod}
+                    copy={copy}
+                  />
+                ) : subscription?.isPremium &&
+                  subscription.billingInterval === 'monthly' ? (
+                  <CurrentPlanNote
+                    copy={copy}
+                    note={
+                      subscription.cancelAtPeriodEnd && subscription.accessUntil
+                        ? copy.accessUntil.replace(
+                            '{date}',
+                            subscription.accessUntil.toLocaleDateString(),
+                          )
+                        : null
+                    }
+                  />
+                ) : subscription?.isPremium ? (
+                  <BillingActionButton
+                    endpoint="/api/billing/paddle/switch"
+                    label={copy.switchToMonthly}
+                    copy={copy}
+                    body={{ interval: 'monthly' }}
+                  />
+                ) : (
+                  <PaddleCheckoutButton
+                    interval="monthly"
+                    label={copy.upgrade}
+                    copy={copy}
+                  />
+                )
               ) : (
-                <PaddleCheckoutButton
-                  interval="monthly"
-                  label={copy.upgrade}
-                  copy={copy}
-                />
+                <Link href="/sign-in" className={buttonVariants()}>
+                  {copy.signIn}
+                </Link>
               )
-            ) : (
-              <Link href="/sign-in" className={buttonVariants()}>
-                {copy.signIn}
-              </Link>
-            )
-          }
-        />
-        <PricingCard
-          title={copy.proAnnual}
-          price={copy.annualPrice}
-          badge={copy.annualSavings}
-          features={copy.features.pro}
-          action={
-            session?.user ? (
-              subscription?.paymentIssue ? (
-                <ManageBillingButton
-                  label={copy.updatePaymentMethod}
-                  copy={copy}
-                />
-              ) : subscription?.isPremium &&
-                subscription.billingInterval === 'annual' ? (
-                <CurrentPlanNote
-                  copy={copy}
-                  note={
-                    subscription.cancelAtPeriodEnd && subscription.accessUntil
-                      ? copy.accessUntil.replace(
-                          '{date}',
-                          subscription.accessUntil.toLocaleDateString(),
-                        )
-                      : null
-                  }
-                />
-              ) : subscription?.isPremium ? (
-                <BillingActionButton
-                  endpoint="/api/billing/paddle/switch"
-                  label={copy.switchToAnnual}
-                  copy={copy}
-                  body={{ interval: 'annual' }}
-                />
+            }
+          />
+          <PricingCard
+            title={copy.proAnnual}
+            price={copy.annualPrice}
+            badge={copy.annualSavings}
+            features={copy.features.pro}
+            action={
+              session?.user ? (
+                subscription?.paymentIssue ? (
+                  <ManageBillingButton
+                    label={copy.updatePaymentMethod}
+                    copy={copy}
+                  />
+                ) : subscription?.isPremium &&
+                  subscription.billingInterval === 'annual' ? (
+                  <CurrentPlanNote
+                    copy={copy}
+                    note={
+                      subscription.cancelAtPeriodEnd && subscription.accessUntil
+                        ? copy.accessUntil.replace(
+                            '{date}',
+                            subscription.accessUntil.toLocaleDateString(),
+                          )
+                        : null
+                    }
+                  />
+                ) : subscription?.isPremium ? (
+                  <BillingActionButton
+                    endpoint="/api/billing/paddle/switch"
+                    label={copy.switchToAnnual}
+                    copy={copy}
+                    body={{ interval: 'annual' }}
+                  />
+                ) : (
+                  <PaddleCheckoutButton
+                    interval="annual"
+                    label={copy.upgrade}
+                    copy={copy}
+                  />
+                )
               ) : (
-                <PaddleCheckoutButton
-                  interval="annual"
-                  label={copy.upgrade}
-                  copy={copy}
-                />
+                <Link href="/sign-in" className={buttonVariants()}>
+                  {copy.signIn}
+                </Link>
               )
-            ) : (
-              <Link href="/sign-in" className={buttonVariants()}>
-                {copy.signIn}
-              </Link>
-            )
-          }
-        />
-      </section>
-    </main>
+            }
+          />
+        </section>
+      </main>
+      <PublicFooter locale={locale} />
+    </div>
   )
 }
 

@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import { getDictionary, getLocale } from '@/lib/i18n/server'
 import { buttonVariants } from '@/components/ui/button'
 import { LanguageSwitcher } from '@/components/language-switcher'
+import { PublicFooter } from '@/components/public-footer'
 
 export default async function LandingPage() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -61,15 +62,10 @@ export default async function LandingPage() {
         </div>
       </main>
 
-      <footer className="grid gap-2 px-6 py-6 text-center text-sm text-muted-foreground md:px-10">
+      <footer className="grid gap-2 px-6 pt-6 text-center text-sm text-muted-foreground md:px-10">
         <p>{dictionary.landing.footer}</p>
-        <Link
-          href="/privacy"
-          className="mx-auto font-medium text-foreground underline-offset-4 hover:underline"
-        >
-          {dictionary.privacy.title}
-        </Link>
       </footer>
+      <PublicFooter locale={locale} className="px-6 pb-6 pt-3 md:px-10" />
     </div>
   )
 }

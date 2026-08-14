@@ -25,19 +25,18 @@ function getArg(name) {
 }
 
 function summarize(rows, currentUser) {
-  const credentialRows = rows.filter((row) => row.provider_id === 'credential')
+  const credentialRows = rows.filter((row) => row.providerId === 'credential')
   const role = currentUser?.role ?? 'user'
 
   return {
     userExists: Boolean(currentUser),
-    emailVerified: currentUser?.email_verified ?? false,
+    emailVerified: currentUser?.emailVerified ?? false,
     role,
-    moderatorAccess: role === 'moderator' || role === 'admin',
     adminAccess: role === 'admin',
     accountRowCount: rows.length,
     credentialAccountCount: credentialRows.length,
     credentialProviderIds: Array.from(
-      new Set(credentialRows.map((row) => row.provider_id)),
+      new Set(credentialRows.map((row) => row.providerId)),
     ),
     credentialPasswordPresent: credentialRows.some(
       (row) => typeof row.password === 'string' && row.password.length > 0,
@@ -67,7 +66,7 @@ try {
 
   const normalizedEmail = emailInput.trim().toLowerCase()
   const userResult = await client.query(
-    'select id, email_verified, role from "user" where email = $1 limit 1',
+    'select id, "emailVerified", role from "user" where lower(email) = $1 limit 1',
     [normalizedEmail],
   )
   const currentUser = userResult.rows[0]
@@ -75,7 +74,7 @@ try {
   let accountRows = []
   if (currentUser?.id) {
     const accountResult = await client.query(
-      'select provider_id, password from account where user_id = $1',
+      'select "providerId", password from account where "userId" = $1',
       [currentUser.id],
     )
     accountRows = accountResult.rows

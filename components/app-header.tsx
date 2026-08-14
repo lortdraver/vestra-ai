@@ -211,41 +211,15 @@ export function AppHeader({
     </Avatar>
   )
 
-  const headerDiagnostic = {
-    authenticated: Boolean(activeUser),
-    serverUserPresent: Boolean(user),
-    rolePresent: Boolean(activeUser?.role),
-    hasName: Boolean(activeUser?.name),
-    hasImage: Boolean(activeUser?.image),
-    currentPathname: pathname,
-    mobileHeaderVersion: 5,
-  }
-
-  console.info('[mobile-header] APP_HEADER_RENDERED', headerDiagnostic)
-  console.info(
-    '[mobile-header] MOBILE_HEADER_BRANCH_RENDERED',
-    headerDiagnostic,
-  )
-
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-      <div
-        data-testid="mobile-app-header"
-        data-mobile-header-version="5"
-        className={MOBILE_TOP_BAR_CLASS}
-      >
+      <div data-testid="mobile-app-header" className={MOBILE_TOP_BAR_CLASS}>
         <Link
           href="/dashboard"
           className="min-w-0 truncate font-serif text-lg font-semibold tracking-tight text-foreground"
         >
           {dictionary.common.brand}
         </Link>
-        <span
-          data-testid="mobile-header-debug-marker"
-          className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white"
-        >
-          TOPBAR-V5
-        </span>
 
         {topBarUser ? (
           <button

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { getRefundCopy, getTermsCopy } from '@/lib/legal/copy'
 import { consentCopy, getPrivacyPolicyCopy } from '@/lib/privacy/copy'
 import {
   buildClearConsentCookie,
@@ -28,8 +29,20 @@ const privacyPageSource = readFileSync(
   join(process.cwd(), 'app/privacy/page.tsx'),
   'utf8',
 )
+const termsPageSource = readFileSync(
+  join(process.cwd(), 'app/terms/page.tsx'),
+  'utf8',
+)
+const refundPageSource = readFileSync(
+  join(process.cwd(), 'app/refund/page.tsx'),
+  'utf8',
+)
 const landingPageSource = readFileSync(
   join(process.cwd(), 'app/page.tsx'),
+  'utf8',
+)
+const publicFooterSource = readFileSync(
+  join(process.cwd(), 'components/public-footer.tsx'),
   'utf8',
 )
 const appHeaderSource = readFileSync(
@@ -188,8 +201,60 @@ describe('privacy consent architecture', () => {
     expect(getPrivacyPolicyCopy('ru').title).toBe('Политика конфиденциальности')
   })
 
+  it('does not expose internal privacy configuration instructions publicly', () => {
+    expect(getPrivacyPolicyCopy('en').contactFallback).not.toContain(
+      'Configure',
+    )
+    expect(getPrivacyPolicyCopy('az').contactFallback).not.toContain('PRIVACY')
+    expect(getPrivacyPolicyCopy('ru').contactFallback).not.toContain('PRIVACY')
+    expect(
+      getPrivacyPolicyCopy('en', 'privacy@example.com').contactFallback,
+    ).toBe('privacy@example.com')
+  })
+
+  it('ships clean UTF-8 privacy and consent copy', () => {
+    const serialized = JSON.stringify({
+      consentCopy,
+      az: getPrivacyPolicyCopy('az'),
+      ru: getPrivacyPolicyCopy('ru'),
+    })
+
+    expect(serialized).toContain('Məxfilik')
+    expect(serialized).toContain('Политика конфиденциальности')
+    expect(serialized).not.toContain('MЙ')
+    expect(serialized).not.toContain('Рџ')
+    expect(serialized).not.toContain('Рќ')
+  })
+
+  it('discloses Paddle payment processing without raw card storage', () => {
+    expect(JSON.stringify(getPrivacyPolicyCopy('en'))).toContain(
+      'Vestra does not store raw card details',
+    )
+    expect(JSON.stringify(getTermsCopy('en'))).toContain(
+      'Paid subscriptions are processed by Paddle',
+    )
+    expect(JSON.stringify(getRefundCopy('en'))).toContain(
+      'Payments are processed by Paddle',
+    )
+  })
+
+  it('adds public terms and refund pages without authentication', () => {
+    expect(termsPageSource).not.toContain('auth.api.getSession')
+    expect(termsPageSource).not.toContain('redirect(')
+    expect(termsPageSource).toContain('getTermsCopy')
+    expect(refundPageSource).not.toContain('auth.api.getSession')
+    expect(refundPageSource).not.toContain('redirect(')
+    expect(refundPageSource).toContain('getRefundCopy')
+    expect(getTermsCopy('az').title).toBe('İstifadə şərtləri')
+    expect(getRefundCopy('ru').title).toBe('Политика возвратов и отмены')
+  })
+
   it('exposes cookie preferences from public and authenticated surfaces', () => {
-    expect(landingPageSource).toContain('href="/privacy"')
+    expect(landingPageSource).toContain('<PublicFooter')
+    expect(publicFooterSource).toContain('href="/privacy"')
+    expect(publicFooterSource).toContain('href="/terms"')
+    expect(publicFooterSource).toContain('href="/refund"')
+    expect(publicFooterSource).toContain('CookiePreferencesButton')
     expect(appHeaderSource).toContain('openCookiePreferences')
     expect(appHeaderSource).toContain('dictionary.privacy.cookiePreferences')
   })
@@ -204,7 +269,7 @@ describe('privacy consent architecture', () => {
   })
 
   it('ships AZ, EN, and RU consent copy', () => {
-    expect(consentCopy.az.bannerTitle).toBeTruthy()
+    expect(consentCopy.az.bannerTitle).toBe('Məxfilik seçimləriniz')
     expect(consentCopy.en.analyticsTitle).toBe('Analytics')
     expect(consentCopy.ru.rejectAnalytics).toBe('Отклонить аналитику')
   })

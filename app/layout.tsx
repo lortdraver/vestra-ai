@@ -25,7 +25,6 @@ export async function generateMetadata(): Promise<Metadata> {
       template: `%s | ${dictionary.common.brand}`,
     },
     description: dictionary.metadata.description,
-    generator: 'v0.app',
     icons: {
       icon: [
         {

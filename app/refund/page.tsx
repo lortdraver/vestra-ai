@@ -1,24 +1,23 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { PublicFooter } from '@/components/public-footer'
-import { getDictionary, getLocale } from '@/lib/i18n/server'
-import { getPrivacyPolicyCopy } from '@/lib/privacy/copy'
-import { CookiePreferencesButton } from '@/components/privacy/cookie-preferences-button'
 import { buttonVariants } from '@/components/ui/button'
+import { getDictionary, getLocale } from '@/lib/i18n/server'
+import { getRefundCopy } from '@/lib/legal/copy'
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale()
-  const policy = getPrivacyPolicyCopy(locale, process.env.PRIVACY_CONTACT_EMAIL)
+  const copy = getRefundCopy(locale, process.env.PRIVACY_CONTACT_EMAIL)
 
   return {
-    title: policy.title,
-    description: policy.intro,
+    title: copy.title,
+    description: copy.description,
   }
 }
 
-export default async function PrivacyPage() {
+export default async function RefundPage() {
   const [dictionary, locale] = await Promise.all([getDictionary(), getLocale()])
-  const policy = getPrivacyPolicyCopy(locale, process.env.PRIVACY_CONTACT_EMAIL)
+  const copy = getRefundCopy(locale, process.env.PRIVACY_CONTACT_EMAIL)
 
   return (
     <div className="min-h-svh bg-background">
@@ -37,36 +36,31 @@ export default async function PrivacyPage() {
         </Link>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 pb-24 pt-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-5xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
         <section className="border-b border-border pb-8">
           <p className="text-sm font-medium uppercase tracking-widest text-accent">
-            {policy.eyebrow}
+            {copy.eyebrow}
           </p>
           <h1 className="mt-4 font-serif text-4xl font-medium tracking-tight text-foreground text-balance md:text-5xl">
-            {policy.title}
+            {copy.title}
           </h1>
           <p className="mt-5 max-w-3xl text-base leading-relaxed text-muted-foreground">
-            {policy.intro}
+            {copy.description}
           </p>
           <div className="mt-5 grid gap-2 text-sm text-muted-foreground">
-            <p>{policy.effectiveDate}</p>
+            <p>{copy.effectiveDate}</p>
+            <p>{copy.ownerReviewNotice}</p>
             <p>
-              {policy.contactLabel}:{' '}
+              {copy.contactLabel}:{' '}
               <span className="font-medium text-foreground">
-                {policy.contactFallback}
+                {copy.contactValue}
               </span>
             </p>
-          </div>
-          <div className="mt-6">
-            <CookiePreferencesButton
-              label={dictionary.privacy.cookiePreferences}
-              className={buttonVariants({ variant: 'outline' })}
-            />
           </div>
         </section>
 
         <div className="grid gap-8 py-10">
-          {policy.sections.map((section) => (
+          {copy.sections.map((section) => (
             <section key={section.title} className="grid gap-3">
               <h2 className="font-serif text-2xl font-medium text-foreground">
                 {section.title}
@@ -82,15 +76,6 @@ export default async function PrivacyPage() {
             </section>
           ))}
         </div>
-
-        <section className="rounded-2xl border border-border bg-muted/30 p-5">
-          <h2 className="font-serif text-xl font-medium text-foreground">
-            {dictionary.privacy.cookiesTitle}
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            {policy.cookieDecision}
-          </p>
-        </section>
       </main>
       <PublicFooter locale={locale} />
     </div>

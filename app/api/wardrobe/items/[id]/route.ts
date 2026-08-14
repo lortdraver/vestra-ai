@@ -160,7 +160,7 @@ async function deleteStorageObjects(
         failedKeys.push(storageKey)
         console.warn('[wardrobe-delete] storage object cleanup failed', {
           itemId,
-          storageKey,
+          storageKeyPresent: Boolean(storageKey),
           error: getDeleteErrorMessage(error),
         })
       }

@@ -7,9 +7,9 @@
 - `BETTER_AUTH_URL` - canonical app URL used by Better Auth.
 - `BETTER_AUTH_TRUSTED_ORIGINS` - optional comma-separated local development
   origins, for example `http://192.168.100.8:3000`.
-- `PRIVACY_CONTACT_EMAIL` - optional public privacy contact shown on
-  `/privacy`. Leave empty until a real privacy contact is ready; do not invent
-  a legal contact.
+- `PRIVACY_CONTACT_EMAIL` - public privacy/legal contact shown on `/privacy`,
+  `/terms`, and `/refund`. It may be empty in local development, but a real
+  owner-approved contact is required before public launch.
 - `NEXT_PUBLIC_GA_MEASUREMENT_ID` - optional GA4 Measurement ID, for example
   `G-XXXXXXXXXX`. Leave empty to disable GA4.
 - `NEXT_PUBLIC_CLARITY_PROJECT_ID` - optional Microsoft Clarity project ID.
@@ -98,8 +98,10 @@ load after Analytics consent. GA4 and Clarity are safely disabled when their
 public IDs are empty. The first-party server event ledger remains independent
 from this optional browser consent.
 
-The public Privacy Policy is available at `/privacy` and uses
-`PRIVACY_CONTACT_EMAIL` if configured.
+The public Privacy Policy is available at `/privacy`; draft Terms are available
+at `/terms`; and draft Refund/Cancellation information is available at
+`/refund`. All three use `PRIVACY_CONTACT_EMAIL` when configured. Public launch
+requires a real owner-approved contact value.
 
 ## Email Verification
 
@@ -267,8 +269,8 @@ Run a server-only sanitized connectivity check with:
 pnpm background-removal:diagnose
 ```
 
-The mock provider is local-only and returns a synthetic transparent image. It is
-blocked in production and must not be used for public launch.
+The mock provider is local-only and preserves the original uploaded image bytes
+unchanged. It is blocked in production and must not be used for public launch.
 
 ## Weather Provider
 

@@ -92,7 +92,7 @@ export const consentCopy: Record<Locale, ConsentCopy> = {
     managePreferences: 'Настроить',
     dialogTitle: 'Настройки cookies',
     dialogDescription:
-      'Необходимые cookies обеспечивают работу Vestra. Аналитику можно изменить в любое время.',
+      'Необходимые cookies обеспечивают работу Vestra. Настройки аналитики можно изменить в любое время.',
     necessaryTitle: 'Необходимые',
     necessaryBody:
       'Нужны для входа, безопасности, сессий, языка и защиты аккаунта.',
@@ -108,11 +108,25 @@ export const consentCopy: Record<Locale, ConsentCopy> = {
   },
 }
 
+const missingContactCopy: Record<Locale, string> = {
+  az: 'Məxfilik əlaqəsi canlı buraxılışdan əvvəl əlavə ediləcək.',
+  en: 'Privacy contact will be added before public launch.',
+  ru: 'Контакт по вопросам приватности будет добавлен перед публичным запуском.',
+}
+
+export function getPrivacyContact(
+  locale: Locale,
+  contactEmail?: string | null,
+) {
+  const contact = contactEmail?.trim()
+  return contact || missingContactCopy[locale]
+}
+
 export function getPrivacyPolicyCopy(
   locale: Locale,
   contactEmail?: string | null,
 ): PrivacyPolicyCopy {
-  const contact = contactEmail || 'Configure PRIVACY_CONTACT_EMAIL'
+  const contact = getPrivacyContact(locale, contactEmail)
 
   const policies: Record<Locale, PrivacyPolicyCopy> = {
     az: {
@@ -143,13 +157,13 @@ export function getPrivacyPolicyCopy(
           title: 'AI emalı',
           body: [
             'Geyim analizi, fon silmə və AI stilist funksiyaları üçün şəkil və geyim metadatası konfiqurasiya olunmuş xidmət provayderlərinə göndərilə bilər.',
-            'AI nəticələri istifadəçi düzəlişlərindən ayrıca saxlanılır ki, istifadəçi düzəlişləri üstünlük təşkil etsin.',
+            'AI nəticələri istifadəçi düzəlişlərindən ayrıca saxlanılır ki, tətbiq edilən yerlərdə istifadəçi düzəlişləri üstünlük təşkil etsin.',
           ],
         },
         {
           title: 'Texniki və təhlükəsizlik məlumatları',
           body: [
-            'Seanslar, IP ünvanı, istifadəçi agenti, audit hadisələri və təhlükəsizlik hadisələri giriş, sui-istifadənin qarşısı və hesab qorunması üçün emal edilə bilər.',
+            'Seanslar, IP ünvanı, istifadəçi agenti, audit hadisələri və təhlükəsizlik hadisələri giriş, sui-istifadənin qarşısının alınması və hesab qorunması üçün emal edilə bilər.',
           ],
         },
         {
@@ -164,6 +178,7 @@ export function getPrivacyPolicyCopy(
           title: 'Saxlama və provayderlər',
           body: [
             'Məlumatlar PostgreSQL/Neon, Vercel və Cloudflare R2 kimi infrastrukturda saxlanıla bilər. Şəkillər özəl saxlanılır və sahiblik yoxlaması ilə təqdim olunur.',
+            'Ödənişli abunəlik ödənişləri Paddle tərəfindən emal olunur. Vestra xam kart məlumatlarını saxlamır.',
             'Məlumatlar xidmətin işləməsi, təhlükəsizlik, istifadəçi dəstəyi, məhsulun yaxşılaşdırılması və qanuni tələblər üçün emal olunur.',
           ],
         },
@@ -232,6 +247,7 @@ export function getPrivacyPolicyCopy(
           title: 'Storage and service providers',
           body: [
             'Data may be stored and processed through infrastructure such as PostgreSQL/Neon, Vercel, and Cloudflare R2. Images remain private and are served through ownership checks.',
+            'Paid subscription payments are processed by Paddle. Vestra does not store raw card details.',
             'Information is processed to operate the service, protect accounts, provide support, improve the product, and meet legal obligations.',
           ],
         },
@@ -265,56 +281,57 @@ export function getPrivacyPolicyCopy(
         {
           title: 'Описание сервиса',
           body: [
-            'Vestra помогает пользователям загружать одежду, которой они уже владеют, анализировать ее с помощью AI, создавать образы и планировать, что надеть.',
+            'Vestra — это цифровой гардероб, который помогает пользователям загружать одежду, которой они уже владеют, анализировать ее с помощью AI, создавать образы и планировать, что надеть.',
           ],
         },
         {
           title: 'Информация, которую вы предоставляете',
           body: [
-            'При создании аккаунта Vestra обрабатывает имя, email и учетные данные пароля. Пароли хранятся безопасно.',
-            'Фотографии гардероба, названия вещей, категории, цвета, материалы, бренды, сезоны, стили и заметки используются для функций гардероба и стилиста.',
+            'При создании аккаунта Vestra обрабатывает данные аккаунта, такие как имя, email и учетные данные пароля. Пароли хранятся безопасно.',
+            'Фотографии гардероба, названия вещей, категории, цвета, материалы, бренды, сезоны, стили и заметки используются для работы функций гардероба и стилиста.',
           ],
         },
         {
           title: 'AI-обработка',
           body: [
-            'Изображения и метаданные гардероба могут передаваться настроенным провайдерам для анализа одежды, удаления фона и функций AI-стилиста.',
-            'AI-результаты хранятся отдельно от пользовательских исправлений, чтобы правки пользователя имели приоритет.',
+            'Изображения и метаданные одежды могут отправляться настроенным поставщикам услуг для анализа одежды, удаления фона и функций AI-стилиста.',
+            'AI-результаты хранятся отдельно от пользовательских исправлений, чтобы пользовательские правки оставались источником истины там, где это применимо.',
           ],
         },
         {
           title: 'Техническая информация и безопасность',
           body: [
-            'Сессии, IP-адрес, user agent, audit-события и события безопасности могут обрабатываться для входа, предотвращения злоупотреблений и защиты аккаунта.',
+            'Сессии, IP-адрес, user agent, события аудита и события безопасности могут обрабатываться для входа, предотвращения злоупотреблений и защиты аккаунта.',
           ],
         },
         {
           title: 'Cookies и аналитика',
           body: [
             'Необходимые cookies поддерживают вход, безопасность, язык и функции аккаунта. Они продолжают работать, даже если аналитика отклонена.',
-            'Аналитические cookies включаются только после согласия. Vestra загружает GA4 и Clarity только после разрешения аналитики.',
+            'Аналитические cookies включаются только после согласия. Vestra загружает GA4 и Clarity только после вашего разрешения аналитики.',
             'Vercel Analytics считается необязательной аналитикой и загружается только после согласия на аналитику.',
           ],
         },
         {
           title: 'Хранение и поставщики услуг',
           body: [
-            'Данные могут храниться и обрабатываться через PostgreSQL/Neon, Vercel и Cloudflare R2. Изображения остаются приватными и выдаются через проверку владельца.',
-            'Информация обрабатывается для работы сервиса, защиты аккаунтов, поддержки, улучшения продукта и выполнения юридических обязанностей.',
+            'Данные могут храниться и обрабатываться через инфраструктуру PostgreSQL/Neon, Vercel и Cloudflare R2. Изображения остаются приватными и выдаются через проверку владения.',
+            'Платные подписки обрабатываются Paddle. Vestra не хранит необработанные данные банковских карт.',
+            'Информация обрабатывается для работы сервиса, защиты аккаунтов, поддержки пользователей, улучшения продукта и выполнения юридических обязательств.',
           ],
         },
         {
           title: 'Ваш выбор и права',
           body: [
             'Вы можете изменить согласие на аналитику в любое время через настройки cookies.',
-            'Используйте настройки аккаунта или контакт по приватности для запросов на удаление аккаунта и данных.',
+            'Используйте настройки аккаунта или контакт по вопросам приватности для запросов на удаление аккаунта и данных.',
           ],
         },
         {
           title: 'Дети, безопасность и изменения',
           body: [
-            'Vestra не предназначена для детей. Мы применяем меры безопасности, но ни одна система не является абсолютно безопасной.',
-            'При изменении политики версия будет обновлена, и Vestra может запросить новое согласие.',
+            'Vestra не предназначена для детей. Используются меры безопасности, но ни одна система не является абсолютно безопасной.',
+            'При изменении этой политики версия будет обновлена, и Vestra может запросить повторное согласие.',
           ],
         },
       ],

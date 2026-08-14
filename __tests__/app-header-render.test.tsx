@@ -56,11 +56,8 @@ describe('AppHeader authenticated mobile shell', () => {
     )
 
     expect(html).toContain('data-testid="mobile-app-header"')
-    expect(html).toContain('data-mobile-header-version="5"')
-    expect(html).toContain('data-testid="mobile-header-debug-marker"')
     expect(html).toContain('data-testid="mobile-account-trigger"')
     expect(html).toContain('Vestra')
-    expect(html).toContain('TOPBAR-V5')
     expect(html).toContain('hidden md:block')
     expect(html).toContain('Mobile navigation')
     expect(html).toContain('Wardrobe')
@@ -86,8 +83,6 @@ describe('AppHeader authenticated mobile shell', () => {
     )
 
     expect(html).toContain('data-testid="mobile-account-trigger"')
-    expect(html).toContain('data-testid="mobile-header-debug-marker"')
-    expect(html).toContain('TOPBAR-V5')
     expect(html).toContain('>S<')
   })
 
@@ -112,7 +107,6 @@ describe('AppHeader authenticated mobile shell', () => {
 
     expect(html).toContain('data-testid="mobile-app-header"')
     expect(html).toContain('data-testid="mobile-account-trigger"')
-    expect(html).toContain('TOPBAR-V5')
     expect(html).toContain('Mobile navigation')
     expect(html).toContain('>S<')
   })
@@ -128,8 +122,20 @@ describe('AppHeader authenticated mobile shell', () => {
 
     expect(html).toContain('data-testid="mobile-app-header"')
     expect(html).toContain('data-testid="mobile-account-trigger"')
-    expect(html).toContain('data-testid="mobile-header-debug-marker"')
-    expect(html).toContain('TOPBAR-V5')
     expect(html).not.toContain('/dashboard/admin')
+  })
+
+  it('does not render temporary production debug markers', () => {
+    const html = renderToStaticMarkup(
+      <AppHeader
+        dictionary={dictionaries.en}
+        locale="en"
+        user={{ email: 'user@example.com', role: 'user' }}
+      />,
+    )
+
+    expect(html).not.toContain('TOPBAR-V5')
+    expect(html).not.toContain('RUNTIME-V4')
+    expect(html).not.toContain('mobile-header-debug-marker')
   })
 })

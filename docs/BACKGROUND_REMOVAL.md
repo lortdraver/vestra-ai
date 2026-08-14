@@ -37,8 +37,8 @@ BACKGROUND_REMOVAL_REQUEST_TIMEOUT_MS="15000"
 BACKGROUND_REMOVAL_SIZE="auto"
 ```
 
-Use `BACKGROUND_REMOVAL_PROVIDER=api` with real credentials before deploying
-background removal to production users.
+Use `BACKGROUND_REMOVAL_PROVIDER=removebg` or `BACKGROUND_REMOVAL_PROVIDER=api`
+with real credentials before deploying background removal to production users.
 
 Run a server-only sanitized connectivity check with:
 
@@ -103,7 +103,7 @@ creation successful, stores the original image as the display image, marks
 
 Production background removal is considered configured only when:
 
-- `BACKGROUND_REMOVAL_PROVIDER=api`;
+- `BACKGROUND_REMOVAL_PROVIDER=removebg` or `BACKGROUND_REMOVAL_PROVIDER=api`;
 - `BACKGROUND_REMOVAL_API_KEY` is set;
 - `BACKGROUND_REMOVAL_API_URL` is set;
 - the configured API returns an actual transparent-background clothing image.

@@ -356,8 +356,9 @@
 - Cloudflare R2 credentials still need to be entered manually in local and
   Railway environments.
 - Real clothing analysis now requires AI credentials; live provider accuracy still needs visual QA with production models.
-- Background removal mock does not perform real segmentation and now returns a
-  synthetic transparent placeholder; production must use a real provider.
+- Background removal mock does not perform real segmentation; mock mode
+  preserves the original uploaded image unchanged and production must use a real
+  provider.
 - Rate limiting is currently in-memory and must be moved to a distributed store before multi-instance production traffic.
 - Account deletion cleanup queue exists, but the asynchronous deletion worker is not implemented.
 - Forgot/reset password and email verification are architecture-ready, but real email delivery is not connected yet.

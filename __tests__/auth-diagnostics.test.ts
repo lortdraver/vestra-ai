@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { getLocalizedAuthErrorMessage } from '@/lib/auth-diagnostics/messages'
 import {
   canonicalizeAuthErrorCode,
@@ -8,6 +10,10 @@ import { getAuthOriginDiagnostics } from '@/lib/auth-origin'
 import { dictionaries } from '@/lib/i18n/dictionaries'
 
 const originalEnv = process.env
+const diagnoseAuthUserSource = readFileSync(
+  join(process.cwd(), 'scripts/diagnose-auth-user.mjs'),
+  'utf8',
+)
 
 beforeEach(() => {
   process.env = {
@@ -116,5 +122,18 @@ describe('auth origin diagnostics', () => {
     expect(diagnostics.requestOriginMatchesTrustedOrigins).toBe(false)
     expect(diagnostics.betterAuthHost).toBe('vestraapp.uk')
     expect(diagnostics.nextPublicAppHost).toBe('www.vestraapp.uk')
+  })
+})
+
+describe('auth user diagnostic script contract', () => {
+  it('uses Better Auth camelCase columns and exposes only password presence', () => {
+    expect(diagnoseAuthUserSource).toContain('"emailVerified"')
+    expect(diagnoseAuthUserSource).toContain('"providerId"')
+    expect(diagnoseAuthUserSource).toContain('"userId"')
+    expect(diagnoseAuthUserSource).not.toContain('email_verified')
+    expect(diagnoseAuthUserSource).not.toContain('provider_id')
+    expect(diagnoseAuthUserSource).not.toContain('user_id')
+    expect(diagnoseAuthUserSource).toContain('credentialPasswordPresent')
+    expect(diagnoseAuthUserSource).not.toContain('passwordHash')
   })
 })
