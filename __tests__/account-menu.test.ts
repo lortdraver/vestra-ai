@@ -4,6 +4,7 @@ import {
   getUserAvatarFallback,
   getUserInitials,
 } from '@/lib/account-menu'
+import { subscriptionDashboardRoute } from '@/lib/billing/subscription-page-model'
 
 describe('account menu helpers', () => {
   it('generates initials from the authenticated user name', () => {
@@ -41,6 +42,13 @@ describe('account menu helpers', () => {
 
     expect(keys).toContain('accountSettings')
     expect(keys).not.toContain('profile')
+  })
+
+  it('routes subscription actions to the dedicated subscription page', () => {
+    expect(
+      getAccountMenuItems('user').find((item) => item.key === 'subscription')
+        ?.href,
+    ).toBe(subscriptionDashboardRoute)
   })
 
   it('shows admin dashboard only for admins', () => {

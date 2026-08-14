@@ -45,6 +45,10 @@ const dashboardLayoutSource = readFileSync(
   join(process.cwd(), 'app/dashboard/layout.tsx'),
   'utf8',
 )
+const subscriptionPageSource = readFileSync(
+  join(process.cwd(), 'app/dashboard/subscription/page.tsx'),
+  'utf8',
+)
 
 describe('responsive UI contracts', () => {
   it('exports a Safari-safe mobile viewport', () => {
@@ -196,6 +200,16 @@ describe('responsive UI contracts', () => {
     expect(wardrobeImageRouteSource).toContain('private, max-age=900')
     expect(wardrobeImageRouteSource).toContain('stale-while-revalidate=3600')
     expect(wardrobeImageRouteSource).toContain("Vary: 'Cookie'")
+  })
+
+  it('keeps the dedicated subscription page mobile-first and action-backed', () => {
+    expect(subscriptionPageSource).toContain('data-testid="subscription-page"')
+    expect(subscriptionPageSource).toContain('max-w-6xl')
+    expect(subscriptionPageSource).toContain('sm:grid-cols-2')
+    expect(subscriptionPageSource).toContain('lg:grid-cols-4')
+    expect(subscriptionPageSource).toContain('ManageBillingButton')
+    expect(subscriptionPageSource).toContain('BillingActionButton')
+    expect(subscriptionPageSource).toContain('href="/pricing"')
   })
 
   it('prefers thumbnail wardrobe images for cards while preserving originals', () => {

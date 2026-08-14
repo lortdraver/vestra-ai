@@ -12,7 +12,14 @@ import {
   switchPaddleSubscriptionPlan,
   verifyPaddleSignature,
 } from '@/lib/billing'
+import {
+  getSubscriptionPageState,
+  getSubscriptionSwitchTarget,
+  subscriptionDashboardRoute,
+} from '@/lib/billing/subscription-page-model'
 import { evaluateSubscriptionLifecycle } from '@/lib/subscription/lifecycle'
+import { subscriptionPlans } from '@/lib/subscription/plans'
+import type { SubscriptionSnapshot } from '@/lib/subscription/types'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -33,6 +40,33 @@ function sign(rawBody: string, secret: string, timestamp = '123') {
     .update(`${timestamp}:${rawBody}`)
     .digest('hex')
   return `ts=${timestamp};h1=${signature}`
+}
+
+function subscriptionSnapshot(
+  overrides: Partial<SubscriptionSnapshot> = {},
+): SubscriptionSnapshot {
+  return {
+    plan: subscriptionPlans.free,
+    status: 'active',
+    isPremium: false,
+    isTrialActive: false,
+    trialEndsAt: null,
+    billingInterval: null,
+    currentPeriodEnd: null,
+    accessUntil: null,
+    graceUntil: null,
+    paymentIssue: false,
+    entitlementReason: 'free',
+    cancelAtPeriodEnd: false,
+    usage: {
+      wardrobe_items: 0,
+      ai_analyses_monthly: 0,
+      stylist_requests_monthly: 0,
+      background_removals_monthly: 0,
+      saved_outfits: 0,
+    },
+    ...overrides,
+  }
 }
 
 describe('Paddle config', () => {
@@ -184,6 +218,90 @@ describe('subscription lifecycle policy', () => {
 
     expect(state.isPro).toBe(false)
     expect(state.entitlementReason).toBe('paused')
+  })
+})
+
+describe('subscription page state model', () => {
+  it('uses the dedicated authenticated subscription route', () => {
+    expect(subscriptionDashboardRoute).toBe('/dashboard/subscription')
+  })
+
+  it('renders Free state for non-premium users', () => {
+    expect(getSubscriptionPageState(subscriptionSnapshot())).toBe('free')
+  })
+
+  it('renders Active Pro state for monthly subscribers', () => {
+    const snapshot = subscriptionSnapshot({
+      plan: subscriptionPlans.premium,
+      isPremium: true,
+      billingInterval: 'monthly',
+      entitlementReason: 'active',
+    })
+
+    expect(getSubscriptionPageState(snapshot)).toBe('active_pro')
+    expect(getSubscriptionSwitchTarget(snapshot)).toBe('annual')
+  })
+
+  it('renders Active Pro state for annual subscribers', () => {
+    const snapshot = subscriptionSnapshot({
+      plan: subscriptionPlans.premium,
+      isPremium: true,
+      billingInterval: 'annual',
+      entitlementReason: 'active',
+    })
+
+    expect(getSubscriptionPageState(snapshot)).toBe('active_pro')
+    expect(getSubscriptionSwitchTarget(snapshot)).toBe('monthly')
+  })
+
+  it('renders Canceling state and disables plan switching', () => {
+    const snapshot = subscriptionSnapshot({
+      plan: subscriptionPlans.premium,
+      isPremium: true,
+      billingInterval: 'monthly',
+      cancelAtPeriodEnd: true,
+      entitlementReason: 'canceling_until_period_end',
+    })
+
+    expect(getSubscriptionPageState(snapshot)).toBe('canceling')
+    expect(getSubscriptionSwitchTarget(snapshot)).toBeNull()
+  })
+
+  it('renders Past Due state when payment action is required', () => {
+    expect(
+      getSubscriptionPageState(
+        subscriptionSnapshot({
+          plan: subscriptionPlans.premium,
+          status: 'past_due',
+          isPremium: true,
+          paymentIssue: true,
+          entitlementReason: 'past_due_grace',
+        }),
+      ),
+    ).toBe('past_due')
+  })
+
+  it('renders Paused state without granting Pro actions', () => {
+    const snapshot = subscriptionSnapshot({
+      plan: subscriptionPlans.premium,
+      status: 'paused',
+      entitlementReason: 'paused',
+    })
+
+    expect(getSubscriptionPageState(snapshot)).toBe('paused')
+    expect(getSubscriptionSwitchTarget(snapshot)).toBeNull()
+  })
+
+  it('renders Canceled state for expired Pro subscriptions', () => {
+    expect(
+      getSubscriptionPageState(
+        subscriptionSnapshot({
+          plan: subscriptionPlans.premium,
+          status: 'canceled',
+          entitlementReason: 'canceled',
+        }),
+      ),
+    ).toBe('canceled')
   })
 })
 

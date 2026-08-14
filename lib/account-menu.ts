@@ -1,4 +1,5 @@
 import { canAccessAdmin } from '@/lib/roles'
+import { subscriptionDashboardRoute } from '@/lib/billing/subscription-page-model'
 
 export type AccountMenuUser = {
   name?: string | null
@@ -54,7 +55,7 @@ export function getAccountMenuItems(
 ): AccountMenuItem[] {
   const items: AccountMenuItem[] = [
     { key: 'accountSettings', href: '/dashboard/account' },
-    { key: 'subscription', href: '/dashboard/account#subscription' },
+    { key: 'subscription', href: subscriptionDashboardRoute },
     { key: 'stylistPreferences', href: '/dashboard/stylist#preferences' },
     { key: 'privacy', href: '/dashboard/account#privacy' },
   ]
