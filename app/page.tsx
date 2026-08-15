@@ -6,6 +6,7 @@ import { getDictionary, getLocale } from '@/lib/i18n/server'
 import { buttonVariants } from '@/components/ui/button'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { PublicFooter } from '@/components/public-footer'
+import { publicFooterCopy } from '@/lib/public-content/copy'
 
 export default async function LandingPage() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -13,6 +14,7 @@ export default async function LandingPage() {
 
   const dictionary = await getDictionary()
   const locale = await getLocale()
+  const publicLinks = publicFooterCopy[locale].product.links
 
   return (
     <div className="flex min-h-svh flex-col bg-background">
@@ -21,6 +23,17 @@ export default async function LandingPage() {
           {dictionary.common.brand}
         </span>
         <nav className="flex items-center gap-3">
+          <div className="hidden items-center gap-1 md:flex">
+            {publicLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
           <LanguageSwitcher
             currentLocale={locale}
             label={dictionary.common.language}
