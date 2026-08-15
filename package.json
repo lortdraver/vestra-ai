@@ -20,6 +20,7 @@
     "auth:diagnose-user": "node scripts/diagnose-auth-user.mjs",
     "auth:diagnose-origin": "node scripts/diagnose-auth-origin.mjs",
     "billing:diagnose": "node scripts/diagnose-billing.mjs",
+    "billing:live-preflight": "node scripts/billing-live-preflight.mjs",
     "billing:reconcile": "node scripts/reconcile-billing.mjs",
     "ai:diagnose:openrouter": "node scripts/diagnose-openrouter.mjs",
     "weather:diagnose": "node scripts/diagnose-weather.mjs",

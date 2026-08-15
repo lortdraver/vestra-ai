@@ -1,11 +1,15 @@
 import { createHmac } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createPaddleCheckoutSession,
   getIntervalForPaddlePriceId,
   getPaddleApiBaseUrl,
+  getPaddleDiagnostics,
   getPaddlePublicConfig,
   getPaddleServerConfig,
+  getPaddleWebhookConfig,
   PaddleConfigError,
   cancelPaddleSubscription,
   resumePaddleScheduledCancellation,
@@ -35,6 +39,15 @@ function stubPaddleEnv() {
   vi.stubEnv('PADDLE_WEBHOOK_SECRET', 'webhook_secret')
   vi.stubEnv('PADDLE_PRO_MONTHLY_PRICE_ID', 'pri_monthly')
   vi.stubEnv('PADDLE_PRO_ANNUAL_PRICE_ID', 'pri_annual')
+}
+
+function stubPaddleLiveEnv() {
+  vi.stubEnv('PADDLE_ENVIRONMENT', 'live')
+  vi.stubEnv('PADDLE_API_KEY', 'pdl_live_key')
+  vi.stubEnv('NEXT_PUBLIC_PADDLE_CLIENT_TOKEN', 'client_live_token')
+  vi.stubEnv('PADDLE_WEBHOOK_SECRET', 'webhook_live_secret')
+  vi.stubEnv('PADDLE_PRO_MONTHLY_PRICE_ID', 'pri_live_monthly')
+  vi.stubEnv('PADDLE_PRO_ANNUAL_PRICE_ID', 'pri_live_annual')
 }
 
 function sign(rawBody: string, secret: string, timestamp = '123') {
@@ -78,10 +91,22 @@ describe('Paddle config', () => {
     expect(getPaddleApiBaseUrl()).toBe('https://sandbox-api.paddle.com')
   })
 
-  it('rejects live mode during sandbox-only monetization v1', () => {
+  it('uses the live API host only for explicit live mode', () => {
+    stubPaddleLiveEnv()
+
+    expect(getPaddleApiBaseUrl()).toBe('https://api.paddle.com')
+    expect(getPaddlePublicConfig()).toEqual({
+      environment: 'live',
+      clientEnvironment: 'production',
+      clientToken: 'client_live_token',
+    })
+  })
+
+  it('rejects invalid or missing environments', () => {
+    expect(() => getPaddlePublicConfig()).toThrow(PaddleConfigError)
     vi.stubEnv('PADDLE_ENVIRONMENT', 'live')
 
-    expect(() => getPaddlePublicConfig()).toThrow()
+    expect(() => getPaddlePublicConfig()).toThrow('paddle_live_not_configured')
   })
 
   it('keeps the client token in public config but not server secrets', () => {
@@ -96,6 +121,31 @@ describe('Paddle config', () => {
 
   it('requires server-side Paddle config for checkout', () => {
     expect(() => getPaddleServerConfig()).toThrow(PaddleConfigError)
+  })
+
+  it('rejects sandbox credentials in live mode', () => {
+    stubPaddleLiveEnv()
+    vi.stubEnv('PADDLE_API_KEY', 'pdl_test_key')
+
+    expect(() => getPaddleServerConfig()).toThrow('paddle_environment_mismatch')
+  })
+
+  it('rejects price ids that visibly belong to another environment', () => {
+    stubPaddleLiveEnv()
+    vi.stubEnv('PADDLE_PRO_MONTHLY_PRICE_ID', 'pri_test_monthly')
+
+    expect(() => getPaddleServerConfig()).toThrow(
+      'paddle_price_environment_mismatch',
+    )
+  })
+
+  it('isolates webhook secrets by configured environment', () => {
+    stubPaddleLiveEnv()
+    vi.stubEnv('PADDLE_WEBHOOK_SECRET', 'webhook_test_secret')
+
+    expect(() => getPaddleWebhookConfig()).toThrow(
+      'paddle_environment_mismatch',
+    )
   })
 
   it('maps canonical intervals to trusted price ids', () => {
@@ -157,6 +207,7 @@ describe('Paddle webhook signatures', () => {
 
 describe('subscription lifecycle policy', () => {
   function row(overrides: Record<string, unknown>) {
+    vi.stubEnv('PADDLE_ENVIRONMENT', 'sandbox')
     return {
       id: 'sub',
       userId: 'user',
@@ -176,7 +227,7 @@ describe('subscription lifecycle policy', () => {
       scheduledChangeAt: null,
       canceledAt: null,
       lastProviderEventAt: new Date('2026-08-14T00:00:00.000Z'),
-      metadata: {},
+      metadata: { paddleEnvironment: 'sandbox' },
       createdAt: new Date('2026-08-01T00:00:00.000Z'),
       updatedAt: new Date('2026-08-14T00:00:00.000Z'),
       ...overrides,
@@ -242,6 +293,19 @@ describe('subscription lifecycle policy', () => {
 
     expect(state.isPro).toBe(false)
     expect(state.paymentIssue).toBe(false)
+    expect(state.entitlementReason).toBe('inactive')
+  })
+
+  it('ignores sandbox Paddle subscriptions when runtime is configured for live', () => {
+    const sandboxRow = row({ status: 'active' })
+    vi.stubEnv('PADDLE_ENVIRONMENT', 'live')
+
+    const state = evaluateSubscriptionLifecycle(
+      sandboxRow,
+      new Date('2026-08-15T00:00:00.000Z'),
+    )
+
+    expect(state.isPro).toBe(false)
     expect(state.entitlementReason).toBe('inactive')
   })
 })
@@ -403,5 +467,47 @@ describe('Paddle lifecycle API contracts', () => {
         }),
       }),
     )
+  })
+})
+
+describe('Paddle live readiness source contracts', () => {
+  it('keeps client Paddle initialization environment-aware', () => {
+    const source = readFileSync(
+      join(process.cwd(), 'components/billing/pricing-client.tsx'),
+      'utf8',
+    )
+
+    expect(source).toContain(
+      "Environment?: { set(value: 'sandbox' | 'production')",
+    )
+    expect(source).toContain(
+      'window.Paddle.Environment?.set(response.environment)',
+    )
+    expect(source).toContain('window.__vestraPaddleToken')
+  })
+
+  it('adds a read-only live preflight command', () => {
+    const packageJson = readFileSync(
+      join(process.cwd(), 'package.json'),
+      'utf8',
+    )
+    const script = readFileSync(
+      join(process.cwd(), 'scripts/billing-live-preflight.mjs'),
+      'utf8',
+    )
+
+    expect(packageJson).toContain('billing:live-preflight')
+    expect(script).toContain('mutation: false')
+    expect(script).toContain('paddle_webhook_route_exists')
+    expect(script).not.toContain('client.query(')
+  })
+
+  it('diagnostics stay sanitized when environment configuration is invalid', () => {
+    vi.stubEnv('PADDLE_ENVIRONMENT', 'production')
+
+    expect(getPaddleDiagnostics()).toMatchObject({
+      environment: null,
+      environmentValid: false,
+    })
   })
 })

@@ -246,6 +246,12 @@
   provider payloads.
 - Added `billing:diagnose` and dry-run-first `billing:reconcile` operational
   scripts.
+- Added Paddle Live readiness without enabling Live: explicit
+  `PADDLE_ENVIRONMENT=sandbox|live`, environment consistency validation,
+  environment-aware subscription row filtering, read-only
+  `pnpm billing:live-preflight`, and `docs/PADDLE_LIVE_LAUNCH.md`.
+- Production remains Sandbox until the owner approves the controlled Live
+  cutover. No Live credentials or Paddle Live resources are stored in code.
 
 ### UX/Admin Improvements: Mobile Account Access And Admin Analytics v1
 

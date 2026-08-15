@@ -134,6 +134,12 @@ Routes:
 Checkout accepts only `monthly` or `annual`. Server config maps those choices to
 trusted Paddle price IDs.
 
+Paddle environment is explicit through `PADDLE_ENVIRONMENT=sandbox|live`.
+Current production should remain Sandbox until owner approval. Subscription rows
+created from Paddle webhooks store `metadata.paddleEnvironment`; when Production
+eventually switches to Live, Sandbox rows are ignored for Live entitlement and
+billing actions rather than deleted. See `docs/PADDLE_LIVE_LAUNCH.md`.
+
 ## Admin
 
 Admin analytics reads internal subscription rows and reports:

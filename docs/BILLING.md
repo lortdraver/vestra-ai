@@ -4,6 +4,10 @@ Vestra Monetization v2 uses Paddle Billing in sandbox mode first. The Vestra
 database remains the subscription source of truth. Browser checkout completion
 never grants Pro by itself.
 
+Live readiness is documented in `docs/PADDLE_LIVE_LAUNCH.md`. Production must
+remain on `PADDLE_ENVIRONMENT=sandbox` until the owner approves a controlled
+Live switch.
+
 ## Plans
 
 Internal plan keys:
@@ -82,9 +86,9 @@ PADDLE_PAST_DUE_GRACE_DAYS="3"
 ```
 
 `PADDLE_PRO_MONTHLY_PRICE_ID` and `PADDLE_PRO_ANNUAL_PRICE_ID` must point to
-the active Paddle Sandbox Vestra Pro prices. The current sandbox catalog is
-EUR 4.99 monthly and EUR 39.99 annual; do not put API keys, webhook secrets, or
-client tokens in committed files.
+the active Paddle Vestra Pro prices for the configured environment. The catalog
+is EUR 4.99 monthly and EUR 39.99 annual; do not put API keys, webhook secrets,
+or client tokens in committed files. Do not mix Sandbox and Live values.
 
 Optional:
 
@@ -92,8 +96,16 @@ Optional:
 PADDLE_API_BASE_URL=""
 ```
 
-Sandbox defaults to `https://sandbox-api.paddle.com`. Live mode is deliberately
-rejected in Monetization v2.
+Sandbox defaults to `https://sandbox-api.paddle.com`; Live uses
+`https://api.paddle.com`. The environment must be explicit and there is no
+automatic fallback between Sandbox and Live.
+
+Stable configuration errors include:
+
+- `paddle_environment_invalid`
+- `paddle_environment_mismatch`
+- `paddle_live_not_configured`
+- `paddle_price_environment_mismatch`
 
 ## Checkout
 
@@ -149,7 +161,7 @@ Billing portal:
 Endpoint:
 
 ```text
-https://www.vestraapp.uk/api/webhooks/paddle
+https://vestraapp.uk/api/webhooks/paddle
 ```
 
 Sandbox can use the same path on a preview or tunnel URL.
@@ -203,6 +215,15 @@ pnpm billing:reconcile -- --email=user@example.com --apply
 Both commands print sanitized summaries only. They do not print API keys, tokens,
 full provider payloads, payment method data, or card details.
 
+Run the read-only Live preflight:
+
+```bash
+pnpm billing:live-preflight
+```
+
+The preflight does not charge, mutate the database, create Paddle resources, or
+make write calls.
+
 ## User Matching
 
 Vestra reconciles users by:
@@ -223,7 +244,7 @@ Vestra never creates users from webhook data and does not rely only on email.
 
 3. Redeploy.
 4. Create the Paddle webhook destination:
-   `https://www.vestraapp.uk/api/webhooks/paddle`.
+   `https://vestraapp.uk/api/webhooks/paddle`.
 5. Select the supported event checkboxes listed above.
 6. Sign in as a Free user.
 7. Open `/pricing`.
@@ -246,11 +267,19 @@ Vestra never creates users from webhook data and does not rely only on email.
 
 ## Minimal Paddle Permissions
 
-The sandbox API key needs:
+Runtime required:
 
-- `subscription.read`
-- `subscription.write`
-- `customer_portal_session.write`
+- Subscriptions: Write
+- Customer portal sessions: Write
+- Customers: Read
+- Prices: Read
+- Products: Read
+
+Operations/debug only:
+
+- Notification settings: Read
+- Notifications: Read
+- Transactions: Read
 
 Webhook delivery also needs the Paddle webhook signing secret. Checkout itself
 is opened through Paddle.js with the client-side token and trusted price IDs
@@ -258,9 +287,10 @@ returned by Vestra.
 
 ## Before Live Launch
 
-- Switch Paddle environment and credentials intentionally.
-- Create live product/price IDs.
-- Configure the live webhook destination and secret.
-- Run full live-mode webhook verification with low-risk internal accounts.
-- Review tax, invoice, refund, and support processes.
-- Add monitoring for webhook failures and unmatched-user events.
+- Follow `docs/PADDLE_LIVE_LAUNCH.md`.
+- Keep Production on Sandbox until owner approval.
+- Create Live product/price IDs manually.
+- Configure the Live webhook destination and secret manually.
+- Run `pnpm billing:live-preflight`.
+- Perform one controlled internal real payment only after approval.
+- Do not switch Production back to Sandbox after Live users exist.

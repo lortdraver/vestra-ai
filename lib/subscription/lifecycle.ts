@@ -1,4 +1,5 @@
 import type { subscription } from '@/lib/db/schema'
+import { paddleMetadataMatchesConfiguredEnvironment } from '@/lib/billing/paddle-config'
 import type { SubscriptionStatus } from './types'
 
 export type SubscriptionLifecycleState = {
@@ -47,6 +48,15 @@ function addDays(date: Date, days: number) {
   return new Date(date.getTime() + days * 86400000)
 }
 
+function paddleRowMatchesRuntime(row: typeof subscription.$inferSelect) {
+  if (row.providerKey !== 'paddle') return true
+  try {
+    return paddleMetadataMatchesConfiguredEnvironment(row.metadata)
+  } catch {
+    return false
+  }
+}
+
 export function evaluateSubscriptionLifecycle(
   row: typeof subscription.$inferSelect | undefined | null,
   now = new Date(),
@@ -59,6 +69,17 @@ export function evaluateSubscriptionLifecycle(
       graceUntil: null,
       accessUntil: null,
       entitlementReason: 'free',
+    }
+  }
+
+  if (!paddleRowMatchesRuntime(row)) {
+    return {
+      status: 'inactive',
+      isPro: false,
+      paymentIssue: false,
+      graceUntil: null,
+      accessUntil: null,
+      entitlementReason: 'inactive',
     }
   }
 

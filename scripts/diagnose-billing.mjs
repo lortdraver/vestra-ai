@@ -56,6 +56,15 @@ function evaluate(row) {
   return { entitled: false, reason: row.status ?? 'inactive', graceUntil: null }
 }
 
+function configuredEnvironment() {
+  return process.env.PADDLE_ENVIRONMENT || 'missing'
+}
+
+function rowEnvironment(row) {
+  const value = row?.metadata?.paddleEnvironment
+  return value === 'sandbox' || value === 'live' ? value : null
+}
+
 function shorten(value) {
   return value ? `${String(value).slice(0, 8)}...` : null
 }
@@ -89,6 +98,7 @@ try {
     : { rows: [] }
   const row = subscriptionResult.rows[0]
   const entitlement = evaluate(row)
+  const paddleEnvironment = rowEnvironment(row)
 
   console.log(
     JSON.stringify(
@@ -102,6 +112,10 @@ try {
         providerMappingPresent: Boolean(
           row?.providerCustomerId && row?.providerSubscriptionId,
         ),
+        configuredPaddleEnvironment: configuredEnvironment(),
+        providerMappingEnvironment: paddleEnvironment,
+        providerMappingMatchesEnvironment:
+          !row || paddleEnvironment === configuredEnvironment(),
         providerCustomerId: shorten(row?.providerCustomerId),
         providerSubscriptionId: shorten(row?.providerSubscriptionId),
         paymentIssueState: row?.status === 'past_due',

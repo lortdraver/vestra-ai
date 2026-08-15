@@ -25,9 +25,22 @@ function hasFlag(name) {
 }
 
 function apiBaseUrl() {
+  const environment = configuredEnvironment()
   return (
-    process.env.PADDLE_API_BASE_URL || 'https://sandbox-api.paddle.com'
+    process.env.PADDLE_API_BASE_URL ||
+    (environment === 'live'
+      ? 'https://api.paddle.com'
+      : 'https://sandbox-api.paddle.com')
   ).replace(/\/$/, '')
+}
+
+function configuredEnvironment() {
+  return process.env.PADDLE_ENVIRONMENT || 'missing'
+}
+
+function rowEnvironment(row) {
+  const value = row?.metadata?.paddleEnvironment
+  return value === 'sandbox' || value === 'live' ? value : null
 }
 
 function toDate(value) {
@@ -77,6 +90,8 @@ async function markOrphaned(client, local, reason, apply) {
         dryRun: !apply,
         userFound: true,
         providerSubscriptionFound: false,
+        configuredPaddleEnvironment: configuredEnvironment(),
+        localSubscriptionEnvironment: rowEnvironment(local),
         localSubscriptionStatus: local.status,
         driftDetected: true,
         repaired: Boolean(apply),
@@ -101,6 +116,12 @@ if (!email) {
 if (!process.env.DATABASE_URL || !process.env.PADDLE_API_KEY) {
   console.error(
     'Missing DATABASE_URL or PADDLE_API_KEY. No mutation was executed.',
+  )
+  process.exit(1)
+}
+if (!['sandbox', 'live'].includes(configuredEnvironment())) {
+  console.error(
+    'Missing or invalid PADDLE_ENVIRONMENT. No mutation was executed.',
   )
   process.exit(1)
 }
@@ -141,6 +162,27 @@ try {
     process.exit(1)
   }
 
+  const localEnvironment = rowEnvironment(local)
+  if (localEnvironment !== configuredEnvironment()) {
+    console.log(
+      JSON.stringify(
+        {
+          ok: false,
+          code: 'paddle_environment_mismatch',
+          dryRun: !apply,
+          userFound: true,
+          configuredPaddleEnvironment: configuredEnvironment(),
+          localSubscriptionEnvironment: localEnvironment,
+          providerLookupSkipped: true,
+          repaired: false,
+        },
+        null,
+        2,
+      ),
+    )
+    process.exit(1)
+  }
+
   if (!local.providerSubscriptionId) {
     await markOrphaned(client, local, 'missing_provider_subscription_id', apply)
     return
@@ -167,6 +209,8 @@ try {
           ok: false,
           code: 'provider_fetch_failed',
           userFound: true,
+          configuredPaddleEnvironment: configuredEnvironment(),
+          localSubscriptionEnvironment: localEnvironment,
           providerStatus: response.status,
         },
         null,
@@ -231,6 +275,8 @@ try {
         dryRun: !apply,
         userFound: true,
         localSubscriptionStatus: local.status,
+        configuredPaddleEnvironment: configuredEnvironment(),
+        localSubscriptionEnvironment: localEnvironment,
         providerSubscriptionFound: true,
         providerStatus: provider.status,
         driftDetected,

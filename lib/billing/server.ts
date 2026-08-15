@@ -1,9 +1,10 @@
 import { and, desc, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { subscription } from '@/lib/db/schema'
+import { paddleMetadataMatchesConfiguredEnvironment } from './paddle-config'
 
 export async function getLatestPaddleSubscriptionForUser(userId: string) {
-  const [row] = await db
+  const rows = await db
     .select()
     .from(subscription)
     .where(
@@ -13,9 +14,13 @@ export async function getLatestPaddleSubscriptionForUser(userId: string) {
       ),
     )
     .orderBy(desc(subscription.updatedAt))
-    .limit(1)
+    .limit(10)
 
-  return row ?? null
+  return (
+    rows.find((row) =>
+      paddleMetadataMatchesConfiguredEnvironment(row.metadata),
+    ) ?? null
+  )
 }
 
 export async function markPaddleSubscriptionOrphaned(

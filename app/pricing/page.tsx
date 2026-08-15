@@ -5,6 +5,7 @@ import { Check, Crown } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { getBillingCopy } from '@/lib/billing/copy'
+import { getPaddleDiagnostics } from '@/lib/billing/paddle-config'
 import { getLocale } from '@/lib/i18n/server'
 import { getSubscriptionSnapshot } from '@/lib/subscription/server'
 import { buttonVariants } from '@/components/ui/button'
@@ -27,6 +28,7 @@ export default async function PricingPage() {
     auth.api.getSession({ headers: await headers() }),
   ])
   const copy = getBillingCopy(locale)
+  const paddleDiagnostics = getPaddleDiagnostics()
   const subscription = session?.user
     ? await getSubscriptionSnapshot(session.user.id)
     : null
@@ -43,10 +45,12 @@ export default async function PricingPage() {
     <div className="min-h-screen bg-background">
       <main className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-10 md:px-6">
         <section className="grid gap-3">
-          <p className="inline-flex w-fit items-center gap-2 rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
-            <Crown className="size-3.5" aria-hidden="true" />
-            Paddle Sandbox
-          </p>
+          {paddleDiagnostics.environment === 'sandbox' ? (
+            <p className="inline-flex w-fit items-center gap-2 rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
+              <Crown className="size-3.5" aria-hidden="true" />
+              {copy.sandboxBadge}
+            </p>
+          ) : null}
           <h1 className="font-serif text-4xl font-medium tracking-tight md:text-5xl">
             {copy.title}
           </h1>

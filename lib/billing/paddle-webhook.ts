@@ -9,7 +9,9 @@ import {
 } from '@/lib/db/schema'
 import {
   getIntervalForPaddlePriceId,
+  getPaddleEnvironment,
   getPaddleWebhookConfig,
+  paddleMetadataMatchesConfiguredEnvironment,
 } from './paddle-config'
 import {
   isSubscriptionLifecycleEvent,
@@ -196,8 +198,8 @@ async function findUserId(input: {
     if (row) return row.id
   }
 
-  const [subscriptionRow] = await db
-    .select({ userId: subscription.userId })
+  const subscriptionRows = await db
+    .select({ userId: subscription.userId, metadata: subscription.metadata })
     .from(subscription)
     .where(
       and(
@@ -213,8 +215,11 @@ async function findUserId(input: {
       ),
     )
     .orderBy(desc(subscription.updatedAt))
-    .limit(1)
+    .limit(10)
 
+  const subscriptionRow = subscriptionRows.find((row) =>
+    paddleMetadataMatchesConfiguredEnvironment(row.metadata),
+  )
   return subscriptionRow?.userId ?? null
 }
 
@@ -242,12 +247,12 @@ async function upsertPaddleSubscription(
     canceledAt: data.canceledAt,
     lastProviderEventAt: data.occurredAt ?? new Date(),
     metadata: {
-      paddleEnvironment: process.env.PADDLE_ENVIRONMENT ?? 'sandbox',
+      paddleEnvironment: getPaddleEnvironment(),
     },
     updatedAt: new Date(),
   }
 
-  const [existing] = await db
+  const existingRows = await db
     .select()
     .from(subscription)
     .where(
@@ -258,7 +263,10 @@ async function upsertPaddleSubscription(
           : eq(subscription.userId, matchedUserId),
       ),
     )
-    .limit(1)
+    .limit(10)
+  const existing = existingRows.find((row) =>
+    paddleMetadataMatchesConfiguredEnvironment(row.metadata),
+  )
 
   if (existing) {
     const existingEventAt = existing.lastProviderEventAt?.getTime() ?? 0
@@ -326,7 +334,10 @@ export async function processPaddleWebhook(
 ) {
   const startedAt = Date.now()
   const config = getPaddleWebhookConfig()
-  console.info('[paddle] WEBHOOK_RECEIVED', {})
+  console.info('[paddle] WEBHOOK_RECEIVED', {
+    environment: config.environment,
+    verified: false,
+  })
   if (
     !verifyPaddleSignature({
       rawBody,
@@ -336,11 +347,16 @@ export async function processPaddleWebhook(
   ) {
     console.warn('[paddle] WEBHOOK_FAILED', {
       code: 'paddle_webhook_invalid_signature',
+      environment: config.environment,
+      verified: false,
       durationMs: Date.now() - startedAt,
     })
     throw new PaddleWebhookError('paddle_webhook_invalid_signature', 401)
   }
-  console.info('[paddle] WEBHOOK_VERIFIED', {})
+  console.info('[paddle] WEBHOOK_VERIFIED', {
+    environment: config.environment,
+    verified: true,
+  })
 
   const payload = JSON.parse(rawBody) as Record<string, unknown>
   const data = extractPaddleData(payload)
@@ -384,6 +400,7 @@ export async function processPaddleWebhook(
           eventType: data.eventType,
           occurredAt: data.occurredAt,
           status: 'received',
+          metadata: { paddleEnvironment: config.environment },
         })
         .returning()
 
@@ -431,9 +448,11 @@ export async function processPaddleWebhook(
   }
 
   console.info('[paddle] WEBHOOK_PROCESSED', {
+    environment: config.environment,
     eventType: data.eventType,
     eventId: data.eventId.slice(0, 12),
-    matched: status === 'processed',
+    matchedSubscription: status === 'processed',
+    verified: true,
     providerStatus: data.status,
     durationMs: Date.now() - startedAt,
   })
