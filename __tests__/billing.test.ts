@@ -67,6 +67,7 @@ function subscriptionSnapshot(
     plan: subscriptionPlans.free,
     status: 'active',
     isPremium: false,
+    entitlementSource: 'free',
     isTrialActive: false,
     trialEndsAt: null,
     billingInterval: null,
@@ -356,6 +357,7 @@ describe('subscription page state model', () => {
     const snapshot = subscriptionSnapshot({
       plan: subscriptionPlans.premium,
       isPremium: true,
+      entitlementSource: 'paddle',
       billingInterval: 'monthly',
       entitlementReason: 'active',
     })
@@ -368,6 +370,7 @@ describe('subscription page state model', () => {
     const snapshot = subscriptionSnapshot({
       plan: subscriptionPlans.premium,
       isPremium: true,
+      entitlementSource: 'paddle',
       billingInterval: 'annual',
       entitlementReason: 'active',
     })

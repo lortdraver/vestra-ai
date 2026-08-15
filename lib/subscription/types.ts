@@ -57,10 +57,14 @@ export type SubscriptionUsageMeter = {
   resetAt: Date | null
 }
 
+export type SubscriptionEntitlementSource =
+  'paddle' | 'internal_override' | 'trial' | 'free' | 'none'
+
 export type SubscriptionSnapshot = {
   plan: SubscriptionPlanDefinition
   status: SubscriptionStatus
   isPremium: boolean
+  entitlementSource: SubscriptionEntitlementSource
   isTrialActive: boolean
   trialEndsAt: Date | null
   billingInterval?: 'monthly' | 'annual' | null

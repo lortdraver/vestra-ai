@@ -59,6 +59,7 @@ export default async function SubscriptionPage() {
   const copy = getBillingCopy(locale)
   const state = getSubscriptionPageState(subscription)
   const switchTarget = getSubscriptionSwitchTarget(subscription)
+  const hasPaddleBilling = subscription.entitlementSource === 'paddle'
   const isProSurface =
     state === 'active_pro' || state === 'canceling' || state === 'past_due'
 
@@ -212,7 +213,7 @@ export default async function SubscriptionPage() {
               </Link>
             ) : null}
 
-            {isProSurface || state === 'paused' ? (
+            {(isProSurface || state === 'paused') && hasPaddleBilling ? (
               <ManageBillingButton
                 label={
                   state === 'past_due' ? copy.updatePaymentMethod : copy.manage
@@ -221,7 +222,7 @@ export default async function SubscriptionPage() {
               />
             ) : null}
 
-            {state === 'canceling' ? (
+            {state === 'canceling' && hasPaddleBilling ? (
               <BillingActionButton
                 endpoint="/api/billing/paddle/resume"
                 label={copy.resume}
@@ -229,7 +230,8 @@ export default async function SubscriptionPage() {
               />
             ) : null}
 
-            {state === 'active_pro' || state === 'past_due' ? (
+            {(state === 'active_pro' || state === 'past_due') &&
+            hasPaddleBilling ? (
               <BillingActionButton
                 endpoint="/api/billing/paddle/cancel"
                 label={copy.cancel}

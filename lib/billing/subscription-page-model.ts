@@ -41,7 +41,11 @@ export function getSubscriptionPageState(
 export function getSubscriptionSwitchTarget(
   subscription: SubscriptionSnapshot,
 ): 'monthly' | 'annual' | null {
-  if (!subscription.isPremium || subscription.cancelAtPeriodEnd) {
+  if (
+    !subscription.isPremium ||
+    subscription.entitlementSource !== 'paddle' ||
+    subscription.cancelAtPeriodEnd
+  ) {
     return null
   }
 

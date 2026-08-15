@@ -32,6 +32,7 @@ export default async function PricingPage() {
   const subscription = session?.user
     ? await getSubscriptionSnapshot(session.user.id)
     : null
+  const hasPaddleBilling = subscription?.entitlementSource === 'paddle'
   if (session?.user) {
     void trackServerEvent({
       eventName: 'pricing_viewed',
@@ -81,6 +82,8 @@ export default async function PricingPage() {
                     label={copy.updatePaymentMethod}
                     copy={copy}
                   />
+                ) : subscription?.isPremium && !hasPaddleBilling ? (
+                  <CurrentPlanNote copy={copy} note={null} />
                 ) : subscription?.isPremium &&
                   subscription.billingInterval === 'monthly' ? (
                   <CurrentPlanNote
@@ -94,7 +97,7 @@ export default async function PricingPage() {
                         : null
                     }
                   />
-                ) : subscription?.isPremium ? (
+                ) : subscription?.isPremium && hasPaddleBilling ? (
                   <BillingActionButton
                     endpoint="/api/billing/paddle/switch"
                     label={copy.switchToMonthly}
@@ -127,6 +130,8 @@ export default async function PricingPage() {
                     label={copy.updatePaymentMethod}
                     copy={copy}
                   />
+                ) : subscription?.isPremium && !hasPaddleBilling ? (
+                  <CurrentPlanNote copy={copy} note={null} />
                 ) : subscription?.isPremium &&
                   subscription.billingInterval === 'annual' ? (
                   <CurrentPlanNote
@@ -140,7 +145,7 @@ export default async function PricingPage() {
                         : null
                     }
                   />
-                ) : subscription?.isPremium ? (
+                ) : subscription?.isPremium && hasPaddleBilling ? (
                   <BillingActionButton
                     endpoint="/api/billing/paddle/switch"
                     label={copy.switchToAnnual}

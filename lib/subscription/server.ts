@@ -7,6 +7,7 @@ import {
   subscriptionRowMatchesRuntime,
 } from './lifecycle'
 import type {
+  SubscriptionEntitlementSource,
   SubscriptionSnapshot,
   SubscriptionUsageKey,
   SubscriptionUsageSnapshot,
@@ -29,6 +30,54 @@ function createEmptyUsage(): SubscriptionUsageSnapshot {
   }
 }
 
+type SubscriptionRow = typeof subscription.$inferSelect
+
+function isPaddleProRow(row: SubscriptionRow, now: Date) {
+  if (row.providerKey !== 'paddle' || !isPremiumPlan(row.planKey)) {
+    return false
+  }
+
+  return evaluateSubscriptionLifecycle(row, now).isPro
+}
+
+function isInternalOverrideRow(row: SubscriptionRow, now: Date) {
+  if (
+    row.providerKey !== 'internal_override' ||
+    row.planKey !== 'premium' ||
+    row.providerCustomerId ||
+    row.providerSubscriptionId
+  ) {
+    return false
+  }
+
+  return evaluateSubscriptionLifecycle(row, now).isPro
+}
+
+function selectEntitlementRow(rows: SubscriptionRow[], now: Date) {
+  const runtimeRows = rows.filter((row) => subscriptionRowMatchesRuntime(row))
+  const paddleProRow = runtimeRows.find((row) => isPaddleProRow(row, now))
+  if (paddleProRow) return paddleProRow
+
+  const internalOverrideRow = runtimeRows.find((row) =>
+    isInternalOverrideRow(row, now),
+  )
+  if (internalOverrideRow) return internalOverrideRow
+
+  return runtimeRows[0] ?? null
+}
+
+function resolveEntitlementSource(
+  row: SubscriptionRow | null,
+  trialActive: boolean,
+): SubscriptionEntitlementSource {
+  if (row?.providerKey === 'paddle') return 'paddle'
+  if (row?.providerKey === 'internal_override') return 'internal_override'
+  if (trialActive) return 'trial'
+  if (!row) return 'none'
+
+  return 'free'
+}
+
 export async function getSubscriptionSnapshot(
   userId: string,
   now = new Date(),
@@ -39,8 +88,7 @@ export async function getSubscriptionSnapshot(
     .where(eq(subscription.userId, userId))
     .orderBy(desc(subscription.updatedAt))
     .limit(10)
-  const subscriptionRow =
-    subscriptionRows.find((row) => subscriptionRowMatchesRuntime(row)) ?? null
+  const subscriptionRow = selectEntitlementRow(subscriptionRows, now)
 
   const plan = getSubscriptionPlan(subscriptionRow?.planKey)
   const { periodStart, periodEnd } = getCurrentMonthWindow(now)
@@ -71,6 +119,7 @@ export async function getSubscriptionSnapshot(
     isPremium:
       (isPremiumPlan(subscriptionRow?.planKey) && lifecycle.isPro) ||
       trialActive,
+    entitlementSource: resolveEntitlementSource(subscriptionRow, trialActive),
     isTrialActive: trialActive,
     trialEndsAt: subscriptionRow?.trialEndsAt ?? null,
     billingInterval:
@@ -93,6 +142,7 @@ export function getFallbackSubscriptionSnapshot(): SubscriptionSnapshot {
     plan: getSubscriptionPlan('free'),
     status: 'active',
     isPremium: false,
+    entitlementSource: 'free',
     isTrialActive: false,
     trialEndsAt: null,
     billingInterval: null,
