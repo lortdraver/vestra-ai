@@ -23,7 +23,10 @@ import {
   getSubscriptionSwitchTarget,
   subscriptionDashboardRoute,
 } from '@/lib/billing/subscription-page-model'
-import { evaluateSubscriptionLifecycle } from '@/lib/subscription/lifecycle'
+import {
+  evaluateSubscriptionLifecycle,
+  subscriptionRowMatchesRuntime,
+} from '@/lib/subscription/lifecycle'
 import { subscriptionPlans } from '@/lib/subscription/plans'
 import type { SubscriptionSnapshot } from '@/lib/subscription/types'
 
@@ -307,6 +310,25 @@ describe('subscription lifecycle policy', () => {
 
     expect(state.isPro).toBe(false)
     expect(state.entitlementReason).toBe('inactive')
+  })
+
+  it('excludes sandbox Paddle rows from runtime subscription snapshots in live mode', () => {
+    const sandboxRow = row({
+      status: 'active',
+      cancelAtPeriodEnd: true,
+      scheduledChangeAction: 'cancel',
+    })
+    vi.stubEnv('PADDLE_ENVIRONMENT', 'live')
+
+    expect(subscriptionRowMatchesRuntime(sandboxRow)).toBe(false)
+  })
+
+  it('excludes orphan premium Paddle rows from runtime subscription snapshots', () => {
+    const orphanRow = row({
+      providerSubscriptionId: null,
+    })
+
+    expect(subscriptionRowMatchesRuntime(orphanRow)).toBe(false)
   })
 })
 

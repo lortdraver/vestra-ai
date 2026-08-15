@@ -2,7 +2,10 @@ import { and, desc, eq, gte, lt } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { subscription, subscriptionUsage } from '@/lib/db/schema'
 import { getSubscriptionPlan, isPremiumPlan, isTrialActive } from './plans'
-import { evaluateSubscriptionLifecycle } from './lifecycle'
+import {
+  evaluateSubscriptionLifecycle,
+  subscriptionRowMatchesRuntime,
+} from './lifecycle'
 import type {
   SubscriptionSnapshot,
   SubscriptionUsageKey,
@@ -30,12 +33,14 @@ export async function getSubscriptionSnapshot(
   userId: string,
   now = new Date(),
 ): Promise<SubscriptionSnapshot> {
-  const [subscriptionRow] = await db
+  const subscriptionRows = await db
     .select()
     .from(subscription)
     .where(eq(subscription.userId, userId))
-    .orderBy(desc(subscription.createdAt))
-    .limit(1)
+    .orderBy(desc(subscription.updatedAt))
+    .limit(10)
+  const subscriptionRow =
+    subscriptionRows.find((row) => subscriptionRowMatchesRuntime(row)) ?? null
 
   const plan = getSubscriptionPlan(subscriptionRow?.planKey)
   const { periodStart, periodEnd } = getCurrentMonthWindow(now)

@@ -57,6 +57,18 @@ function paddleRowMatchesRuntime(row: typeof subscription.$inferSelect) {
   }
 }
 
+export function subscriptionRowMatchesRuntime(
+  row: typeof subscription.$inferSelect,
+) {
+  if (!paddleRowMatchesRuntime(row)) return false
+
+  return !(
+    row.providerKey === 'paddle' &&
+    row.planKey === 'premium' &&
+    !row.providerSubscriptionId
+  )
+}
+
 export function evaluateSubscriptionLifecycle(
   row: typeof subscription.$inferSelect | undefined | null,
   now = new Date(),
@@ -72,22 +84,7 @@ export function evaluateSubscriptionLifecycle(
     }
   }
 
-  if (!paddleRowMatchesRuntime(row)) {
-    return {
-      status: 'inactive',
-      isPro: false,
-      paymentIssue: false,
-      graceUntil: null,
-      accessUntil: null,
-      entitlementReason: 'inactive',
-    }
-  }
-
-  if (
-    row.providerKey === 'paddle' &&
-    row.planKey === 'premium' &&
-    !row.providerSubscriptionId
-  ) {
+  if (!subscriptionRowMatchesRuntime(row)) {
     return {
       status: 'inactive',
       isPro: false,
