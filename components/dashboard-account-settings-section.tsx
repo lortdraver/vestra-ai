@@ -5,8 +5,11 @@ import { useRouter } from 'next/navigation'
 import {
   Cookie,
   CreditCard,
+  FileQuestion,
+  FileText,
   Headphones,
   LogOut,
+  ReceiptText,
   Shield,
   SlidersHorizontal,
   UserCog,
@@ -49,6 +52,7 @@ export function DashboardAccountSettingsSection({
 }) {
   const router = useRouter()
   const copy = getDashboardSettingsCopy(locale)
+  const publicLinksCopy = getDashboardPublicLinksCopy(locale)
   const menuItems = getAccountMenuItems(role)
 
   const handleSignOut = async () => {
@@ -97,6 +101,36 @@ export function DashboardAccountSettingsSection({
           >
             <Headphones className="size-4" aria-hidden="true" />
             {copy.support}
+          </Link>
+          <Link
+            href="/faq"
+            className={cn(
+              buttonVariants({ variant: 'outline' }),
+              'min-h-12 justify-start rounded-xl px-3 text-sm',
+            )}
+          >
+            <FileQuestion className="size-4" aria-hidden="true" />
+            {publicLinksCopy.faq}
+          </Link>
+          <Link
+            href="/terms"
+            className={cn(
+              buttonVariants({ variant: 'outline' }),
+              'min-h-12 justify-start rounded-xl px-3 text-sm',
+            )}
+          >
+            <FileText className="size-4" aria-hidden="true" />
+            {publicLinksCopy.terms}
+          </Link>
+          <Link
+            href="/refund"
+            className={cn(
+              buttonVariants({ variant: 'outline' }),
+              'min-h-12 justify-start rounded-xl px-3 text-sm',
+            )}
+          >
+            <ReceiptText className="size-4" aria-hidden="true" />
+            {publicLinksCopy.refund}
           </Link>
         </div>
 
@@ -161,6 +195,26 @@ function getDashboardSettingsCopy(locale: Locale) {
         'Профиль, план, язык, приватность и выход доступны здесь и на мобильном.',
       support: 'Поддержка / помощь',
       languageDescription: 'Измените язык интерфейса Vestra.',
+    },
+  }[locale]
+}
+
+function getDashboardPublicLinksCopy(locale: Locale) {
+  return {
+    az: {
+      faq: 'FAQ',
+      terms: 'İstifadə şərtləri',
+      refund: 'Geri ödəniş və ləğv siyasəti',
+    },
+    en: {
+      faq: 'FAQ',
+      terms: 'Terms of Service',
+      refund: 'Refund / Cancellation Policy',
+    },
+    ru: {
+      faq: 'FAQ',
+      terms: 'Условия использования',
+      refund: 'Политика возврата и отмены',
     },
   }[locale]
 }

@@ -171,6 +171,16 @@ describe('responsive UI contracts', () => {
     expect(dashboardAccountSettingsSource).toContain(
       'href="/dashboard/account#support"',
     )
+    expect(dashboardAccountSettingsSource).toContain('href="/faq"')
+    expect(dashboardAccountSettingsSource).toContain('href="/terms"')
+    expect(dashboardAccountSettingsSource).toContain('href="/refund"')
+    expect(dashboardAccountSettingsSource).toContain(
+      'getDashboardPublicLinksCopy(locale)',
+    )
+    expect(dashboardAccountSettingsSource).toContain('Terms of Service')
+    expect(dashboardAccountSettingsSource).toContain(
+      'Refund / Cancellation Policy',
+    )
     expect(dashboardAccountSettingsSource).not.toContain('fixed')
     expect(dashboardAccountSettingsSource).not.toContain('sticky')
   })
