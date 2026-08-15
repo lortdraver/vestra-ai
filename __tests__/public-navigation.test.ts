@@ -2,11 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { billingCopy } from '@/lib/billing/copy'
-import {
-  faqCopy,
-  publicFooterCopy,
-  supportCopy,
-} from '@/lib/public-content/copy'
+import { faqCopy, siteFooterCopy, supportCopy } from '@/lib/public-content/copy'
 
 const source = (path: string) => readFileSync(join(process.cwd(), path), 'utf8')
 
@@ -14,6 +10,7 @@ const landingPageSource = source('app/page.tsx')
 const pricingPageSource = source('app/pricing/page.tsx')
 const faqPageSource = source('app/faq/page.tsx')
 const supportPageSource = source('app/support/page.tsx')
+const dashboardLayoutSource = source('app/dashboard/layout.tsx')
 const publicFooterSource = source('components/public-footer.tsx')
 const faqAccordionSource = source('components/faq-accordion.tsx')
 
@@ -28,20 +25,28 @@ describe('public navigation and help pages', () => {
   })
 
   it('exposes product and legal navigation from the homepage footer', () => {
-    expect(landingPageSource).toContain('publicFooterCopy')
+    expect(landingPageSource).toContain('siteFooterCopy')
     expect(landingPageSource).toContain('<PublicFooter')
-    expect(publicFooterCopy.en.product.links.map((link) => link.href)).toEqual([
-      '/pricing',
-      '/faq',
-      '/support',
+    expect(siteFooterCopy.en.product.links.map((link) => link.key)).toEqual([
+      'home',
+      'wardrobe',
+      'stylist',
+      'planner',
+      'savedLooks',
+      'pricing',
     ])
-    expect(publicFooterCopy.en.legal.links.map((link) => link.href)).toEqual([
-      '/privacy',
-      '/terms',
-      '/refund',
+    expect(siteFooterCopy.en.help.links.map((link) => link.key)).toEqual([
+      'faq',
+      'support',
+      'feedback',
     ])
-    expect(publicFooterSource).toContain('copy.product.links')
-    expect(publicFooterSource).toContain('copy.legal.links')
+    expect(siteFooterCopy.en.legal.links.map((link) => link.key)).toEqual([
+      'privacy',
+      'terms',
+      'refund',
+    ])
+    expect(publicFooterSource).toContain('publicProductRoutes')
+    expect(publicFooterSource).toContain('authenticatedProductRoutes')
     expect(publicFooterSource).toContain('CookiePreferencesButton')
   })
 
@@ -49,7 +54,19 @@ describe('public navigation and help pages', () => {
     expect(pricingPageSource).toContain('<PublicFooter')
     expect(faqPageSource).toContain('<PublicFooter')
     expect(supportPageSource).toContain('<PublicFooter')
-    expect(publicFooterSource).toContain('publicFooterCopy')
+    expect(publicFooterSource).toContain('siteFooterCopy')
+  })
+
+  it('mounts one authenticated footer across dashboard product surfaces', () => {
+    expect(dashboardLayoutSource).toContain('<PublicFooter')
+    expect(dashboardLayoutSource).toContain('authenticated')
+    expect(dashboardLayoutSource).toContain(
+      'pb-[calc(env(safe-area-inset-bottom)+6.75rem)]',
+    )
+    expect(publicFooterSource).toContain("wardrobe: '/dashboard/wardrobe'")
+    expect(publicFooterSource).toContain("stylist: '/dashboard/stylist'")
+    expect(publicFooterSource).toContain("planner: '/dashboard/planner'")
+    expect(publicFooterSource).toContain("savedLooks: '/dashboard/outfits'")
   })
 
   it('keeps pricing and legal support navigation visible on pricing', () => {
@@ -94,17 +111,26 @@ describe('public navigation and help pages', () => {
 
   it('localizes public footer groups for AZ, EN, and RU', () => {
     for (const locale of ['az', 'en', 'ru'] as const) {
-      const copy = publicFooterCopy[locale]
-      expect(copy.product.links.map((link) => link.href)).toEqual([
-        '/pricing',
-        '/faq',
-        '/support',
+      const copy = siteFooterCopy[locale]
+      expect(copy.product.links.map((link) => link.key)).toEqual([
+        'home',
+        'wardrobe',
+        'stylist',
+        'planner',
+        'savedLooks',
+        'pricing',
       ])
-      expect(copy.legal.links.map((link) => link.href)).toEqual([
-        '/privacy',
-        '/terms',
-        '/refund',
+      expect(copy.help.links.map((link) => link.key)).toEqual([
+        'faq',
+        'support',
+        'feedback',
       ])
+      expect(copy.legal.links.map((link) => link.key)).toEqual([
+        'privacy',
+        'terms',
+        'refund',
+      ])
+      expect(copy.description).toBeTruthy()
       expect(copy.cookiePreferences).toBeTruthy()
       expect(copy.copyright).toBeTruthy()
     }

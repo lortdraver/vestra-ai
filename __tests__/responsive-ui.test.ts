@@ -33,6 +33,10 @@ const appHeaderSource = readFileSync(
   join(process.cwd(), 'components/app-header.tsx'),
   'utf8',
 )
+const publicFooterSource = readFileSync(
+  join(process.cwd(), 'components/public-footer.tsx'),
+  'utf8',
+)
 const languageSwitcherSource = readFileSync(
   join(process.cwd(), 'components/language-switcher.tsx'),
   'utf8',
@@ -86,6 +90,14 @@ describe('responsive UI contracts', () => {
     expect(DASHBOARD_CONTENT_CLASS).toContain('max-w-[1680px]')
     expect(DASHBOARD_CONTENT_CLASS).toContain('xl:px-8')
     expect(dashboardLayoutSource).toContain('DASHBOARD_CONTENT_CLASS')
+    expect(dashboardLayoutSource).toContain('<PublicFooter')
+    expect(dashboardLayoutSource).toContain('authenticated')
+    expect(dashboardLayoutSource).toContain(
+      'pb-[calc(env(safe-area-inset-bottom)+6.75rem)]',
+    )
+    expect(publicFooterSource).toContain('sm:grid-cols-2')
+    expect(publicFooterSource).toContain('lg:grid-cols')
+    expect(publicFooterSource).toContain('min-h-10')
     expect(dashboardLayoutSource).not.toContain('max-w-6xl flex-1')
   })
 

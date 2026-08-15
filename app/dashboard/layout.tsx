@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { user } from '@/lib/db/schema'
 import { AppHeader } from '@/components/app-header'
 import { EmailVerificationBanner } from '@/components/account/email-verification-banner'
+import { PublicFooter } from '@/components/public-footer'
 import { getDictionary, getLocale } from '@/lib/i18n/server'
 import { eq } from 'drizzle-orm'
 import { SubscriptionOverview } from '@/components/subscription/subscription-overview'
@@ -58,6 +59,11 @@ export default async function DashboardLayout({
         locale={locale}
       />
       <main className={DASHBOARD_CONTENT_CLASS}>{children}</main>
+      <PublicFooter
+        locale={locale}
+        authenticated
+        className="border-t border-border px-6 pb-[calc(env(safe-area-inset-bottom)+6.75rem)] pt-8 text-sm text-muted-foreground md:px-10 md:pb-8"
+      />
     </div>
   )
 }

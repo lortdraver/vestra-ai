@@ -116,6 +116,122 @@ export const publicFooterCopy: Record<Locale, PublicFooterCopy> = {
   },
 }
 
+type SiteFooterColumn = {
+  title: string
+  links: {
+    key: string
+    label: string
+  }[]
+}
+
+export type SiteFooterCopy = {
+  description: string
+  product: SiteFooterColumn
+  help: SiteFooterColumn
+  legal: SiteFooterColumn
+  cookiePreferences: string
+  copyright: string
+}
+
+export const siteFooterCopy: Record<Locale, SiteFooterCopy> = {
+  az: {
+    description: 'AI ilə çalışan şəxsi qarderob və stil köməkçiniz.',
+    product: {
+      title: 'Məhsul',
+      links: [
+        { key: 'home', label: 'Ana səhifə' },
+        { key: 'wardrobe', label: 'Qarderob' },
+        { key: 'stylist', label: 'AI Stilist' },
+        { key: 'planner', label: 'Planlayıcı' },
+        { key: 'savedLooks', label: 'Saxlanılan kombinlər' },
+        { key: 'pricing', label: 'Qiymətlər' },
+      ],
+    },
+    help: {
+      title: 'Kömək',
+      links: [
+        { key: 'faq', label: 'FAQ' },
+        { key: 'support', label: 'Dəstək' },
+        { key: 'feedback', label: 'Problem bildir / rəy göndər' },
+      ],
+    },
+    legal: {
+      title: 'Hüquqi',
+      links: [
+        { key: 'privacy', label: 'Məxfilik siyasəti' },
+        { key: 'terms', label: 'İstifadə şərtləri' },
+        { key: 'refund', label: 'Geri ödəniş və ləğv siyasəti' },
+      ],
+    },
+    cookiePreferences: 'Kuki seçimləri',
+    copyright: 'Bütün hüquqlar qorunur.',
+  },
+  en: {
+    description: 'Your AI-powered personal wardrobe and styling assistant.',
+    product: {
+      title: 'Product',
+      links: [
+        { key: 'home', label: 'Home' },
+        { key: 'wardrobe', label: 'Wardrobe' },
+        { key: 'stylist', label: 'AI Stylist' },
+        { key: 'planner', label: 'Planner' },
+        { key: 'savedLooks', label: 'Saved Looks' },
+        { key: 'pricing', label: 'Pricing' },
+      ],
+    },
+    help: {
+      title: 'Help',
+      links: [
+        { key: 'faq', label: 'FAQ' },
+        { key: 'support', label: 'Support' },
+        { key: 'feedback', label: 'Report a problem / Feedback' },
+      ],
+    },
+    legal: {
+      title: 'Legal',
+      links: [
+        { key: 'privacy', label: 'Privacy Policy' },
+        { key: 'terms', label: 'Terms of Service' },
+        { key: 'refund', label: 'Refund / Cancellation Policy' },
+      ],
+    },
+    cookiePreferences: 'Cookie preferences',
+    copyright: 'All rights reserved.',
+  },
+  ru: {
+    description: 'Ваш AI-помощник для гардероба и персонального стиля.',
+    product: {
+      title: 'Продукт',
+      links: [
+        { key: 'home', label: 'Главная' },
+        { key: 'wardrobe', label: 'Гардероб' },
+        { key: 'stylist', label: 'AI Стилист' },
+        { key: 'planner', label: 'Планировщик' },
+        { key: 'savedLooks', label: 'Сохраненные образы' },
+        { key: 'pricing', label: 'Цены' },
+      ],
+    },
+    help: {
+      title: 'Помощь',
+      links: [
+        { key: 'faq', label: 'FAQ' },
+        { key: 'support', label: 'Поддержка' },
+        { key: 'feedback', label: 'Сообщить о проблеме / отзыв' },
+      ],
+    },
+    legal: {
+      title: 'Правовая информация',
+      links: [
+        { key: 'privacy', label: 'Политика конфиденциальности' },
+        { key: 'terms', label: 'Условия использования' },
+        { key: 'refund', label: 'Политика возврата и отмены' },
+      ],
+    },
+    cookiePreferences: 'Настройки cookies',
+    copyright: 'Все права защищены.',
+  },
+}
+
 export const supportCopy: Record<Locale, SupportPageCopy> = {
   az: {
     title: 'Dəstək və əlaqə',

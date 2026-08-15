@@ -6,7 +6,7 @@ import { getDictionary, getLocale } from '@/lib/i18n/server'
 import { buttonVariants } from '@/components/ui/button'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { PublicFooter } from '@/components/public-footer'
-import { publicFooterCopy } from '@/lib/public-content/copy'
+import { siteFooterCopy } from '@/lib/public-content/copy'
 
 export default async function LandingPage() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -14,7 +14,18 @@ export default async function LandingPage() {
 
   const dictionary = await getDictionary()
   const locale = await getLocale()
-  const publicLinks = publicFooterCopy[locale].product.links
+  const footerCopy = siteFooterCopy[locale]
+  const publicLinks = [
+    {
+      href: '/pricing',
+      label: getFooterLabel(footerCopy.product.links, 'pricing'),
+    },
+    { href: '/faq', label: getFooterLabel(footerCopy.help.links, 'faq') },
+    {
+      href: '/support',
+      label: getFooterLabel(footerCopy.help.links, 'support'),
+    },
+  ]
 
   return (
     <div className="flex min-h-svh flex-col bg-background">
@@ -81,4 +92,11 @@ export default async function LandingPage() {
       <PublicFooter locale={locale} className="px-6 pb-6 pt-3 md:px-10" />
     </div>
   )
+}
+
+function getFooterLabel(
+  links: { key: string; label: string }[],
+  key: string,
+): string {
+  return links.find((link) => link.key === key)?.label ?? key
 }

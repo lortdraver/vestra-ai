@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { getRefundCopy, getTermsCopy } from '@/lib/legal/copy'
-import { publicFooterCopy } from '@/lib/public-content/copy'
+import { siteFooterCopy } from '@/lib/public-content/copy'
 import { consentCopy, getPrivacyPolicyCopy } from '@/lib/privacy/copy'
 import {
   buildClearConsentCookie,
@@ -252,12 +252,12 @@ describe('privacy consent architecture', () => {
 
   it('exposes cookie preferences from public and authenticated surfaces', () => {
     expect(landingPageSource).toContain('<PublicFooter')
-    expect(publicFooterCopy.en.legal.links.map((link) => link.href)).toEqual([
-      '/privacy',
-      '/terms',
-      '/refund',
+    expect(siteFooterCopy.en.legal.links.map((link) => link.key)).toEqual([
+      'privacy',
+      'terms',
+      'refund',
     ])
-    expect(publicFooterSource).toContain('copy.legal.links')
+    expect(publicFooterSource).toContain('legalRoutes')
     expect(publicFooterSource).toContain('CookiePreferencesButton')
     expect(appHeaderSource).toContain('openCookiePreferences')
     expect(appHeaderSource).toContain('dictionary.privacy.cookiePreferences')
