@@ -1,24 +1,33 @@
 import { z } from 'zod'
 import type { StylistWardrobeItem } from './types'
 
+const preferenceFields = {
+  preferredStyles: z.array(z.string().trim().min(1).max(80)).max(20),
+  dislikedStyles: z.array(z.string().trim().min(1).max(80)).max(20),
+  preferredColors: z.array(z.string().trim().min(1).max(80)).max(20),
+  avoidedColors: z.array(z.string().trim().min(1).max(80)).max(20),
+  preferredFormality: z.string().trim().max(80),
+  preferredFit: z.string().trim().max(80),
+  preferredWardrobeItemIds: z.array(z.string().uuid()).max(50),
+  dislikedWardrobeItemIds: z.array(z.string().uuid()).max(50),
+}
+
 export const stylistPreferenceSchema = z.object({
-  preferredStyles: z
-    .array(z.string().trim().min(1).max(80))
-    .max(20)
-    .default([]),
-  dislikedStyles: z.array(z.string().trim().min(1).max(80)).max(20).default([]),
-  preferredColors: z
-    .array(z.string().trim().min(1).max(80))
-    .max(20)
-    .default([]),
-  avoidedColors: z.array(z.string().trim().min(1).max(80)).max(20).default([]),
-  preferredFormality: z.string().trim().max(80).default(''),
-  preferredFit: z.string().trim().max(80).default(''),
-  preferredWardrobeItemIds: z.array(z.string().uuid()).max(50).default([]),
-  dislikedWardrobeItemIds: z.array(z.string().uuid()).max(50).default([]),
+  preferredStyles: preferenceFields.preferredStyles.default([]),
+  dislikedStyles: preferenceFields.dislikedStyles.default([]),
+  preferredColors: preferenceFields.preferredColors.default([]),
+  avoidedColors: preferenceFields.avoidedColors.default([]),
+  preferredFormality: preferenceFields.preferredFormality.default(''),
+  preferredFit: preferenceFields.preferredFit.default(''),
+  preferredWardrobeItemIds: preferenceFields.preferredWardrobeItemIds.default(
+    [],
+  ),
+  dislikedWardrobeItemIds: preferenceFields.dislikedWardrobeItemIds.default([]),
 })
 
-export const stylistPreferencePatchSchema = stylistPreferenceSchema.partial()
+// Built from the default-free fields: Zod 4 applies `.default()` even inside
+// `.partial()`, which made every partial PATCH reset the omitted preferences.
+export const stylistPreferencePatchSchema = z.object(preferenceFields).partial()
 
 export type StylistPreferenceProfile = z.infer<typeof stylistPreferenceSchema>
 export type StylistLearnedPreferenceSignals = {

@@ -1,4 +1,9 @@
 import { betterAuth } from 'better-auth'
+import { APIError } from 'better-auth/api'
+import {
+  AccountDeletionBlockedError,
+  deleteUserAppData,
+} from '@/lib/account/deletion'
 import { buildAccountEmailTemplate } from '@/lib/account/email-templates'
 import {
   getAccountEmailProvider,
@@ -122,6 +127,30 @@ export const auth = betterAuth({
     },
   },
   trustedOrigins,
+  user: {
+    deleteUser: {
+      enabled: true,
+      // Removes all app data and queues images for purge before Better Auth
+      // deletes the user row. Throwing aborts the deletion.
+      beforeDelete: async (deletedUser) => {
+        try {
+          await deleteUserAppData(deletedUser.id)
+        } catch (error) {
+          if (error instanceof AccountDeletionBlockedError) {
+            throw new APIError('BAD_REQUEST', {
+              code: error.code,
+              message:
+                'Cancel the active subscription before deleting the account.',
+            })
+          }
+          throw error
+        }
+        console.info('[account-deletion] APP_DATA_DELETED', {
+          userId: deletedUser.id,
+        })
+      },
+    },
+  },
   session: {
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,

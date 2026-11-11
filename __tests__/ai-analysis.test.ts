@@ -11,6 +11,10 @@ import {
   openRouterDiagnostics,
 } from '@/lib/ai/openai-compatible-provider'
 import { enhanceClothingAnalysis } from '@/lib/ai/quality'
+import {
+  isAnalysisLeaseStale,
+  resolveAnalysisDisplayState,
+} from '@/lib/ai/analysis-lease'
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -286,6 +290,136 @@ describe('AI provider behavior', () => {
     })
     expect(calls[1]).toMatchObject({
       response_format: { type: 'json_object' },
+    })
+  })
+
+  it('aborts a hung provider request after the configured timeout', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    vi.stubEnv('AI_REQUEST_TIMEOUT_MS', '1000')
+    vi.useFakeTimers()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            ;(init as RequestInit).signal?.addEventListener('abort', () =>
+              reject(new DOMException('Aborted', 'AbortError')),
+            )
+          }),
+      ),
+    )
+
+    const provider = new OpenAICompatibleClothingAnalysisProvider({
+      apiKey: 'secret-key',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      modelId: 'openrouter/test-model',
+    })
+
+    const pending = provider.analyzeClothing({
+      itemId: 'item_1',
+      userId: 'user_1',
+      imageUrl: 'https://example.com/image.webp',
+      imageDataUrl: 'data:image/webp;base64,abc',
+      name: 'Grey tee',
+      category: 'tops',
+      clothingType: 't-shirt',
+    })
+    const assertion = expect(pending).rejects.toMatchObject({
+      detail: { status: 408, code: 'ai_provider_timeout' },
+    })
+    await vi.advanceTimersByTimeAsync(1_100)
+    await assertion
+    vi.useRealTimers()
+  })
+
+  it('records the real provider model instead of the model-reported id', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          model: 'vendor/actual-model-2026',
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  detectedClothingType: 't-shirt',
+                  detectedCategory: 'tops',
+                  colors: ['grey'],
+                  material: 'cotton',
+                  season: ['spring'],
+                  style: ['casual'],
+                  warmthLevel: 1,
+                  formalityLevel: 1,
+                  confidenceScore: 0.8,
+                  visualDescription: 'A grey t-shirt.',
+                  promptVersion: 'made-up-version',
+                  modelId: 'wardrobe-vision-v1',
+                }),
+              },
+            },
+          ],
+        }),
+      ),
+    )
+
+    const provider = new OpenAICompatibleClothingAnalysisProvider({
+      apiKey: 'secret-key',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      modelId: 'openrouter/test-model',
+    })
+
+    const result = await provider.analyzeClothing({
+      itemId: 'item_1',
+      userId: 'user_1',
+      imageUrl: 'https://example.com/image.webp',
+      imageDataUrl: 'data:image/webp;base64,abc',
+      name: 'Grey tee',
+      category: 'tops',
+      clothingType: 't-shirt',
+    })
+
+    expect(result.modelId).toBe('vendor/actual-model-2026')
+  })
+})
+
+describe('AI analysis lease', () => {
+  const now = new Date('2026-11-11T12:00:00Z')
+
+  it('treats a recent analyzing claim as active', () => {
+    expect(
+      isAnalysisLeaseStale('analyzing', new Date(now.getTime() - 60_000), now),
+    ).toBe(false)
+  })
+
+  it('treats an old analyzing claim as stale and reclaimable', () => {
+    expect(
+      isAnalysisLeaseStale(
+        'analyzing',
+        new Date(now.getTime() - 10 * 60_000),
+        now,
+      ),
+    ).toBe(true)
+  })
+
+  it('never treats other statuses as stale leases', () => {
+    expect(
+      isAnalysisLeaseStale('done', new Date(now.getTime() - 86_400_000), now),
+    ).toBe(false)
+  })
+
+  it('presents a stale analyzing item as a retryable timeout failure', () => {
+    expect(
+      resolveAnalysisDisplayState(
+        {
+          analysisStatus: 'analyzing',
+          analysisError: null,
+          updatedAt: new Date(now.getTime() - 10 * 60_000),
+        },
+        now,
+      ),
+    ).toEqual({
+      analysisStatus: 'failed',
+      analysisError: 'ai_provider_timeout',
     })
   })
 })

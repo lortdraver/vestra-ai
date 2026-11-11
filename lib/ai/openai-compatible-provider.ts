@@ -259,6 +259,16 @@ function logDevelopmentProviderRequest(input: {
   console.log('[dev] OpenRouter clothing analysis request completed', input)
 }
 
+const DEFAULT_ANALYSIS_TIMEOUT_MS = 45_000
+
+export function getAnalysisRequestTimeoutMs() {
+  const configured = Number(process.env.AI_REQUEST_TIMEOUT_MS)
+  if (!Number.isFinite(configured) || configured <= 0) {
+    return DEFAULT_ANALYSIS_TIMEOUT_MS
+  }
+  return Math.min(Math.max(configured, 1_000), 120_000)
+}
+
 function getOpenRouterReferer() {
   return process.env.OPENROUTER_HTTP_REFERER ?? 'http://localhost:3000'
 }
@@ -326,11 +336,31 @@ export class OpenAICompatibleClothingAnalysisProvider implements ClothingAnalysi
   ) {
     const requestUrl = toCompletionsUrl(this.config.baseUrl)
     const requestStartedAt = performance.now()
-    const response = await fetch(requestUrl, {
-      method: 'POST',
-      headers: getHeaders(this.config.apiKey),
-      body: JSON.stringify(this.buildRequestBody(input, responseFormat)),
-    })
+    const timeoutMs = getAnalysisRequestTimeoutMs()
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), timeoutMs)
+    let response: Response
+    try {
+      response = await fetch(requestUrl, {
+        method: 'POST',
+        headers: getHeaders(this.config.apiKey),
+        body: JSON.stringify(this.buildRequestBody(input, responseFormat)),
+        signal: controller.signal,
+      })
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        const durationMs = Math.round(performance.now() - requestStartedAt)
+        throw new AiProviderHttpError('ai_provider_timeout', {
+          status: 408,
+          code: 'ai_provider_timeout',
+          message: `Clothing analysis request exceeded ${timeoutMs}ms`,
+          durationMs,
+        })
+      }
+      throw error
+    } finally {
+      clearTimeout(timeout)
+    }
     const durationMs = Math.round(performance.now() - requestStartedAt)
 
     if (!response.ok) {
@@ -423,6 +453,7 @@ export class OpenAICompatibleClothingAnalysisProvider implements ClothingAnalysi
 
     const responseParsingStartedAt = performance.now()
     const payload = (await response.json()) as {
+      model?: string
       choices?: Array<{ message?: { content?: string } }>
     }
     const content = payload.choices?.[0]?.message?.content
@@ -436,6 +467,12 @@ export class OpenAICompatibleClothingAnalysisProvider implements ClothingAnalysi
 
     const validationStartedAt = performance.now()
     const analysis = clothingAnalysisSchema.parse(parsedContent)
+    // The model's self-reported modelId is not trustworthy; record the model
+    // the provider actually served, falling back to the configured model.
+    analysis.modelId =
+      (typeof payload.model === 'string' &&
+        payload.model.trim().slice(0, 120)) ||
+      this.config.modelId
     const zodValidationMs = Math.round(performance.now() - validationStartedAt)
 
     Object.defineProperty(analysis, '__timing', {

@@ -16,7 +16,7 @@ import { getBillingCopy } from '@/lib/billing/copy'
 import { getSubscriptionSnapshot } from '@/lib/subscription/server'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { AccountActions } from '@/components/account/account-actions'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   BillingActionButton,
@@ -171,16 +171,25 @@ export default async function AccountPage() {
 
       <section className="grid gap-4 md:grid-cols-2">
         <AccountCard title={dictionary.account.actions}>
-          <AccountActions dictionary={dictionary} />
+          <AccountActions
+            dictionary={dictionary}
+            currentName={session.user.name}
+          />
         </AccountCard>
 
         <AccountCard title={dictionary.account.security}>
-          <Button type="button" variant="outline">
+          <Link
+            href="/forgot-password"
+            className={buttonVariants({ variant: 'outline' })}
+          >
             {dictionary.account.changePassword}
-          </Button>
-          <Button type="button" variant="outline">
+          </Link>
+          <Link
+            href="/verify-email"
+            className={buttonVariants({ variant: 'outline' })}
+          >
             {dictionary.account.emailVerification}
-          </Button>
+          </Link>
           <p className="text-sm text-muted-foreground">
             {dictionary.account.securityBody}
           </p>

@@ -1,4 +1,7 @@
-import { and, eq, ne } from 'drizzle-orm'
+import { and, eq, lt, ne, or } from 'drizzle-orm'
+import { getAnalysisLeaseCutoff } from '@/lib/ai/analysis-lease'
+import { EntitlementError } from '@/lib/subscription/entitlements'
+import { consumeMonthlyUsage } from '@/lib/subscription/usage-meter'
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getClothingAnalysisProvider } from '@/lib/ai'
@@ -131,7 +134,10 @@ export async function POST(
       and(
         eq(wardrobeItem.id, id),
         eq(wardrobeItem.userId, userId),
-        ne(wardrobeItem.analysisStatus, 'analyzing'),
+        or(
+          ne(wardrobeItem.analysisStatus, 'analyzing'),
+          lt(wardrobeItem.updatedAt, getAnalysisLeaseCutoff()),
+        ),
       ),
     )
     .returning()
@@ -147,6 +153,32 @@ export async function POST(
       analysisStatus: 'analyzing',
     })
     return NextResponse.json({ item: itemDto }, { status: 202 })
+  }
+
+  try {
+    await consumeMonthlyUsage(userId, 'ai_analyses_monthly')
+  } catch (error) {
+    if (!(error instanceof EntitlementError)) throw error
+
+    const [limitedItem] = await db
+      .update(wardrobeItem)
+      .set({
+        analysisStatus: 'failed',
+        analysisError: 'analysis_limit_reached',
+        updatedAt: new Date(),
+      })
+      .where(and(eq(wardrobeItem.id, id), eq(wardrobeItem.userId, userId)))
+      .returning()
+
+    return NextResponse.json(
+      {
+        error: 'analysis_limit_reached',
+        limit: error.limit,
+        used: error.used,
+        item: await toWardrobeItemDtoWithWear(userId, limitedItem),
+      },
+      { status: 402 },
+    )
   }
 
   try {

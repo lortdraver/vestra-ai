@@ -33,8 +33,11 @@ const pool = new pg.Pool({
 })
 
 const client = await pool.connect()
+// Serialise concurrent runs (e.g. two deploys at once) across all machines.
+const MIGRATION_LOCK_ID = 727_381_001
 
 try {
+  await client.query('SELECT pg_advisory_lock($1)', [MIGRATION_LOCK_ID])
   await client.query(`
     CREATE TABLE IF NOT EXISTS public.app_schema_migrations (
       name text PRIMARY KEY,
@@ -71,6 +74,9 @@ try {
 
   console.log('Database SQL migrations are up to date.')
 } finally {
+  await client
+    .query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_ID])
+    .catch(() => undefined)
   client.release()
   await pool.end()
 }

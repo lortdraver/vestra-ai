@@ -1,0 +1,57 @@
+name: Database migrations
+
+# Applies committed SQL migrations (drizzle/*.sql) to the production database
+# whenever they change on main. Vercel deploys the app from the same push, so
+# every migration must be backward compatible (add, never drop/rename in the
+# same release). Already-applied files are skipped; runs are serialised with a
+# Postgres advisory lock.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'drizzle/**'
+      - 'scripts/apply-drizzle-sql.mjs'
+  workflow_dispatch:
+
+concurrency:
+  group: db-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Create a "production" environment in GitHub to require a manual
+    # approval before migrations run (Settings → Environments).
+    environment: production
+    steps:
+      - name: Check migration secret
+        id: secret
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_MIGRATE }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL_MIGRATE secret is not set; skipping." >> "$GITHUB_STEP_SUMMARY"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.secret.outputs.configured == 'true'
+        uses: actions/checkout@v4
+      - if: steps.secret.outputs.configured == 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - if: steps.secret.outputs.configured == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.secret.outputs.configured == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.secret.outputs.configured == 'true'
+        name: Apply migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_MIGRATE }}
+        run: pnpm db:apply
