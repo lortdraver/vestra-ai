@@ -26,6 +26,15 @@ const nextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   serverExternalPackages: ['sharp'],
+  // sharp's native addon dlopen()s libvips-cpp.so from the sibling
+  // @img/sharp-libvips-<platform> package. File tracing only follows JS
+  // requires, so under pnpm the .so files were left out of the Vercel
+  // function bundle and every sharp call failed with ERR_DLOPEN_FAILED.
+  outputFileTracingIncludes: {
+    '/api/**': [
+      './node_modules/.pnpm/@img+sharp-libvips-linux-x64@*/node_modules/@img/sharp-libvips-linux-x64/lib/**/*',
+    ],
+  },
   images: {
     remotePatterns: [],
   },
