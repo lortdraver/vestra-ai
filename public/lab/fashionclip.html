@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Vestra Lab — FashionCLIP</title>
+<style>
+  :root { --bg:#f6f3ee; --card:#fffdf9; --ink:#1f1b16; --muted:#7a7268; --line:#e7e1d8; --accent:#1f1b16; --ok:#2f7d4f; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--ink); }
+  main { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-family: Georgia, 'Playfair Display', serif; font-weight: 500; font-size: 30px; margin: 0 0 6px; }
+  .sub { color: var(--muted); margin: 0 0 24px; line-height: 1.5; }
+  .status { display:flex; align-items:center; gap:10px; padding:12px 14px; border:1px solid var(--line); background:var(--card); border-radius:12px; font-size:14px; margin-bottom:16px; }
+  .dot { width:10px; height:10px; border-radius:50%; background:#c9a227; flex:none; }
+  .dot.ok { background: var(--ok); } .dot.err { background:#b3261e; }
+  .bar { height:4px; background:var(--line); border-radius:2px; overflow:hidden; margin-top:6px; }
+  .bar > i { display:block; height:100%; width:0; background:var(--accent); transition:width .2s; }
+  .drop { border: 1.5px dashed #cfc6b8; border-radius: 16px; padding: 32px; text-align:center; background: var(--card); cursor:pointer; transition: border-color .15s, background .15s; }
+  .drop.hover { border-color: var(--accent); background:#fff; }
+  .drop.disabled { opacity:.5; pointer-events:none; }
+  .drop b { display:block; font-size:16px; margin-bottom:4px; }
+  .drop span { color: var(--muted); font-size: 14px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap:16px; margin-top: 20px; }
+  .item { background:var(--card); border:1px solid var(--line); border-radius:16px; overflow:hidden; }
+  .item img { width:100%; height:260px; object-fit:contain; background:#efebe4; display:block; }
+  .item .body { padding: 14px; }
+  .row { margin-bottom: 10px; }
+  .row .k { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 4px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { font-size: 13px; padding: 4px 9px; border-radius: 999px; background:#efebe4; }
+  .chip.top { background: var(--accent); color:#fff; }
+  .chip small { opacity:.7; margin-left:4px; }
+  .meta { font-size:12px; color:var(--muted); margin-top:6px; }
+  .pending { padding: 20px 14px; color: var(--muted); font-size:14px; }
+  footer { margin-top: 32px; font-size: 13px; color: var(--muted); line-height:1.6; }
+</style>
+</head>
+<body>
+<main>
+  <h1>FashionCLIP — тест распознавания одежды</h1>
+  <p class="sub">Модель работает прямо в твоём браузере: фото никуда не отправляются, API не нужен, это бесплатно.
+    Загрузи 5–10 своих вещей и посмотри, насколько точно она угадывает тип, цвет, стиль и сезон.</p>
+
+  <div class="status" id="status">
+    <div class="dot" id="dot"></div>
+    <div style="flex:1">
+      <div id="statusText">Загружаю модель (~150 МБ, только в первый раз)…</div>
+      <div class="bar"><i id="bar"></i></div>
+    </div>
+  </div>
+
+  <label class="drop disabled" id="drop">
+    <b>Перетащи фото сюда или нажми, чтобы выбрать</b>
+    <span>JPG, PNG, WEBP · можно сразу несколько</span>
+    <input type="file" id="file" accept="image/*" multiple hidden />
+  </label>
+
+  <div class="grid" id="grid"></div>
+
+  <footer>
+    Модель: <a href="https://huggingface.co/Marqo/marqo-fashionCLIP">Marqo-FashionCLIP</a> (Apache-2.0) через Transformers.js.
+    Это zero-shot: модель выбирает самую похожую метку из списка ниже по смыслу, без дообучения.
+    Проценты — относительная уверенность внутри каждой группы.
+  </footer>
+</main>
+
+<script type="module">
+import {
+  CLIPTextModelWithProjection, CLIPVisionModelWithProjection,
+  AutoTokenizer, AutoProcessor, RawImage, env,
+} from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2';
+
+env.allowLocalModels = false;
+const MODEL = 'Marqo/marqo-fashionCLIP';
+
+// [English prompt for the model, Russian label for the UI]
+const GROUPS = {
+  'Тип вещи': [
+    ['a t-shirt','футболка'],['a shirt','рубашка'],['a blouse','блузка'],['a polo shirt','поло'],
+    ['a hoodie','худи'],['a sweatshirt','свитшот'],['a sweater','свитер'],['a cardigan','кардиган'],
+    ['a jacket','куртка'],['a blazer','пиджак'],['a coat','пальто'],['a puffer jacket','пуховик'],
+    ['a vest','жилет'],['jeans','джинсы'],['trousers','брюки'],['sweatpants','спортивные штаны'],
+    ['shorts','шорты'],['a skirt','юбка'],['a dress','платье'],['a tank top','майка'],
+    ['sneakers','кроссовки'],['boots','ботинки'],['dress shoes','туфли'],['sandals','сандалии'],
+    ['a bag','сумка'],['a backpack','рюкзак'],['a cap','кепка'],['a hat','шапка'],
+    ['a scarf','шарф'],['a belt','ремень'],['a watch','часы'],['sunglasses','очки'],
+  ],
+  'Цвет': [
+    ['black','чёрный'],['white','белый'],['grey','серый'],['navy blue','тёмно-синий'],['blue','синий'],
+    ['light blue','голубой'],['beige','бежевый'],['brown','коричневый'],['green','зелёный'],['olive','оливковый'],
+    ['red','красный'],['burgundy','бордовый'],['pink','розовый'],['purple','фиолетовый'],['yellow','жёлтый'],
+    ['orange','оранжевый'],['multicolor','разноцветный'],
+  ].map(([en,ru]) => [`a ${en} clothing item`, ru]),
+  'Стиль': [
+    ['casual everyday clothing','casual'],['classic formal business clothing','классика'],
+    ['sportswear athletic clothing','спорт'],['streetwear urban clothing','streetwear'],
+    ['elegant evening clothing','вечерний'],['minimalist clothing','минимализм'],
+    ['outdoor hiking clothing','outdoor'],['vintage retro clothing','винтаж'],
+  ],
+  'Сезон': [
+    ['warm summer clothing','лето'],['light spring or autumn clothing','весна/осень'],
+    ['warm winter clothing','зима'],['all-season clothing','всесезон'],
+  ],
+  'Узор': [
+    ['solid plain color, no pattern','однотонный'],['striped','полоска'],['checked plaid','клетка'],
+    ['floral print','цветочный'],['graphic print or logo','принт/лого'],['denim texture','деним'],
+  ].map(([en,ru]) => [`${en} clothing`, ru]),
+};
+
+const $ = (id) => document.getElementById(id);
+const setStatus = (text, state) => {
+  $('statusText').textContent = text;
+  $('dot').className = 'dot' + (state ? ' ' + state : '');
+};
+
+let tokenizer, processor, textModel, visionModel, textEmb = {};
+const files = new Map();
+const progress = (p) => {
+  if (p.status === 'progress' && p.total) {
+    files.set(p.file, [p.loaded, p.total]);
+    let l = 0, t = 0; for (const [a, b] of files.values()) { l += a; t += b; }
+    $('bar').style.width = (100 * l / t).toFixed(1) + '%';
+    $('statusText').textContent = `Загружаю модель… ${(l / 1e6).toFixed(0)} / ${(t / 1e6).toFixed(0)} МБ`;
+  }
+};
+
+function normalize(data) {
+  let s = 0; for (const v of data) s += v * v; s = Math.sqrt(s) || 1;
+  return Float32Array.from(data, (v) => v / s);
+}
+function rows(t) {
+  const [n, d] = t.dims; const out = [];
+  for (let i = 0; i < n; i++) out.push(normalize(t.data.slice(i * d, (i + 1) * d)));
+  return out;
+}
+
+async function load() {
+  const device = navigator.gpu ? 'webgpu' : 'wasm';
+  const opts = { device, dtype: 'q8', progress_callback: progress };
+  try {
+    [tokenizer, processor] = await Promise.all([
+      AutoTokenizer.from_pretrained(MODEL), AutoProcessor.from_pretrained(MODEL),
+    ]);
+    try {
+      [textModel, visionModel] = await Promise.all([
+        CLIPTextModelWithProjection.from_pretrained(MODEL, opts),
+        CLIPVisionModelWithProjection.from_pretrained(MODEL, opts),
+      ]);
+    } catch (e) {
+      console.warn('q8/' + device + ' failed, falling back to fp32/wasm', e);
+      const fb = { device: 'wasm', dtype: 'fp32', progress_callback: progress };
+      [textModel, visionModel] = await Promise.all([
+        CLIPTextModelWithProjection.from_pretrained(MODEL, fb),
+        CLIPVisionModelWithProjection.from_pretrained(MODEL, fb),
+      ]);
+    }
+    setStatus('Готовлю метки…');
+    for (const [group, labels] of Object.entries(GROUPS)) {
+      const inputs = tokenizer(labels.map((l) => l[0]), { padding: 'max_length', truncation: true });
+      const { text_embeds } = await textModel(inputs);
+      textEmb[group] = rows(text_embeds);
+    }
+    $('bar').style.width = '100%';
+    setStatus(`Модель готова (${device === 'webgpu' ? 'WebGPU' : 'CPU'}). Загружай фото.`, 'ok');
+    $('drop').classList.remove('disabled');
+    window.__fclipReady = true;
+  } catch (e) {
+    console.error(e);
+    setStatus('Не удалось загрузить модель: ' + (e?.message || e), 'err');
+  }
+}
+
+async function classify(blob) {
+  const image = await RawImage.fromBlob(blob);
+  const inputs = await processor(image);
+  const t0 = performance.now();
+  const { image_embeds } = await visionModel(inputs);
+  const img = rows(image_embeds)[0];
+  const result = {};
+  for (const [group, labels] of Object.entries(GROUPS)) {
+    const logits = textEmb[group].map((t) => 100 * t.reduce((s, v, i) => s + v * img[i], 0));
+    const m = Math.max(...logits);
+    const ex = logits.map((x) => Math.exp(x - m)); const z = ex.reduce((a, b) => a + b, 0);
+    result[group] = labels.map((l, i) => ({ label: l[1], p: ex[i] / z }))
+      .sort((a, b) => b.p - a.p).slice(0, 3);
+  }
+  return { result, ms: Math.round(performance.now() - t0) };
+}
+window.__fclipClassify = classify;
+
+async function handle(fileList) {
+  for (const file of fileList) {
+    if (!file.type.startsWith('image/')) continue;
+    const card = document.createElement('div');
+    card.className = 'item';
+    const url = URL.createObjectURL(file);
+    card.innerHTML = `<img alt=""><div class="pending">Анализирую…</div>`;
+    card.querySelector('img').src = url;
+    $('grid').prepend(card);
+    try {
+      const { result, ms } = await classify(file);
+      const body = document.createElement('div');
+      body.className = 'body';
+      for (const [group, top] of Object.entries(result)) {
+        const row = document.createElement('div'); row.className = 'row';
+        row.innerHTML = `<div class="k">${group}</div><div class="chips">` + top.map((t, i) =>
+          `<span class="chip${i === 0 ? ' top' : ''}">${t.label}<small>${Math.round(t.p * 100)}%</small></span>`).join('') + '</div>';
+        body.appendChild(row);
+      }
+      const meta = document.createElement('div'); meta.className = 'meta';
+      meta.textContent = `${file.name} · ${ms} мс`;
+      body.appendChild(meta);
+      card.querySelector('.pending').replaceWith(body);
+    } catch (e) {
+      console.error(e);
+      card.querySelector('.pending').textContent = 'Ошибка: ' + (e?.message || e);
+    }
+  }
+}
+
+const drop = $('drop');
+$('file').addEventListener('change', (e) => { handle(e.target.files); e.target.value = ''; });
+['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('hover'); }));
+['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('hover'); }));
+drop.addEventListener('drop', (e) => handle(e.dataTransfer.files));
+
+load();
+</script>
+</body>
+</html>
