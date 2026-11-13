@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex" />
-<title>Vestra Lab — FashionCLIP</title>
+<title>Vestra Lab — FashionCLIP v2</title>
 <style>
   :root { --bg:#f6f3ee; --card:#fffdf9; --ink:#1f1b16; --muted:#7a7268; --line:#e7e1d8; --accent:#1f1b16; --ok:#2f7d4f; }
   * { box-sizing: border-box; }
@@ -34,14 +34,17 @@
   .chip small { opacity:.7; margin-left:4px; }
   .meta { font-size:12px; color:var(--muted); margin-top:6px; }
   .pending { padding: 20px 14px; color: var(--muted); font-size:14px; }
+  .fix { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin:4px 0 2px; flex-wrap:wrap; }
+  .fix select { font:inherit; padding:4px 6px; border-radius:8px; border:1px solid var(--line); background:#fff; }
+  .fix .saved { color: var(--ok); }
   footer { margin-top: 32px; font-size: 13px; color: var(--muted); line-height:1.6; }
 </style>
 </head>
 <body>
 <main>
-  <h1>FashionCLIP — тест распознавания одежды</h1>
+  <h1>FashionCLIP v2 — тест распознавания одежды</h1>
   <p class="sub">Модель работает прямо в твоём браузере: фото никуда не отправляются, API не нужен, это бесплатно.
-    Загрузи 5–10 своих вещей и посмотри, насколько точно она угадывает тип, цвет, стиль и сезон.</p>
+    Загрузи свои вещи. Если тип неверный — выбери правильный: модель запомнит пример и будет узнавать похожие вещи.</p>
 
   <div class="status" id="status">
     <div class="dot" id="dot"></div>
@@ -62,7 +65,8 @@
   <footer>
     Модель: <a href="https://huggingface.co/Marqo/marqo-fashionCLIP">Marqo-FashionCLIP</a> (Apache-2.0) через Transformers.js.
     Это zero-shot: модель выбирает самую похожую метку из списка ниже по смыслу, без дообучения.
-    Проценты — относительная уверенность внутри каждой группы.
+    Проценты — относительная уверенность внутри каждой группы.<br>
+    Твоих исправлений сохранено: <b id="memCount">0</b> (хранятся только в этом браузере).
   </footer>
 </main>
 
@@ -75,39 +79,95 @@ import {
 env.allowLocalModels = false;
 const MODEL = 'Marqo/marqo-fashionCLIP';
 
-// [English prompt for the model, Russian label for the UI]
-const GROUPS = {
-  'Тип вещи': [
-    ['a t-shirt','футболка'],['a shirt','рубашка'],['a blouse','блузка'],['a polo shirt','поло'],
-    ['a hoodie','худи'],['a sweatshirt','свитшот'],['a sweater','свитер'],['a cardigan','кардиган'],
-    ['a jacket','куртка'],['a blazer','пиджак'],['a coat','пальто'],['a puffer jacket','пуховик'],
-    ['a vest','жилет'],['jeans','джинсы'],['trousers','брюки'],['sweatpants','спортивные штаны'],
-    ['shorts','шорты'],['a skirt','юбка'],['a dress','платье'],['a tank top','майка'],
-    ['sneakers','кроссовки'],['boots','ботинки'],['dress shoes','туфли'],['sandals','сандалии'],
-    ['a bag','сумка'],['a backpack','рюкзак'],['a cap','кепка'],['a hat','шапка'],
-    ['a scarf','шарф'],['a belt','ремень'],['a watch','часы'],['sunglasses','очки'],
+// Each class: [Russian label, [several English descriptions]].
+// Several phrasings per class + several photo templates are averaged
+// ("prompt ensembling"), which is much more robust than one short word.
+const TEMPLATES = ['a photo of {}', 'a product photo of {}', '{} lying flat on the floor', 'a close-up photo of {}'];
+
+// Type is decided hierarchically: first the broad group, then the item inside it.
+const TYPE_TREE = {
+  'верх': [
+    ['футболка', ['a t-shirt', 'a short sleeve tee']],
+    ['рубашка', ['a button-up shirt', 'a collared shirt']],
+    ['поло', ['a polo shirt']],
+    ['майка', ['a tank top', 'a sleeveless top']],
+    ['худи', ['a hoodie', 'a hooded sweatshirt']],
+    ['свитшот', ['a sweatshirt', 'a crewneck sweatshirt']],
+    ['свитер', ['a knit sweater', 'a knitted wool jumper', 'a pullover sweater', 'a long sleeve knitwear top']],
+    ['кардиган', ['a cardigan', 'a button-up knit cardigan']],
+    ['блузка', ['a blouse']],
   ],
+  'верхняя одежда': [
+    ['куртка', ['a jacket', 'a zip-up jacket', 'a bomber jacket', 'a windbreaker']],
+    ['пуховик', ['a puffer jacket', 'a quilted padded jacket', 'a down jacket', 'a hooded quilted winter jacket']],
+    ['пальто', ['a long coat', 'a wool overcoat', 'a trench coat']],
+    ['пиджак', ['a blazer', 'a suit jacket']],
+    ['жилет', ['a vest', 'a sleeveless gilet']],
+  ],
+  'низ': [
+    ['джинсы', ['jeans', 'denim jeans', 'wide-leg baggy jeans', 'straight-leg denim trousers']],
+    ['брюки', ['trousers', 'chino pants', 'dress pants']],
+    ['спортивные штаны', ['sweatpants', 'jogger pants', 'track pants']],
+    ['шорты', ['shorts', 'denim shorts']],
+    ['юбка', ['a skirt', 'a mini skirt', 'a pleated skirt']],
+  ],
+  'платье': [
+    ['платье', ['a dress', 'a summer dress', 'an evening dress']],
+  ],
+  'обувь': [
+    ['кроссовки', ['sneakers', 'running shoes', 'low-top trainers']],
+    ['ботинки', ['boots', 'ankle boots', 'lace-up leather work boots', 'hiking boots', 'high-top nubuck boots']],
+    ['туфли', ['dress shoes', 'leather loafers', 'oxford shoes']],
+    ['сандалии', ['sandals', 'slides', 'flip-flops']],
+  ],
+  'головной убор': [
+    ['кепка', ['a baseball cap']],
+    ['шапка', ['a beanie', 'a knit winter hat worn on the head']],
+  ],
+  'аксессуары': [
+    ['сумка', ['a handbag', 'a tote bag']],
+    ['рюкзак', ['a backpack']],
+    ['шарф', ['a scarf']],
+    ['ремень', ['a leather belt']],
+    ['часы', ['a wristwatch']],
+    ['очки', ['sunglasses']],
+  ],
+};
+const GROUP_PROMPTS = {
+  'верх': ['a top', 'a shirt or sweater for the upper body'],
+  'верхняя одежда': ['outerwear', 'a jacket or coat'],
+  'низ': ['pants', 'trousers, jeans or a skirt for the lower body'],
+  'платье': ['a dress'],
+  'обувь': ['footwear', 'a pair of shoes or boots'],
+  'головной убор': ['headwear worn on the head'],
+  'аксессуары': ['a fashion accessory', 'a bag'],
+};
+const ATTRS = {
   'Цвет': [
-    ['black','чёрный'],['white','белый'],['grey','серый'],['navy blue','тёмно-синий'],['blue','синий'],
-    ['light blue','голубой'],['beige','бежевый'],['brown','коричневый'],['green','зелёный'],['olive','оливковый'],
-    ['red','красный'],['burgundy','бордовый'],['pink','розовый'],['purple','фиолетовый'],['yellow','жёлтый'],
-    ['orange','оранжевый'],['multicolor','разноцветный'],
-  ].map(([en,ru]) => [`a ${en} clothing item`, ru]),
+    ['чёрный','black'],['белый','white'],['серый','grey'],['тёмно-синий','navy blue'],['синий','blue'],
+    ['голубой','light blue'],['бежевый','beige'],['коричневый','brown'],['зелёный','green'],['оливковый','olive green'],
+    ['красный','red'],['бордовый','burgundy'],['розовый','pink'],['фиолетовый','purple'],['жёлтый','yellow'],
+    ['оранжевый','orange'],['разноцветный','multicolor'],
+  ].map(([ru, en]) => [ru, [`a ${en} clothing item`, `${en} clothes`]]),
   'Стиль': [
-    ['casual everyday clothing','casual'],['classic formal business clothing','классика'],
-    ['sportswear athletic clothing','спорт'],['streetwear urban clothing','streetwear'],
-    ['elegant evening clothing','вечерний'],['minimalist clothing','минимализм'],
-    ['outdoor hiking clothing','outdoor'],['vintage retro clothing','винтаж'],
+    ['casual', ['casual everyday clothing']], ['классика', ['classic formal business clothing']],
+    ['спорт', ['sportswear athletic clothing']], ['streetwear', ['streetwear urban clothing']],
+    ['вечерний', ['elegant evening clothing']], ['минимализм', ['minimalist basic clothing']],
+    ['outdoor', ['outdoor hiking clothing']], ['винтаж', ['vintage retro clothing']],
   ],
   'Сезон': [
-    ['warm summer clothing','лето'],['light spring or autumn clothing','весна/осень'],
-    ['warm winter clothing','зима'],['all-season clothing','всесезон'],
+    ['лето', ['light summer clothing for hot weather']], ['весна/осень', ['light spring or autumn clothing']],
+    ['зима', ['warm winter clothing for cold weather']], ['всесезон', ['all-season clothing']],
   ],
   'Узор': [
-    ['solid plain color, no pattern','однотонный'],['striped','полоска'],['checked plaid','клетка'],
-    ['floral print','цветочный'],['graphic print or logo','принт/лого'],['denim texture','деним'],
-  ].map(([en,ru]) => [`${en} clothing`, ru]),
+    ['однотонный', ['solid plain color clothing with no pattern']], ['полоска', ['striped clothing']],
+    ['клетка', ['checked plaid clothing']], ['цветочный', ['floral print clothing']],
+    ['принт/лого', ['clothing with a large graphic print']], ['деним', ['denim fabric clothing']],
+    ['стёганый', ['quilted padded fabric clothing']], ['вязаный', ['knitted fabric clothing']],
+  ],
 };
+// Color prompts above already contain the noun; others get the photo templates.
+const NO_TEMPLATE = new Set(['Цвет']);
 
 const $ = (id) => document.getElementById(id);
 const setStatus = (text, state) => {
@@ -115,7 +175,7 @@ const setStatus = (text, state) => {
   $('dot').className = 'dot' + (state ? ' ' + state : '');
 };
 
-let tokenizer, processor, textModel, visionModel, textEmb = {};
+let tokenizer, processor, textModel, visionModel;
 const files = new Map();
 const progress = (p) => {
   if (p.status === 'progress' && p.total) {
@@ -134,6 +194,47 @@ function rows(t) {
   const [n, d] = t.dims; const out = [];
   for (let i = 0; i < n; i++) out.push(normalize(t.data.slice(i * d, (i + 1) * d)));
   return out;
+}
+const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
+function softmax(xs) {
+  const m = Math.max(...xs); const ex = xs.map((x) => Math.exp(x - m));
+  const z = ex.reduce((a, b) => a + b, 0); return ex.map((e) => e / z);
+}
+
+async function embedTexts(texts) {
+  const out = [];
+  for (let i = 0; i < texts.length; i += 64) {
+    const inputs = tokenizer(texts.slice(i, i + 64), { padding: 'max_length', truncation: true });
+    const { text_embeds } = await textModel(inputs);
+    out.push(...rows(text_embeds));
+  }
+  return out;
+}
+// One embedding per class = normalized mean of all its prompt embeddings.
+async function classEmbeddings(classes, useTemplates = true) {
+  const texts = [], owner = [];
+  classes.forEach(([, descs], ci) => {
+    for (const d of descs) {
+      for (const t of useTemplates ? TEMPLATES : ['{}']) { texts.push(t.replace('{}', d)); owner.push(ci); }
+    }
+  });
+  const embs = await embedTexts(texts);
+  const sums = classes.map(() => new Float32Array(embs[0].length));
+  embs.forEach((e, i) => { const s = sums[owner[i]]; for (let k = 0; k < e.length; k++) s[k] += e[k]; });
+  return sums.map(normalize);
+}
+
+const EMB = { groups: null, types: {}, attrs: {} };
+const ALL_TYPES = Object.entries(TYPE_TREE).flatMap(([g, items]) => items.map(([ru]) => [ru, g]));
+
+// User corrections = tiny personal training set (stored in this browser only).
+const MEMORY_KEY = 'vestra-lab-fclip-examples';
+let examples = [];
+try { examples = JSON.parse(localStorage.getItem(MEMORY_KEY) || '[]'); } catch {}
+function saveExample(vec, label) {
+  examples.push({ label, v: Array.from(vec, (x) => +x.toFixed(4)) });
+  try { localStorage.setItem(MEMORY_KEY, JSON.stringify(examples)); } catch {}
+  $('memCount').textContent = examples.length;
 }
 
 async function load() {
@@ -157,14 +258,13 @@ async function load() {
       ]);
     }
     setStatus('Готовлю метки…');
-    for (const [group, labels] of Object.entries(GROUPS)) {
-      const inputs = tokenizer(labels.map((l) => l[0]), { padding: 'max_length', truncation: true });
-      const { text_embeds } = await textModel(inputs);
-      textEmb[group] = rows(text_embeds);
-    }
+    EMB.groups = await classEmbeddings(Object.entries(GROUP_PROMPTS));
+    for (const [g, items] of Object.entries(TYPE_TREE)) EMB.types[g] = await classEmbeddings(items);
+    for (const [a, items] of Object.entries(ATTRS)) EMB.attrs[a] = await classEmbeddings(items, !NO_TEMPLATE.has(a));
     $('bar').style.width = '100%';
     setStatus(`Модель готова (${device === 'webgpu' ? 'WebGPU' : 'CPU'}). Загружай фото.`, 'ok');
     $('drop').classList.remove('disabled');
+    $('memCount').textContent = examples.length;
     window.__fclipReady = true;
   } catch (e) {
     console.error(e);
@@ -172,21 +272,40 @@ async function load() {
   }
 }
 
+const SCALE = 100;
 async function classify(blob) {
   const image = await RawImage.fromBlob(blob);
   const inputs = await processor(image);
   const t0 = performance.now();
   const { image_embeds } = await visionModel(inputs);
   const img = rows(image_embeds)[0];
-  const result = {};
-  for (const [group, labels] of Object.entries(GROUPS)) {
-    const logits = textEmb[group].map((t) => 100 * t.reduce((s, v, i) => s + v * img[i], 0));
-    const m = Math.max(...logits);
-    const ex = logits.map((x) => Math.exp(x - m)); const z = ex.reduce((a, b) => a + b, 0);
-    result[group] = labels.map((l, i) => ({ label: l[1], p: ex[i] / z }))
-      .sort((a, b) => b.p - a.p).slice(0, 3);
+
+  // Type: P(group) * P(item | group)
+  const groupNames = Object.keys(TYPE_TREE);
+  const pg = softmax(EMB.groups.map((e) => SCALE * dot(e, img)));
+  let typeScores = [];
+  groupNames.forEach((g, gi) => {
+    const pi = softmax(EMB.types[g].map((e) => SCALE * dot(e, img)));
+    TYPE_TREE[g].forEach(([ru], i) => typeScores.push({ label: ru, p: pg[gi] * pi[i] }));
+  });
+
+  // Personal examples (k-NN): a close match to an item the user already corrected wins.
+  let memoryHit = null;
+  for (const ex of examples) {
+    const sim = dot(ex.v, img);
+    if (!memoryHit || sim > memoryHit.sim) memoryHit = { label: ex.label, sim };
   }
-  return { result, ms: Math.round(performance.now() - t0) };
+  if (memoryHit && memoryHit.sim > 0.8) {
+    const w = Math.min(1, (memoryHit.sim - 0.8) / 0.1); // 0.8 → 0, 0.9+ → 1
+    typeScores = typeScores.map((t) => ({ ...t, p: (1 - w) * t.p + (t.label === memoryHit.label ? w : 0) }));
+  } else memoryHit = null;
+
+  const result = { 'Тип вещи': typeScores.sort((a, b) => b.p - a.p).slice(0, 3) };
+  for (const [a, items] of Object.entries(ATTRS)) {
+    const p = softmax(EMB.attrs[a].map((e) => SCALE * dot(e, img)));
+    result[a] = items.map(([ru], i) => ({ label: ru, p: p[i] })).sort((x, y) => y.p - x.p).slice(0, 3);
+  }
+  return { result, ms: Math.round(performance.now() - t0), vec: img, memoryHit };
 }
 window.__fclipClassify = classify;
 
@@ -200,7 +319,7 @@ async function handle(fileList) {
     card.querySelector('img').src = url;
     $('grid').prepend(card);
     try {
-      const { result, ms } = await classify(file);
+      const { result, ms, vec, memoryHit } = await classify(file);
       const body = document.createElement('div');
       body.className = 'body';
       for (const [group, top] of Object.entries(result)) {
@@ -209,8 +328,17 @@ async function handle(fileList) {
           `<span class="chip${i === 0 ? ' top' : ''}">${t.label}<small>${Math.round(t.p * 100)}%</small></span>`).join('') + '</div>';
         body.appendChild(row);
       }
+      const fix = document.createElement('div'); fix.className = 'fix';
+      fix.innerHTML = `<span>Неверный тип?</span><select><option value="">выбери правильный…</option>` +
+        ALL_TYPES.map(([ru]) => `<option>${ru}</option>`).join('') + `</select>`;
+      fix.querySelector('select').addEventListener('change', (e) => {
+        if (!e.target.value) return;
+        saveExample(vec, e.target.value);
+        fix.innerHTML = `<span class="saved">✓ Запомнил: «${e.target.value}». Похожие вещи теперь будут распознаваться так.</span>`;
+      });
+      body.appendChild(fix);
       const meta = document.createElement('div'); meta.className = 'meta';
-      meta.textContent = `${file.name} · ${ms} мс`;
+      meta.textContent = `${file.name} · ${ms} мс` + (memoryHit ? ` · по твоему примеру (${Math.round(memoryHit.sim * 100)}% сходства)` : '');
       body.appendChild(meta);
       card.querySelector('.pending').replaceWith(body);
     } catch (e) {
