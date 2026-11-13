@@ -279,6 +279,7 @@ export const dictionaries = {
         correctionsSaved: 'AI düzəlişləri saxlanıldı.',
         favoriteAdded: 'Favoritlərə əlavə edildi.',
         favoriteRemoved: 'Favoritlərdən çıxarıldı.',
+        favoriteSaveFailed: 'Favoriti yadda saxlamaq mümkün olmadı.',
       },
       empty: {
         title: 'Qarderobunuz hələ boşdur',
@@ -355,6 +356,8 @@ export const dictionaries = {
             'AI modeli qadağandır və ya hesab üçün icazə verilməyib.',
           providerNotFound: 'AI modeli və ya endpoint tapılmadı.',
           providerTimeout: 'AI provayderi vaxtında cavab vermədi.',
+          analysisLimitReached:
+            'Bu ay üçün AI analiz limitinə çatdınız. Vestra Pro ilə daha çox analiz edin.',
           providerRateLimited:
             'AI provayderi limit tətbiq etdi. Bir az sonra yenidən cəhd edin.',
           providerUnavailable: 'AI provayderi hazırda əlçatan deyil.',
@@ -544,7 +547,18 @@ export const dictionaries = {
       logout: 'Çıxış',
       deleteAccount: 'Hesabı sil',
       deleteAccountBody:
-        'Hesab silinməsi üçün təhlükəsiz kaskad və şəkil silmə hazırlığı qurulub.',
+        'Hesabınız, qarderobunuz, obrazlarınız və şəkilləriniz həmişəlik silinəcək. Bu əməliyyat geri qaytarıla bilməz.',
+      deleteAccountConfirm: 'Hesabı həmişəlik sil',
+      deleteAccountPasswordLabel: 'Təsdiq üçün şifrənizi daxil edin',
+      deleteAccountActiveSubscription:
+        'Hesabı silməzdən əvvəl aktiv Vestra Pro abunəliyini ləğv edin.',
+      deleteAccountFailed:
+        'Hesabı silmək mümkün olmadı. Şifrəni yoxlayıb yenidən cəhd edin.',
+      nameLabel: 'Ad',
+      saveProfile: 'Yadda saxla',
+      profileSaved: 'Profil yeniləndi.',
+      profileSaveFailed: 'Profili yeniləmək mümkün olmadı.',
+      cancel: 'Ləğv et',
       security: 'Təhlükəsizlik',
       changePassword: 'Şifrəni dəyiş',
       emailVerification: 'E-poçt təsdiqi',
@@ -982,6 +996,7 @@ export const dictionaries = {
         correctionsSaved: 'AI corrections saved.',
         favoriteAdded: 'Added to favorites.',
         favoriteRemoved: 'Removed from favorites.',
+        favoriteSaveFailed: 'Could not save the favorite.',
       },
       empty: {
         title: 'Your wardrobe is empty',
@@ -1059,6 +1074,8 @@ export const dictionaries = {
             'The AI model is forbidden or restricted for this account.',
           providerNotFound: 'The AI model or endpoint was not found.',
           providerTimeout: 'The AI provider timed out.',
+          analysisLimitReached:
+            'You have reached this month’s AI analysis limit. Upgrade to Vestra Pro for more.',
           providerRateLimited:
             'The AI provider rate-limited the request. Try again shortly.',
           providerUnavailable: 'The AI provider is currently unavailable.',
@@ -1247,7 +1264,18 @@ export const dictionaries = {
       logout: 'Log out',
       deleteAccount: 'Delete account',
       deleteAccountBody:
-        'Secure account deletion cascade and future image deletion preparation are in place.',
+        'Your account, wardrobe, outfits, and photos will be permanently deleted. This cannot be undone.',
+      deleteAccountConfirm: 'Permanently delete account',
+      deleteAccountPasswordLabel: 'Enter your password to confirm',
+      deleteAccountActiveSubscription:
+        'Cancel your active Vestra Pro subscription before deleting your account.',
+      deleteAccountFailed:
+        'Could not delete the account. Check your password and try again.',
+      nameLabel: 'Name',
+      saveProfile: 'Save',
+      profileSaved: 'Profile updated.',
+      profileSaveFailed: 'Could not update the profile.',
+      cancel: 'Cancel',
       security: 'Security',
       changePassword: 'Change password',
       emailVerification: 'Email verification',
@@ -1684,6 +1712,7 @@ export const dictionaries = {
         correctionsSaved: 'Исправления AI сохранены.',
         favoriteAdded: 'Добавлено в избранное.',
         favoriteRemoved: 'Удалено из избранного.',
+        favoriteSaveFailed: 'Не удалось сохранить избранное.',
       },
       empty: {
         title: 'Ваш гардероб пока пуст',
@@ -1760,6 +1789,8 @@ export const dictionaries = {
             'AI-модель запрещена или ограничена для этого аккаунта.',
           providerNotFound: 'AI-модель или endpoint не найдены.',
           providerTimeout: 'AI-провайдер не ответил вовремя.',
+          analysisLimitReached:
+            'Вы исчерпали лимит AI-анализов на этот месяц. Оформите Vestra Pro, чтобы получить больше.',
           providerRateLimited:
             'AI-провайдер ограничил запрос. Попробуйте немного позже.',
           providerUnavailable: 'AI-провайдер сейчас недоступен.',
@@ -2075,7 +2106,18 @@ export const dictionaries = {
       logout: 'Выйти',
       deleteAccount: 'Удалить аккаунт',
       deleteAccountBody:
-        'Подготовлены безопасное каскадное удаление аккаунта и будущее удаление изображений.',
+        'Ваш аккаунт, гардероб, образы и фотографии будут удалены навсегда. Это действие нельзя отменить.',
+      deleteAccountConfirm: 'Удалить аккаунт навсегда',
+      deleteAccountPasswordLabel: 'Введите пароль для подтверждения',
+      deleteAccountActiveSubscription:
+        'Перед удалением аккаунта отмените активную подписку Vestra Pro.',
+      deleteAccountFailed:
+        'Не удалось удалить аккаунт. Проверьте пароль и попробуйте снова.',
+      nameLabel: 'Имя',
+      saveProfile: 'Сохранить',
+      profileSaved: 'Профиль обновлён.',
+      profileSaveFailed: 'Не удалось обновить профиль.',
+      cancel: 'Отмена',
       security: 'Безопасность',
       changePassword: 'Сменить пароль',
       emailVerification: 'Подтверждение эл. почты',

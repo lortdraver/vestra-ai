@@ -13,6 +13,12 @@ import {
   wearLogItem,
 } from '@/lib/db/schema'
 import { getObjectStorage } from '@/lib/storage'
+import { EntitlementError } from '@/lib/subscription/entitlements'
+import { consumeMonthlyUsage } from '@/lib/subscription/usage-meter'
+import {
+  ImageSanitizeError,
+  sanitizeUploadedImage,
+} from '@/lib/wardrobe/image-sanitize'
 import { getWearStatsForItems } from '@/lib/wear/server'
 import {
   getDeleteErrorMessage,
@@ -237,16 +243,40 @@ export async function PATCH(
         )
       }
 
+      let uploadFile: File
+      try {
+        uploadFile = await sanitizeUploadedImage(imageResult.data)
+      } catch (error) {
+        if (error instanceof ImageSanitizeError) {
+          return NextResponse.json({ error: error.code }, { status: 400 })
+        }
+        throw error
+      }
+
+      if ((process.env.BACKGROUND_REMOVAL_PROVIDER ?? 'mock') !== 'mock') {
+        try {
+          await consumeMonthlyUsage(userId, 'background_removals_monthly')
+        } catch (error) {
+          if (error instanceof EntitlementError) {
+            return NextResponse.json(
+              { error: error.code, limit: error.limit, used: error.used },
+              { status: 402 },
+            )
+          }
+          throw error
+        }
+      }
+
       const originalImage = await getObjectStorage().putWardrobeImage({
         userId,
-        file: imageResult.data,
+        file: uploadFile,
         variant: 'original',
       })
 
       const backgroundRemoval =
         await getBackgroundRemovalProvider().removeBackground({
           userId,
-          file: imageResult.data,
+          file: uploadFile,
           mode: 'single_item',
         })
 
@@ -333,7 +363,9 @@ export async function PATCH(
         processedImageContentType: processedImage.contentType,
         processedImageSize: String(processedImage.size),
         ...thumbnailUpdate,
-        backgroundRemovalStatus: 'done',
+        // The mock returns the original image unchanged; never record success.
+        backgroundRemovalStatus:
+          backgroundRemoval.provider === 'mock' ? 'failed' : 'done',
         backgroundRemovalProvider: backgroundRemoval.provider,
         backgroundRemovalModelId: backgroundRemoval.modelId,
         imageColorHints,

@@ -13,7 +13,7 @@ import type {
   SubscriptionUsageSnapshot,
 } from './types'
 
-function getCurrentMonthWindow(now = new Date()) {
+export function getCurrentMonthWindow(now = new Date()) {
   return {
     periodStart: new Date(now.getFullYear(), now.getMonth(), 1),
     periodEnd: new Date(now.getFullYear(), now.getMonth() + 1, 1),

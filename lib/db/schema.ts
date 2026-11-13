@@ -864,3 +864,15 @@ export const analyticsEvent = pgTable(
       .where(sql`"dedupeKey" is not null`),
   }),
 )
+
+export const rateLimitBucket = pgTable(
+  'rate_limit_bucket',
+  {
+    key: text('key').primaryKey(),
+    count: integer('count').notNull().default(0),
+    resetAt: timestamp('resetAt', { withTimezone: true }).notNull(),
+  },
+  (table) => ({
+    resetAtIdx: index('rate_limit_bucket_reset_at_idx').on(table.resetAt),
+  }),
+)

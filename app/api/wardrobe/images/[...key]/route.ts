@@ -61,6 +61,8 @@ export async function GET(
       'Cache-Control': 'private, max-age=900, stale-while-revalidate=3600',
       'Content-Length': String(object.size),
       'Content-Type': object.contentType,
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'none'; sandbox",
       Vary: 'Cookie',
     },
   })

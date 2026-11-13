@@ -23,6 +23,11 @@ import {
   type EntitlementCode,
   EntitlementError,
 } from '@/lib/subscription'
+import { consumeMonthlyUsage } from '@/lib/subscription/usage-meter'
+import {
+  ImageSanitizeError,
+  sanitizeUploadedImage,
+} from '@/lib/wardrobe/image-sanitize'
 import { getWearStatsForItems } from '@/lib/wear/server'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { toWardrobeItemDto } from '@/lib/wardrobe/serialize'
@@ -237,6 +242,16 @@ export async function POST(request: Request) {
       )
     }
 
+    try {
+      // Replace the client file with a decoded, re-encoded, EXIF-free copy.
+      imageResult.data = await sanitizeUploadedImage(imageResult.data)
+    } catch (error) {
+      if (error instanceof ImageSanitizeError) {
+        return uploadJsonError(error.code, 400, stage, error.code)
+      }
+      throw error
+    }
+
     stage = 'IMAGE_VALIDATED'
     logUploadStage(stage, {
       userId,
@@ -310,6 +325,19 @@ export async function POST(request: Request) {
       const backgroundRemovalProvider = getBackgroundRemovalProvider()
       stage = 'BACKGROUND_CLIENT_CREATED'
       logUploadStage(stage, { userId, backgroundProvider })
+
+      if (backgroundProvider === 'mock') {
+        // The mock returns the original image unchanged; never record that
+        // as a successful background removal.
+        throw new BackgroundRemovalProviderError(
+          'background_removal_not_configured',
+          'Mock background removal does not process images',
+        )
+      }
+
+      // Paid per image: meter before calling the provider. When the monthly
+      // limit is reached this throws and the upload keeps the original image.
+      await consumeMonthlyUsage(userId, 'background_removals_monthly')
 
       stage = 'BACKGROUND_REMOVAL_STARTED'
       logUploadStage(stage, { userId, backgroundProvider })

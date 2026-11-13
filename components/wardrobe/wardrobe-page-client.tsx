@@ -90,6 +90,7 @@ type AnalysisErrorCode =
   | 'ai_provider_unavailable'
   | 'ai_provider_local_image_data_url_missing'
   | 'ai_credentials_missing'
+  | 'analysis_limit_reached'
   | 'analysis_failed'
 
 type FormState = {
@@ -254,6 +255,8 @@ function getAnalysisErrorMessage(
       return messages.localImageDataMissing
     case 'ai_credentials_missing':
       return messages.aiCredentialsMissing
+    case 'analysis_limit_reached':
+      return messages.analysisLimitReached
     default:
       return messages.analyze
   }
@@ -395,6 +398,54 @@ export function WardrobePageClient({
     return () => window.clearTimeout(timeout)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, categoryFilter, seasonFilter, styleFilter])
+
+  useEffect(() => {
+    // Favorites persist as stylist "preferred items", so they also inform
+    // outfit generation.
+    let cancelled = false
+    void fetch('/api/stylist/preferences')
+      .then((response) => (response.ok ? response.json() : null))
+      .then(
+        (
+          data: {
+            preferences?: { preferredWardrobeItemIds?: string[] }
+          } | null,
+        ) => {
+          const ids = data?.preferences?.preferredWardrobeItemIds
+          if (!cancelled && Array.isArray(ids)) setFavoriteItemIds(new Set(ids))
+        },
+      )
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const toggleFavorite = (itemId: string) => {
+    const previous = favoriteItemIds
+    const next = new Set(previous)
+    if (next.has(itemId)) next.delete(itemId)
+    else next.add(itemId)
+    setFavoriteItemIds(next)
+    setToastMessage(
+      next.has(itemId) ? t.toast.favoriteAdded : t.toast.favoriteRemoved,
+    )
+
+    void fetch('/api/stylist/preferences', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        preferredWardrobeItemIds: Array.from(next).slice(0, 50),
+      }),
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error('favorite_save_failed')
+      })
+      .catch(() => {
+        setFavoriteItemIds(previous)
+        setToastMessage(t.toast.favoriteSaveFailed)
+      })
+  }
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -1373,19 +1424,7 @@ export function WardrobePageClient({
                       ? t.card.removeFavorite
                       : t.card.addFavorite
                   }
-                  onClick={() =>
-                    setFavoriteItemIds((current) => {
-                      const next = new Set(current)
-                      if (next.has(item.id)) next.delete(item.id)
-                      else next.add(item.id)
-                      setToastMessage(
-                        next.has(item.id)
-                          ? t.toast.favoriteAdded
-                          : t.toast.favoriteRemoved,
-                      )
-                      return next
-                    })
-                  }
+                  onClick={() => toggleFavorite(item.id)}
                   className="absolute right-2.5 top-2.5 grid size-11 place-items-center rounded-full border border-foreground/10 bg-background/90 text-foreground shadow-sm backdrop-blur transition hover:scale-105 sm:size-10"
                 >
                   <Heart

@@ -22,6 +22,7 @@ export type BackgroundRemovalErrorCode =
   | 'background_removal_timeout'
   | 'background_removal_provider_unavailable'
   | 'background_removal_invalid_response'
+  | 'background_removal_not_configured'
 
 export class BackgroundRemovalProviderError extends Error {
   constructor(

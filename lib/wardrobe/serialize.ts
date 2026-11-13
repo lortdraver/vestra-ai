@@ -6,6 +6,7 @@ import {
   parseClothingAnalysis,
   type AnalysisStatus,
 } from '@/lib/ai/analysis-schema'
+import { resolveAnalysisDisplayState } from '@/lib/ai/analysis-lease'
 import type { WardrobeItemDto } from './types'
 import { selectThumbnailUrl } from './thumbnails'
 
@@ -36,10 +37,11 @@ export function toWardrobeItemDto(
   item: WardrobeItemRow,
   wearStats?: WearStats,
 ): WardrobeItemDto {
+  const displayState = resolveAnalysisDisplayState(item)
   const analysisStatus = analysisStatuses.includes(
-    item.analysisStatus as AnalysisStatus,
+    displayState.analysisStatus as AnalysisStatus,
   )
-    ? (item.analysisStatus as AnalysisStatus)
+    ? (displayState.analysisStatus as AnalysisStatus)
     : 'pending'
   const aiAnalysis = item.aiAnalysis
     ? parseClothingAnalysis(item.aiAnalysis)
@@ -94,7 +96,7 @@ export function toWardrobeItemDto(
     aiAnalysis,
     userCorrections,
     effectiveAnalysis: mergeAnalysisCorrections(aiAnalysis, userCorrections),
-    analysisError: item.analysisError,
+    analysisError: displayState.analysisError,
     analysisPromptVersion: item.analysisPromptVersion,
     analysisModelId: item.analysisModelId,
     analyzedAt: item.analyzedAt?.toISOString() ?? null,
