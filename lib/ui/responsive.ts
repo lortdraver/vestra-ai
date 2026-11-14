@@ -5,7 +5,7 @@ export const MOBILE_TOP_BAR_CLASS =
   'md:hidden w-full min-h-14 flex items-center justify-between px-4 bg-white border-b'
 
 export const WARDROBE_LAYOUT_CLASS =
-  'grid gap-5 lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]'
+  'grid grid-cols-1 gap-5 lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]'
 
 export const WARDROBE_UPLOAD_PANEL_CLASS =
   'rounded-xl border border-foreground/10 bg-card/95 p-4 shadow-sm lg:sticky lg:top-24 lg:self-start'

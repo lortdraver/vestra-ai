@@ -127,6 +127,11 @@
   body {
     @apply min-w-0 max-w-full;
   }
+  /* iOS Safari zooms the whole page out when anything is wider than the
+     screen; clipping on <html> as well keeps the layout at device width. */
+  html {
+    overflow-x: clip;
+  }
   body {
     @apply overflow-x-hidden bg-background text-foreground;
   }
