@@ -120,15 +120,8 @@ export function ConsentManager({
         </section>
       )}
 
-      {consent.hasDecision && (
-        <button
-          type="button"
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] left-3 z-40 rounded-full border border-border bg-background/90 px-3 py-2 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:bottom-4"
-          onClick={() => setDialogOpen(true)}
-        >
-          {copy.cookiePreferences}
-        </button>
-      )}
+      {/* Preferences reopen from the footer, the privacy page and Account.
+          A floating button here covered page content on every screen. */}
 
       {dialogOpen && (
         <div

@@ -94,8 +94,7 @@ export const dictionaries = {
       admin: 'Admin',
       signOut: 'Çıxış',
       greeting: 'Sizi görməyimizə şadıq',
-      foundationReady:
-        'Qarderob, AI geyim analizi, şəkil emalı və şəxsi stilist artıq işləyir.',
+      foundationReady: 'Bu gün nə etmək istəyirsiniz?',
       sections: {
         wardrobe: {
           description:
@@ -808,8 +807,7 @@ export const dictionaries = {
       admin: 'Admin',
       signOut: 'Sign out',
       greeting: 'Good to see you',
-      foundationReady:
-        'Wardrobe, AI clothing analysis, image processing, and the personal stylist are now live.',
+      foundationReady: 'What would you like to do today?',
       sections: {
         wardrobe: {
           description:
@@ -1562,8 +1560,7 @@ export const dictionaries = {
       admin: 'Админ',
       signOut: 'Выйти',
       greeting: 'Рады вас видеть',
-      foundationReady:
-        'Гардероб, AI-анализ одежды, обработка изображений и персональный стилист уже работают.',
+      foundationReady: 'Что хотите сделать сегодня?',
       sections: {
         wardrobe: {
           description:

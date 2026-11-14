@@ -1,9 +1,11 @@
 import { Crown, Sparkles } from 'lucide-react'
+import { formatDate } from '@/lib/i18n/format'
 import type { Locale } from '@/lib/i18n/config'
 import type { Dictionary } from '@/lib/i18n/dictionaries'
 import type { SubscriptionSnapshot } from '@/lib/subscription'
 import { getSubscriptionUsageDisplayMeters } from '@/lib/subscription/usage-display'
 import { SubscriptionUsageCounters } from './usage-counters'
+import type { AiAvailability } from '@/lib/ai/availability'
 
 const usageKeys = [
   'wardrobe_items',
@@ -16,24 +18,32 @@ export async function SubscriptionOverview({
   subscription,
   userId,
   locale,
+  aiAvailability = { analysis: true, stylist: true },
 }: {
   dictionary: Dictionary
   subscription: SubscriptionSnapshot
   userId: string
   locale: Locale
+  aiAvailability?: AiAvailability
 }) {
   const t = dictionary.subscription
+  // Don't count down quotas for AI features that are switched off.
+  const features = usageKeys.filter(
+    (key) =>
+      (key !== 'ai_analyses_monthly' || aiAvailability.analysis) &&
+      (key !== 'stylist_requests_monthly' || aiAvailability.stylist),
+  )
   const meters = await getSubscriptionUsageDisplayMeters({
     userId,
     subscription,
-    features: usageKeys,
+    features,
   }).catch(() => null)
   const planLabel = t.plans[subscription.plan.key]
   const trialLabel =
     subscription.isTrialActive && subscription.trialEndsAt
       ? t.trialActive.replace(
           '{date}',
-          subscription.trialEndsAt.toLocaleDateString(),
+          formatDate(subscription.trialEndsAt, locale),
         )
       : subscription.isPremium
         ? t.premiumActive

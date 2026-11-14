@@ -51,7 +51,7 @@ export function PublicFooter({
           </h2>
           <div className="grid gap-2">
             {groups.legal.links.map((link) => (
-              <FooterLink key={link.href} href={link.href}>
+              <FooterLink key={`${link.href}:${link.label}`} href={link.href}>
                 {link.label}
               </FooterLink>
             ))}
@@ -148,7 +148,7 @@ function FooterLinkGroup({
       </h2>
       <div className="grid gap-2">
         {links.map((link) => (
-          <FooterLink key={link.href} href={link.href}>
+          <FooterLink key={`${link.href}:${link.label}`} href={link.href}>
             {link.label}
           </FooterLink>
         ))}

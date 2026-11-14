@@ -112,9 +112,12 @@ function getStylistGenerateErrorMessage(
 export function StylistPageClient({
   dictionary,
   locale,
+  aiAvailable = true,
 }: {
   dictionary: Dictionary
   locale: Locale
+  /** False while the paid AI stylist is switched off on the server. */
+  aiAvailable?: boolean
 }) {
   const t = dictionary.stylist
   const [message, setMessage] = useState('')
@@ -236,6 +239,7 @@ export function StylistPageClient({
     message: string
     quickRequest?: QuickRequestId
   }) => {
+    if (!aiAvailable) return
     if (generationInFlightRef.current) return
 
     generationInFlightRef.current = true
@@ -489,12 +493,24 @@ export function StylistPageClient({
           </p>
         </div>
 
+        {!aiAvailable && (
+          <div
+            role="status"
+            className="rounded-2xl border border-accent/30 bg-accent/5 p-4 text-sm"
+          >
+            <p className="font-medium">{unavailableCopy[locale].title}</p>
+            <p className="mt-1 text-muted-foreground">
+              {unavailableCopy[locale].body}
+            </p>
+          </div>
+        )}
+
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {quickRequests.map(({ id, label, Icon }) => (
             <button
               key={id}
               type="button"
-              disabled={isLoading}
+              disabled={isLoading || !aiAvailable}
               onClick={() =>
                 void requestOutfit({ message: label, quickRequest: id })
               }
@@ -553,9 +569,12 @@ export function StylistPageClient({
               value={message}
               onChange={(event) => setMessage(event.target.value)}
               placeholder={t.inputPlaceholder}
-              disabled={isLoading}
+              disabled={isLoading || !aiAvailable}
             />
-            <Button type="submit" disabled={isLoading || !message.trim()}>
+            <Button
+              type="submit"
+              disabled={isLoading || !aiAvailable || !message.trim()}
+            >
               <Send />
               {t.actions.send}
             </Button>
@@ -1130,3 +1149,18 @@ function StylistConfidence({ label, value }: { label: string; value: number }) {
     </div>
   )
 }
+
+const unavailableCopy = {
+  az: {
+    title: 'AI stilist müvəqqəti dayandırılıb',
+    body: 'Tezliklə qayıdacaq. Bu arada qarderobunuza geyim əlavə edə və saxlanmış obrazlara baxa bilərsiniz.',
+  },
+  en: {
+    title: 'The AI stylist is paused for now',
+    body: 'It will be back soon. Meanwhile you can keep adding clothes and browse your saved outfits.',
+  },
+  ru: {
+    title: 'AI-стилист временно на паузе',
+    body: 'Скоро вернётся. А пока можно добавлять вещи в гардероб и смотреть сохранённые образы.',
+  },
+} as const

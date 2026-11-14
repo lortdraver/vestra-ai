@@ -1,4 +1,5 @@
 import { AlertCircle } from 'lucide-react'
+import { formatDate } from '@/lib/i18n/format'
 import type { Locale } from '@/lib/i18n/config'
 import type { Dictionary } from '@/lib/i18n/dictionaries'
 import type {
@@ -56,10 +57,7 @@ export function SubscriptionUsageCounters({
         const periodLabel = copy.period[meter.period]
         const resetLabel =
           meter.resetAt && meter.period === 'month'
-            ? copy.resetsOn.replace(
-                '{date}',
-                meter.resetAt.toLocaleDateString(),
-              )
+            ? copy.resetsOn.replace('{date}', formatDate(meter.resetAt, locale))
             : null
 
         return (

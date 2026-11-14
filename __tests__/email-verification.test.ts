@@ -21,7 +21,11 @@ import {
 const originalEnv = process.env
 
 beforeEach(() => {
-  process.env = { ...originalEnv, NEXT_PUBLIC_APP_URL: 'https://vestra.test' }
+  process.env = {
+    ...originalEnv,
+    NEXT_PUBLIC_APP_URL: 'https://vestra.test',
+    BETTER_AUTH_URL: 'https://vestra.test',
+  }
   resetRateLimitBuckets()
   vi.restoreAllMocks()
 })
