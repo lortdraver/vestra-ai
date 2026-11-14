@@ -28,6 +28,9 @@
 - `AI_PROVIDER` - `openai-compatible` for real clothing analysis. Use `mock`
   only for tests or explicit local mock mode.
 - `AI_API_KEY` - required when `AI_PROVIDER=openai-compatible`.
+- `AI_FEATURES_DISABLED` - set to `true` to pause the paid AI analysis and
+  stylist without removing keys. The UI then shows a "paused" state instead
+  of failing, and hides the AI quota meters.
 - `AI_API_BASE_URL` - required OpenAI-compatible base URL. For OpenRouter use
   `https://openrouter.ai/api/v1`; Vestra sends requests to
   `https://openrouter.ai/api/v1/chat/completions`.
