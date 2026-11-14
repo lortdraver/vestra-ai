@@ -56,7 +56,12 @@ export default async function AccountPage() {
         db
           .select({ value: count() })
           .from(wardrobeItem)
-          .where(eq(wardrobeItem.userId, session.user.id)),
+          .where(
+            and(
+              eq(wardrobeItem.userId, session.user.id),
+              eq(wardrobeItem.imageDeletionStatus, 'active'),
+            ),
+          ),
       ),
       getCount(
         db
@@ -177,6 +182,13 @@ export default async function AccountPage() {
             dictionary={dictionary}
             currentName={session.user.name}
           />
+          <a
+            href="/api/account/export"
+            download
+            className="inline-flex h-10 w-fit items-center justify-center rounded-lg border border-input px-3 text-sm font-medium transition-colors hover:bg-muted"
+          >
+            {exportLabel[locale]}
+          </a>
         </AccountCard>
 
         <AccountCard title={dictionary.account.security}>
@@ -329,3 +341,9 @@ function AccountCard({
     </div>
   )
 }
+
+const exportLabel = {
+  az: 'Məlumatlarımı yüklə (JSON)',
+  en: 'Download my data (JSON)',
+  ru: 'Скачать мои данные (JSON)',
+} as const

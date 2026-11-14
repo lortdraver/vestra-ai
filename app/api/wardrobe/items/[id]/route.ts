@@ -1,4 +1,5 @@
 import { and, count, eq } from 'drizzle-orm'
+import { isUuid } from '@/lib/validation/uuid'
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
@@ -193,6 +194,10 @@ export async function GET(
   }
 
   const { id } = (await params) as { id: string }
+
+  if (!isUuid(id)) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  }
   const item = await getOwnedItem(userId, id)
   if (!item) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
@@ -214,6 +219,10 @@ export async function PATCH(
   }
 
   const { id } = (await params) as { id: string }
+
+  if (!isUuid(id)) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  }
   const existingItem = await getOwnedItem(userId, id)
   if (!existingItem) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
@@ -417,6 +426,9 @@ export async function DELETE(
 
     stage = 'AUTHENTICATED'
     const { id } = (await params) as { id: string }
+    if (!isUuid(id)) {
+      return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    }
     logDeleteStage(stage, { itemId: id })
 
     const existingItem = await getOwnedItem(userId, id, {

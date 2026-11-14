@@ -1,4 +1,5 @@
 import { headers } from 'next/headers'
+import { isUuid } from '@/lib/validation/uuid'
 import { NextResponse } from 'next/server'
 import { apiError } from '@/lib/api/errors'
 import { auth } from '@/lib/auth'
@@ -18,6 +19,10 @@ export async function DELETE(
   if (!userId) return apiError('unauthorized', 401)
 
   const { id } = (await params) as { id: string }
+
+  if (!isUuid(id)) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  }
   const deleted = await deleteWearLogForUser(userId, id)
   if (!deleted) {
     const dictionary = await getDictionary()

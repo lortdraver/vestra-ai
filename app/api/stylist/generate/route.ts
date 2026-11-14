@@ -76,6 +76,9 @@ import type {
   StylistWardrobeItem,
 } from '@/lib/stylist'
 
+// Background removal, image processing and AI calls can take a while.
+export const maxDuration = 60
+
 type StylistGenerateStage =
   | 'REQUEST_STARTED'
   | 'AUTHENTICATED'
