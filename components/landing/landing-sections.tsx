@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { Reveal } from '@/components/landing/reveal'
+import { ButaBand, ButaPattern } from '@/components/landing/buta-pattern'
 import {
   BootIllustration,
   CameraIcon,
@@ -65,7 +66,9 @@ export function OutfitOfTheDay({ copy }: { copy: LandingCopy['outfit'] }) {
     { key: 'boots', node: <BootIllustration className="h-16 w-auto" /> },
   ]
   return (
-    <section className="bg-secondary/60 px-6 py-20 md:px-10 md:py-28">
+    <section className="relative bg-secondary/60 px-6 py-20 md:px-10 md:py-28">
+      <ButaBand className="absolute inset-x-0 top-0" />
+      <ButaBand className="absolute inset-x-0 bottom-0 rotate-180" />
       <div className="mx-auto grid max-w-5xl items-center gap-12 md:grid-cols-2">
         <Reveal>
           <p className="text-sm font-medium uppercase tracking-widest text-accent">
@@ -138,6 +141,12 @@ export function FinalCta({
   return (
     <section className="px-6 py-20 md:px-10 md:py-24">
       <Reveal className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl bg-primary px-8 py-14 text-center text-primary-foreground md:py-20">
+        <ButaPattern
+          opacity={0.1}
+          color="var(--landing-camel)"
+          size={120}
+          className="[mask-image:linear-gradient(to_right,black,transparent_45%,transparent_55%,black)]"
+        />
         <div className="landing-blob landing-blob-a absolute -left-16 -top-16 size-64 rounded-full opacity-30" />
         <div className="relative">
           <h2 className="font-serif text-3xl font-medium tracking-tight text-balance md:text-5xl">
