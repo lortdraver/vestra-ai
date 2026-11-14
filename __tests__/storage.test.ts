@@ -8,6 +8,9 @@ afterEach(() => {
 describe('storage abstraction', () => {
   it('refuses local object storage in production', async () => {
     vi.stubEnv('NODE_ENV', 'production')
+    // CI exports a localhost app URL, which the guard treats as local dev.
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://vestraapp.uk')
+    vi.stubEnv('BETTER_AUTH_URL', 'https://vestraapp.uk')
 
     await expect(
       new LocalObjectStorage().putWardrobeImage({
