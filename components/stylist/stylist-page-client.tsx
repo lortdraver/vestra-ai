@@ -498,13 +498,13 @@ export function StylistPageClient({
             className="rounded-2xl border border-accent/30 bg-accent/5 p-4 text-sm"
           >
             <p className="font-medium">{unavailableCopy[locale].title}</p>
-            <p className="mt-1 text-muted-foreground">
+            <p className="mt-1 hidden text-muted-foreground sm:block">
               {unavailableCopy[locale].body}
             </p>
           </div>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           {quickRequests.map(({ id, label, Icon }) => (
             <button
               key={id}

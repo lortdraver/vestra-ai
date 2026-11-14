@@ -304,17 +304,10 @@ export default async function DashboardPage() {
                   <Sparkles className="size-4" aria-hidden="true" />
                   {home.outfitThumbs.length > 0 ? t.newOutfit : t.buildFirst}
                 </Link>
-                <Link
-                  href="/dashboard/planner"
-                  className="inline-flex h-11 items-center gap-2 rounded-full border border-input px-5 text-sm"
-                >
-                  <CalendarDays className="size-4" aria-hidden="true" />
-                  {t.plan}
-                </Link>
               </div>
             </section>
 
-            <div className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-1">
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
               <ActionCard
                 href="/dashboard/wardrobe?add=1"
                 icon={Camera}
@@ -327,7 +320,7 @@ export default async function DashboardPage() {
                 title={t.plan}
                 hint={t.planHint}
               />
-              <div className="col-span-2 lg:col-span-1">
+              <div className="sm:col-span-2 lg:col-span-1">
                 <ActionCard
                   href="/dashboard/stylist"
                   icon={Sparkles}
