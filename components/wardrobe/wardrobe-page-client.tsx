@@ -40,7 +40,8 @@ import {
 } from '@/lib/wardrobe/catalog-filters'
 import type { ApiErrorCode } from '@/lib/api/errors'
 import type { Dictionary } from '@/lib/i18n/dictionaries'
-import type { Locale } from '@/lib/i18n/config'
+import { normalizeLocale, type Locale } from '@/lib/i18n/config'
+import { formatDate } from '@/lib/i18n/format'
 import type { WardrobeInsightsDto, WearLogDto } from '@/lib/wear'
 import {
   acceptedImageTypes,
@@ -294,9 +295,11 @@ function dateInputToIso(value: string) {
 
 function formatLocalDate(value: string | null) {
   if (!value) return ''
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(
-    new Date(value),
+  // Client-only: the server layout sets <html lang> to the site language.
+  const locale = normalizeLocale(
+    typeof document === 'undefined' ? null : document.documentElement.lang,
   )
+  return formatDate(value, locale)
 }
 
 function makeWearIdempotencyKey(scope: string) {
@@ -1351,6 +1354,7 @@ export function WardrobePageClient({
       <section className="grid gap-4">
         <InsightsPanel
           dictionary={dictionary}
+          locale={locale}
           insights={insights}
           range={insightsRange}
           dismissedItemIds={dismissedInsightItemIds}
@@ -2653,6 +2657,7 @@ function WearSummary({
 
 function InsightsPanel({
   dictionary,
+  locale,
   insights,
   range,
   dismissedItemIds,
@@ -2660,6 +2665,7 @@ function InsightsPanel({
   onDismissItem,
 }: {
   dictionary: Dictionary
+  locale: Locale
   insights: WardrobeInsightsDto | null
   range: WardrobeInsightsDto['range']
   dismissedItemIds: Set<string>
@@ -2769,6 +2775,7 @@ function InsightsPanel({
               />
               <InsightsDetails
                 dictionary={dictionary}
+                locale={locale}
                 insights={insights}
                 visibleLongUnused={visibleLongUnused}
                 onDismissItem={onDismissItem}
@@ -2812,6 +2819,7 @@ function InsightsPanel({
           <div className="hidden md:block">
             <InsightsDetails
               dictionary={dictionary}
+              locale={locale}
               insights={insights}
               visibleLongUnused={visibleLongUnused}
               onDismissItem={onDismissItem}
@@ -2825,11 +2833,13 @@ function InsightsPanel({
 
 function InsightsDetails({
   dictionary,
+  locale,
   insights,
   visibleLongUnused,
   onDismissItem,
 }: {
   dictionary: Dictionary
+  locale: Locale
   insights: WardrobeInsightsDto
   visibleLongUnused: WardrobeInsightsDto['longUnused']['30']
   onDismissItem: (itemId: string) => void
@@ -2877,14 +2887,14 @@ function InsightsDetails({
         </div>
       )}
 
-      <div className="rounded-lg border border-border p-3">
+      <div className="min-w-0 rounded-lg border border-border p-3">
         <h3 className="font-medium">{t.recentActivity}</h3>
         <div className="mt-3 grid gap-2 text-sm">
           {insights.recentActivity.length === 0 ? (
             <p className="text-muted-foreground">{t.empty}</p>
           ) : (
             insights.recentActivity.map((log) => (
-              <div key={log.id} className="flex justify-between gap-3">
+              <div key={log.id} className="flex min-w-0 justify-between gap-3">
                 <span className="min-w-0 truncate">
                   {log.items.map((item) => item.name).join(', ')}
                 </span>
@@ -2897,27 +2907,27 @@ function InsightsDetails({
         </div>
       </div>
 
-      <div className="rounded-lg border border-border p-3">
+      <div className="min-w-0 rounded-lg border border-border p-3">
         <h3 className="font-medium">{t.categoryUsage}</h3>
         <div className="mt-3 grid gap-2 text-sm">
-          {insights.categoryUsage.map((category) => (
-            <div key={category.category}>
-              <div className="flex justify-between gap-3">
-                <span>
-                  {dictionary.wardrobe.options.categories[
-                    category.category as keyof typeof dictionary.wardrobe.options.categories
-                  ] ?? category.category}
-                </span>
-                <span>{category.utilizationPercentage}%</span>
+          {insights.categoryUsage
+            .filter((category) => category.category !== unresolvedWardrobeRole)
+            .map((category) => (
+              <div key={category.category}>
+                <div className="flex justify-between gap-3">
+                  <span className="min-w-0 truncate">
+                    {getWardrobeRoleLabel(locale, category.category)}
+                  </span>
+                  <span>{category.utilizationPercentage}%</span>
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-foreground"
+                    style={{ width: `${category.utilizationPercentage}%` }}
+                  />
+                </div>
               </div>
-              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-foreground"
-                  style={{ width: `${category.utilizationPercentage}%` }}
-                />
-              </div>
-            </div>
-          ))}
+            ))}
         </div>
       </div>
     </div>
