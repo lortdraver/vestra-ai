@@ -10,6 +10,7 @@ import { siteFooterCopy } from '@/lib/public-content/copy'
 import { landingCopy } from '@/lib/public-content/landing-copy'
 import { LandingStyles } from '@/components/landing/landing-styles'
 import { HeroShowcase } from '@/components/landing/hero-showcase'
+import { ButaPattern } from '@/components/landing/buta-pattern'
 import {
   FinalCta,
   HowItWorks,
@@ -72,8 +73,9 @@ export default async function LandingPage() {
       </header>
 
       <main className="flex-1">
-        <section className="overflow-x-clip px-6 md:px-10">
-          <div className="mx-auto grid max-w-6xl items-center gap-14 py-14 md:grid-cols-[1.1fr_1fr] md:py-20">
+        <section className="relative overflow-x-clip px-6 md:px-10">
+          <ButaPattern className="[mask-image:radial-gradient(ellipse_90%_80%_at_50%_45%,black_30%,transparent_80%)]" />
+          <div className="relative mx-auto grid max-w-6xl items-center gap-14 py-14 md:grid-cols-[1.1fr_1fr] md:py-20">
             <div className="landing-hero-in text-center md:text-left">
               <p className="text-sm font-medium uppercase tracking-widest text-accent">
                 {dictionary.landing.eyebrow}
