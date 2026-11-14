@@ -131,3 +131,15 @@
     @apply overflow-x-hidden bg-background text-foreground;
   }
 }
+
+/*
+ * Subtle buta (Azerbaijani paisley) ornament behind full-page backgrounds.
+ * Applied to the page wrappers (min-h-svh/min-h-screen + bg-background);
+ * cards keep their solid backgrounds, so content stays easy to read.
+ * The landing page draws its own, richer version.
+ */
+:where(.min-h-svh, .min-h-screen).bg-background:not(.landing) {
+  background-image: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2296%22 height=%22112%22 viewBox=%220 0 96 112%22%3E%3Cg fill=%22none%22 stroke=%22%239a6a3a%22 stroke-width=%221.3%22 stroke-linejoin=%22round%22 opacity=%22.05%22%3E%3Cg transform=%22translate(6 2)%22%3E%3Cpath d=%22M22 56C10 56 4 47 6 36C8 27 15 21 21 15C25 11 28 7 33 5C38 3 41 8 38 11C36 13 33 12 33 10C31 13 29 16 30 20C31 24 36 28 38 36C40 47 33 56 22 56Z%22/%3E%3Cpath d=%22M22 50C14 50 10 44 11 37C12 31 17 26 23 22C23 26 25 29 29 33C32 37 32 43 29 46C27 49 25 50 22 50Z%22/%3E%3Ccircle cx=%2220%22 cy=%2240%22 r=%222.4%22 fill=%22%239a6a3a%22 stroke=%22none%22/%3E%3Ccircle cx=%2215%22 cy=%2232%22 r=%221.1%22 fill=%22%239a6a3a%22 stroke=%22none%22/%3E%3Ccircle cx=%2219%22 cy=%2227%22 r=%221.1%22 fill=%22%239a6a3a%22 stroke=%22none%22/%3E%3C/g%3E%3Cg transform=%22translate(94 54) scale(-1 1)%22%3E%3Cpath d=%22M22 56C10 56 4 47 6 36C8 27 15 21 21 15C25 11 28 7 33 5C38 3 41 8 38 11C36 13 33 12 33 10C31 13 29 16 30 20C31 24 36 28 38 36C40 47 33 56 22 56Z%22/%3E%3Cpath d=%22M22 50C14 50 10 44 11 37C12 31 17 26 23 22C23 26 25 29 29 33C32 37 32 43 29 46C27 49 25 50 22 50Z%22/%3E%3Ccircle cx=%2220%22 cy=%2240%22 r=%222.4%22 fill=%22%239a6a3a%22 stroke=%22none%22/%3E%3Ccircle cx=%2215%22 cy=%2232%22 r=%221.1%22 fill=%22%239a6a3a%22 stroke=%22none%22/%3E%3Ccircle cx=%2219%22 cy=%2227%22 r=%221.1%22 fill=%22%239a6a3a%22 stroke=%22none%22/%3E%3C/g%3E%3Cpath transform=%22translate(76 26)%22 d=%22M0 -5Q2 0 0 5Q-2 0 0 -5ZM-5 0Q0 2 5 0Q0 -2 -5 0Z%22/%3E%3Cpath transform=%22translate(24 84)%22 d=%22M0 -5Q2 0 0 5Q-2 0 0 -5ZM-5 0Q0 2 5 0Q0 -2 -5 0Z%22/%3E%3C/g%3E%3C/svg%3E');
+  background-size: 132px 154px;
+  background-position: center top;
+}
