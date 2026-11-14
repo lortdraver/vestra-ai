@@ -1,10 +1,15 @@
 import { ApiStylistProvider } from './api-provider'
 import { MockStylistProvider } from './mock-provider'
+import { RuleStylistProvider } from './rule-provider'
 import type { StylistProvider } from './types'
 
 type ResolvedStylistProviderConfig =
   | {
       provider: 'mock'
+      diagnostics: StylistProviderDiagnostics
+    }
+  | {
+      provider: 'rules'
       diagnostics: StylistProviderDiagnostics
     }
   | {
@@ -16,7 +21,7 @@ type ResolvedStylistProviderConfig =
     }
 
 export type StylistProviderDiagnostics = {
-  resolvedProvider: 'mock' | 'api'
+  resolvedProvider: 'mock' | 'api' | 'rules'
   configuredProvider: string | null
   hasApiKey: boolean
   hasBaseUrl: boolean
@@ -43,11 +48,9 @@ function getApiCredentials() {
   return { apiKey, baseUrl, modelId }
 }
 
-function getMissingCredentialsMessage() {
-  return [
-    'Real stylist provider is missing required environment variables.',
-    'Set AI_API_KEY, AI_API_BASE_URL, and AI_MODEL_ID, or set the STYLIST_AI_* equivalents.',
-  ].join(' ')
+function isPaidAiForcedOff() {
+  const value = process.env.AI_FEATURES_DISABLED?.trim().toLowerCase()
+  return value === '1' || value === 'true' || value === 'yes'
 }
 
 export function resolveStylistProviderConfig(): ResolvedStylistProviderConfig {
@@ -56,6 +59,22 @@ export function resolveStylistProviderConfig(): ResolvedStylistProviderConfig {
   const hasRealCredentials = Boolean(apiKey && baseUrl && modelId)
   const resolvedProvider =
     configuredProvider ?? (hasRealCredentials ? 'api' : null)
+  const rulesConfig = (): ResolvedStylistProviderConfig => ({
+    provider: 'rules',
+    diagnostics: {
+      resolvedProvider: 'rules',
+      configuredProvider,
+      hasApiKey: Boolean(apiKey),
+      hasBaseUrl: Boolean(baseUrl),
+      hasModelId: Boolean(modelId),
+      modelId: null,
+      requestUrlHost: null,
+    },
+  })
+
+  // Paid AI paused or not configured: fall back to the free rule-based
+  // stylist instead of failing every request.
+  if (isPaidAiForcedOff() || resolvedProvider === 'rules') return rulesConfig()
 
   if (resolvedProvider === 'mock') {
     if (process.env.NODE_ENV === 'production') {
@@ -77,9 +96,7 @@ export function resolveStylistProviderConfig(): ResolvedStylistProviderConfig {
   }
 
   if (resolvedProvider === 'api' || resolvedProvider === 'openai-compatible') {
-    if (!apiKey || !baseUrl || !modelId) {
-      throw new Error(getMissingCredentialsMessage())
-    }
+    if (!apiKey || !baseUrl || !modelId) return rulesConfig()
 
     return {
       provider: 'api',
@@ -98,11 +115,7 @@ export function resolveStylistProviderConfig(): ResolvedStylistProviderConfig {
     }
   }
 
-  if (!resolvedProvider) {
-    throw new Error(
-      `${getMissingCredentialsMessage()} For local mock mode, set STYLIST_AI_PROVIDER=mock explicitly.`,
-    )
-  }
+  if (!resolvedProvider) return rulesConfig()
 
   throw new Error(`Unsupported stylist provider: ${resolvedProvider}`)
 }
@@ -115,6 +128,9 @@ export function getStylistProvider(): StylistProvider {
   const config = resolveStylistProviderConfig()
   if (config.provider === 'mock') {
     return new MockStylistProvider()
+  }
+  if (config.provider === 'rules') {
+    return new RuleStylistProvider()
   }
 
   return new ApiStylistProvider(config)

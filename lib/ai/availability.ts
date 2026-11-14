@@ -4,7 +4,7 @@ import { resolveStylistProviderConfig } from '@/lib/stylist'
 export type AiAvailability = {
   /** Server-side (paid) clothing analysis can run. */
   analysis: boolean
-  /** The AI stylist can generate outfits. */
+  /** The paid AI stylist runs. When false the free rule-based stylist is used. */
   stylist: boolean
 }
 
@@ -22,6 +22,14 @@ function canBuild(factory: () => unknown) {
   }
 }
 
+function isPaidStylist() {
+  try {
+    return resolveStylistProviderConfig().provider === 'api'
+  } catch {
+    return false
+  }
+}
+
 /**
  * Whether the paid AI features are configured. The UI uses this to stop
  * promising features that would only fail: when AI is switched off (by
@@ -33,6 +41,6 @@ export function getAiAvailability(): AiAvailability {
 
   return {
     analysis: canBuild(getClothingAnalysisProvider),
-    stylist: canBuild(resolveStylistProviderConfig),
+    stylist: isPaidStylist(),
   }
 }

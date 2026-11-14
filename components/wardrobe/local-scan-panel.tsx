@@ -60,17 +60,17 @@ const copy: Record<
   },
 }
 
-// Hidden switch while the feature is being tested: open any page with
-// ?scan=1 to turn it on in this browser, ?scan=0 to turn it off again.
+// On for everyone. Escape hatch for troubleshooting: open any page with
+// ?scan=0 to turn the in-browser scan off in this browser, ?scan=1 to undo.
 const FLAG_KEY = 'vestra-local-scan'
 function readScanFlag() {
   try {
     const param = new URLSearchParams(window.location.search).get('scan')
-    if (param === '1') window.localStorage.setItem(FLAG_KEY, '1')
-    if (param === '0') window.localStorage.removeItem(FLAG_KEY)
-    return window.localStorage.getItem(FLAG_KEY) === '1'
+    if (param === '0') window.localStorage.setItem(FLAG_KEY, '0')
+    if (param === '1') window.localStorage.removeItem(FLAG_KEY)
+    return window.localStorage.getItem(FLAG_KEY) !== '0'
   } catch {
-    return false
+    return true
   }
 }
 const subscribeToNothing = () => () => {}

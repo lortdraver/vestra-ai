@@ -126,7 +126,7 @@ export function PlannerPageClient({
   aiAvailable = true,
 }: {
   locale: Locale
-  /** False while the paid AI stylist is switched off on the server. */
+  /** False while the paid AI stylist is off; the free rule-based stylist runs. */
   aiAvailable?: boolean
 }) {
   const t = getPlannerCopy(locale)
@@ -674,8 +674,7 @@ export function PlannerPageClient({
               <Button
                 type="button"
                 onClick={() => void generateForDay()}
-                disabled={isLoading || !aiAvailable}
-                title={aiAvailable ? undefined : aiPausedLabel[locale]}
+                disabled={isLoading}
               >
                 <Sparkles className="size-4" />
                 {isLoading ? t.loading : t.generate}
@@ -832,7 +831,7 @@ function OutfitOptionCard({
 }
 
 const aiPausedLabel = {
-  az: 'AI stilist müvəqqəti dayandırılıb — saxlanmış obrazlardan seçin',
-  en: 'The AI stylist is paused — choose from saved outfits',
-  ru: 'AI-стилист на паузе — выберите из сохранённых образов',
+  az: 'Pulsuz rejim: obrazlar qaydalara görə sizin geyimlərinizdən yığılır.',
+  en: 'Free mode: outfits are built from your clothes using style rules.',
+  ru: 'Бесплатный режим: образы собираются из ваших вещей по правилам.',
 } as const

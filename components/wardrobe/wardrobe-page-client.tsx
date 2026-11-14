@@ -24,6 +24,20 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LocalScanPanel } from '@/components/wardrobe/local-scan-panel'
+import { FirstOutfitChecklist } from '@/components/wardrobe/first-outfit-checklist'
+import {
+  CatalogFilterBar,
+  CatalogPagination,
+} from '@/components/wardrobe/catalog-controls'
+import {
+  CATALOG_PAGE_SIZE,
+  applyCatalogFilters,
+  emptyCatalogFilters,
+  getCatalogFilterOptions,
+  hasCatalogFilters,
+  paginate,
+  type CatalogFilters,
+} from '@/lib/wardrobe/catalog-filters'
 import type { ApiErrorCode } from '@/lib/api/errors'
 import type { Dictionary } from '@/lib/i18n/dictionaries'
 import type { Locale } from '@/lib/i18n/config'
@@ -314,6 +328,10 @@ export function WardrobePageClient({
   const [categoryFilter, setCategoryFilter] = useState('')
   const [seasonFilter, setSeasonFilter] = useState('')
   const [styleFilter, setStyleFilter] = useState('')
+  const [catalogFilters, setCatalogFilters] =
+    useState<CatalogFilters>(emptyCatalogFilters)
+  const [catalogPage, setCatalogPage] = useState(1)
+  const catalogTopRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCompressing, setIsCompressing] = useState(false)
@@ -396,6 +414,7 @@ export function WardrobePageClient({
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
+      setCatalogPage(1)
       void fetchItems()
     }, 250)
 
@@ -489,14 +508,27 @@ export function WardrobePageClient({
     return () => window.clearTimeout(timeout)
   }, [toastMessage])
 
+  const catalogFilterOptions = useMemo(
+    () => getCatalogFilterOptions(items),
+    [items],
+  )
+  const filteredItems = useMemo(
+    () => applyCatalogFilters(items, catalogFilters, favoriteItemIds),
+    [items, catalogFilters, favoriteItemIds],
+  )
+  const pagedItems = paginate(filteredItems, catalogPage, CATALOG_PAGE_SIZE)
   const visibleCountLabel = useMemo(
-    () => t.itemCount.replace('{count}', String(items.length)),
-    [items.length, t.itemCount],
+    () => t.itemCount.replace('{count}', String(filteredItems.length)),
+    [filteredItems.length, t.itemCount],
   )
   const hasActiveFilters = Boolean(
-    search || categoryFilter || seasonFilter || styleFilter,
+    search ||
+    categoryFilter ||
+    seasonFilter ||
+    styleFilter ||
+    hasCatalogFilters(catalogFilters),
   )
-  const showEmptyState = !error && items.length === 0
+  const showEmptyState = !error && filteredItems.length === 0
 
   const resetForm = () => {
     setForm(emptyForm)
@@ -1330,6 +1362,10 @@ export function WardrobePageClient({
           }
         />
 
+        {!hasActiveFilters && !isLoading && (
+          <FirstOutfitChecklist locale={locale} items={items} />
+        )}
+
         <div className={WARDROBE_FILTER_BAR_CLASS}>
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-2 top-2 size-4 text-muted-foreground" />
@@ -1382,6 +1418,18 @@ export function WardrobePageClient({
           <p className="text-sm text-muted-foreground">{visibleCountLabel}</p>
         </div>
 
+        <div ref={catalogTopRef} className="scroll-mt-24">
+          <CatalogFilterBar
+            locale={locale}
+            filters={catalogFilters}
+            options={catalogFilterOptions}
+            onChange={(next) => {
+              setCatalogFilters(next)
+              setCatalogPage(1)
+            }}
+          />
+        </div>
+
         {items.length === 0 && !isLoading && !hasActiveFilters && !error && (
           <OnboardingPanel dictionary={dictionary} />
         )}
@@ -1405,176 +1453,192 @@ export function WardrobePageClient({
             </p>
           </div>
         ) : (
-          <div className={WARDROBE_GRID_CLASS}>
-            {items.map((item) => (
-              <Card
-                key={item.id}
-                className="group relative gap-0 rounded-xl border-foreground/10 bg-card/95 py-0 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-lg"
-              >
-                <button
-                  type="button"
-                  onClick={() => selectItem(item)}
-                  className={cn(
-                    WARDROBE_CARD_ACTION_CLASS,
-                    WARDROBE_CARD_IMAGE_CLASS,
-                    'w-full overflow-hidden rounded-t-xl bg-[linear-gradient(135deg,_var(--muted),_var(--background))] text-left',
-                  )}
+          <>
+            <div className={WARDROBE_GRID_CLASS}>
+              {pagedItems.items.map((item) => (
+                <Card
+                  key={item.id}
+                  className="group relative gap-0 rounded-xl border-foreground/10 bg-card/95 py-0 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-lg"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={item.thumbnailImageUrl}
-                    alt={item.name}
-                    width={item.thumbnailImageWidth ?? 480}
-                    height={item.thumbnailImageHeight ?? 480}
-                    data-fallback-step="thumb"
-                    loading="lazy"
-                    decoding="async"
-                    onError={(event) => {
-                      const image = event.currentTarget
-                      const fallbackStep = image.dataset.fallbackStep ?? 'thumb'
-                      if (
-                        fallbackStep === 'thumb' &&
-                        image.src !== item.processedImageUrl
-                      ) {
-                        image.dataset.fallbackStep = 'processed'
-                        image.src = item.processedImageUrl
-                        return
-                      }
-                      if (
-                        fallbackStep !== 'original' &&
-                        image.src !== item.originalImageUrl
-                      ) {
-                        image.dataset.fallbackStep = 'original'
-                        image.src = item.originalImageUrl
-                      }
-                    }}
-                    className="size-full object-contain object-center p-3 transition duration-500 group-hover:scale-[1.02] sm:p-4 md:p-5"
-                  />
-                </button>
-                <button
-                  type="button"
-                  aria-label={
-                    favoriteItemIds.has(item.id)
-                      ? t.card.removeFavorite
-                      : t.card.addFavorite
-                  }
-                  onClick={() => toggleFavorite(item.id)}
-                  className="absolute right-2.5 top-2.5 grid size-11 place-items-center rounded-full border border-foreground/10 bg-background/90 text-foreground shadow-sm backdrop-blur transition hover:scale-105 sm:size-10"
-                >
-                  <Heart
+                  <button
+                    type="button"
+                    onClick={() => selectItem(item)}
                     className={cn(
-                      'size-4',
-                      favoriteItemIds.has(item.id) &&
-                        'fill-foreground text-foreground',
+                      WARDROBE_CARD_ACTION_CLASS,
+                      WARDROBE_CARD_IMAGE_CLASS,
+                      'w-full overflow-hidden rounded-t-xl bg-[linear-gradient(135deg,_var(--muted),_var(--background))] text-left',
                     )}
-                  />
-                </button>
-                <div className="absolute left-2.5 top-2.5 flex max-w-[calc(100%-4rem)] flex-wrap gap-1.5">
-                  <span className="rounded-full bg-background/85 px-2 py-1 text-xs font-medium shadow-sm backdrop-blur">
-                    {t.card.status[getDisplayStatus(item)]}
-                  </span>
-                </div>
-                <CardContent className="grid gap-2 p-3 sm:p-3.5">
-                  <div className="min-w-0">
-                    <h2 className="truncate font-medium leading-snug">
-                      {item.name}
-                    </h2>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {getWardrobeRoleLabel(
-                        locale,
-                        item.effectiveAnalysis?.detectedCategory ??
-                          item.category,
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.thumbnailImageUrl}
+                      alt={item.name}
+                      width={item.thumbnailImageWidth ?? 480}
+                      height={item.thumbnailImageHeight ?? 480}
+                      data-fallback-step="thumb"
+                      loading="lazy"
+                      decoding="async"
+                      onError={(event) => {
+                        const image = event.currentTarget
+                        const fallbackStep =
+                          image.dataset.fallbackStep ?? 'thumb'
+                        if (
+                          fallbackStep === 'thumb' &&
+                          image.src !== item.processedImageUrl
+                        ) {
+                          image.dataset.fallbackStep = 'processed'
+                          image.src = item.processedImageUrl
+                          return
+                        }
+                        if (
+                          fallbackStep !== 'original' &&
+                          image.src !== item.originalImageUrl
+                        ) {
+                          image.dataset.fallbackStep = 'original'
+                          image.src = item.originalImageUrl
+                        }
+                      }}
+                      className="size-full object-contain object-center p-3 transition duration-500 group-hover:scale-[1.02] sm:p-4 md:p-5"
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={
+                      favoriteItemIds.has(item.id)
+                        ? t.card.removeFavorite
+                        : t.card.addFavorite
+                    }
+                    onClick={() => toggleFavorite(item.id)}
+                    className="absolute right-2.5 top-2.5 grid size-11 place-items-center rounded-full border border-foreground/10 bg-background/90 text-foreground shadow-sm backdrop-blur transition hover:scale-105 sm:size-10"
+                  >
+                    <Heart
+                      className={cn(
+                        'size-4',
+                        favoriteItemIds.has(item.id) &&
+                          'fill-foreground text-foreground',
                       )}
-                      {' · '}
-                      {getWardrobeSubtypeLabel(
-                        locale,
-                        item.effectiveAnalysis?.detectedClothingType ??
-                          item.clothingType,
-                      )}
-                    </p>
+                    />
+                  </button>
+                  <div className="absolute left-2.5 top-2.5 flex max-w-[calc(100%-4rem)] flex-wrap gap-1.5">
+                    <span className="rounded-full bg-background/85 px-2 py-1 text-xs font-medium shadow-sm backdrop-blur">
+                      {t.card.status[getDisplayStatus(item)]}
+                    </span>
                   </div>
-                  <TagList
-                    values={[
-                      ...(item.effectiveAnalysis?.colors ?? item.colors).map(
-                        (color) => getWardrobeColorFamilyLabel(locale, color),
-                      ),
-                      ...(item.effectiveAnalysis?.season ?? item.seasons).map(
-                        (season) =>
-                          (t.options.seasons as Record<string, string>)[
-                            season
-                          ] ?? season,
-                      ),
-                      ...(item.effectiveAnalysis?.style ?? item.styles).map(
-                        (style) => getWardrobeStyleTagLabel(locale, style),
-                      ),
-                    ]}
-                  />
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {/* Items already sorted by the in-browser scan or by hand
-                        don't need a pending-analysis badge. */}
-                    {!(
-                      item.analysisStatus === 'pending' &&
-                      item.category !== unresolvedWardrobeRole
-                    ) && (
-                      <AnalysisStatusBadge
-                        label={t.analysis.status[item.analysisStatus]}
-                        status={item.analysisStatus}
-                      />
-                    )}
-                    {item.effectiveAnalysis?.confidenceScore !== undefined && (
-                      <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
-                        {t.card.confidence}{' '}
-                        {Math.round(
-                          item.effectiveAnalysis.confidenceScore * 100,
+                  <CardContent className="grid gap-2 p-3 sm:p-3.5">
+                    <div className="min-w-0">
+                      <h2 className="truncate font-medium leading-snug">
+                        {item.name}
+                      </h2>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {getWardrobeRoleLabel(
+                          locale,
+                          item.effectiveAnalysis?.detectedCategory ??
+                            item.category,
                         )}
-                        %
-                      </span>
-                    )}
-                  </div>
-                  <WearSummary dictionary={dictionary} item={item} compact />
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      aria-label={dictionary.wear.actions.woreThis}
-                      disabled={wearSubmittingIds.has(item.id)}
-                      onClick={() => void recordWear(item)}
-                    >
-                      {wearSubmittingIds.has(item.id) ? (
-                        <Loader2 className="animate-spin" />
-                      ) : (
-                        <Check />
+                        {' · '}
+                        {getWardrobeSubtypeLabel(
+                          locale,
+                          item.effectiveAnalysis?.detectedClothingType ??
+                            item.clothingType,
+                        )}
+                      </p>
+                    </div>
+                    <TagList
+                      values={[
+                        ...(item.effectiveAnalysis?.colors ?? item.colors).map(
+                          (color) => getWardrobeColorFamilyLabel(locale, color),
+                        ),
+                        ...(item.effectiveAnalysis?.season ?? item.seasons).map(
+                          (season) =>
+                            (t.options.seasons as Record<string, string>)[
+                              season
+                            ] ?? season,
+                        ),
+                        ...(item.effectiveAnalysis?.style ?? item.styles).map(
+                          (style) => getWardrobeStyleTagLabel(locale, style),
+                        ),
+                      ]}
+                    />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {/* Items already sorted by the in-browser scan or by hand
+                        don't need a pending-analysis badge. */}
+                      {!(
+                        item.analysisStatus === 'pending' &&
+                        item.category !== unresolvedWardrobeRole
+                      ) && (
+                        <AnalysisStatusBadge
+                          label={t.analysis.status[item.analysisStatus]}
+                          status={item.analysisStatus}
+                        />
                       )}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      aria-label={t.actions.edit}
-                      onClick={() => startEdit(item)}
-                    >
-                      <Edit />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      aria-label={t.actions.delete}
-                      disabled={deletingItemIds.has(item.id)}
-                      onClick={() => void handleDelete(item)}
-                    >
-                      {deletingItemIds.has(item.id) ? (
-                        <Loader2 className="animate-spin" />
-                      ) : (
-                        <Trash2 />
+                      {item.effectiveAnalysis?.confidenceScore !==
+                        undefined && (
+                        <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
+                          {t.card.confidence}{' '}
+                          {Math.round(
+                            item.effectiveAnalysis.confidenceScore * 100,
+                          )}
+                          %
+                        </span>
                       )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    </div>
+                    <WearSummary dictionary={dictionary} item={item} compact />
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        aria-label={dictionary.wear.actions.woreThis}
+                        disabled={wearSubmittingIds.has(item.id)}
+                        onClick={() => void recordWear(item)}
+                      >
+                        {wearSubmittingIds.has(item.id) ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <Check />
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        aria-label={t.actions.edit}
+                        onClick={() => startEdit(item)}
+                      >
+                        <Edit />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        aria-label={t.actions.delete}
+                        disabled={deletingItemIds.has(item.id)}
+                        onClick={() => void handleDelete(item)}
+                      >
+                        {deletingItemIds.has(item.id) ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <Trash2 />
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <CatalogPagination
+              locale={locale}
+              page={pagedItems.page}
+              pageCount={pagedItems.pageCount}
+              onPageChange={(next) => {
+                setCatalogPage(next)
+                catalogTopRef.current?.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'start',
+                })
+              }}
+            />
+          </>
         )}
       </section>
 
