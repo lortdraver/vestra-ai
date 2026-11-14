@@ -11,7 +11,7 @@ export const WARDROBE_UPLOAD_PANEL_CLASS =
   'rounded-xl border border-foreground/10 bg-card/95 p-4 shadow-sm lg:sticky lg:top-24 lg:self-start'
 
 export const WARDROBE_FILTER_BAR_CLASS =
-  'flex flex-col gap-3 rounded-lg border border-border bg-card p-3 sm:p-4 xl:flex-row xl:items-center'
+  'grid grid-cols-3 gap-2 rounded-2xl border border-border bg-card p-3 sm:p-4 xl:flex xl:items-center xl:gap-3 [&>*:first-child]:col-span-3 [&>p]:col-span-3 [&>select]:min-w-0 [&>select]:text-sm'
 
 export const WARDROBE_GRID_CLASS =
   'grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]'
