@@ -1,4 +1,5 @@
 import { and, eq, lt, ne, or } from 'drizzle-orm'
+import { isUuid } from '@/lib/validation/uuid'
 import { getAnalysisLeaseCutoff } from '@/lib/ai/analysis-lease'
 import { EntitlementError } from '@/lib/subscription/entitlements'
 import { consumeMonthlyUsage } from '@/lib/subscription/usage-meter'
@@ -18,6 +19,9 @@ import { wardrobeItem } from '@/lib/db/schema'
 import { getObjectStorage } from '@/lib/storage'
 import { getWearStatsForItems } from '@/lib/wear/server'
 import { toWardrobeItemDto } from '@/lib/wardrobe/serialize'
+
+// Background removal, image processing and AI calls can take a while.
+export const maxDuration = 60
 
 async function getCurrentUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -114,6 +118,10 @@ export async function POST(
   }
 
   const { id } = (await params) as { id: string }
+
+  if (!isUuid(id)) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  }
   const item = await getOwnedItem(userId, id)
   if (!item) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
@@ -322,6 +330,10 @@ export async function PATCH(
   }
 
   const { id } = (await params) as { id: string }
+
+  if (!isUuid(id)) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  }
   const item = await getOwnedItem(userId, id)
   if (!item) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })

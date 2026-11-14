@@ -4,8 +4,8 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { user, wardrobeItem } from '@/lib/db/schema'
-import { canAccessAdmin } from '@/lib/roles'
 import { getObjectStorage } from '@/lib/storage'
+import { R2ObjectStorage } from '@/lib/storage/r2'
 import { sanitizeStorageKey } from '@/lib/storage/r2'
 
 async function getCurrentUser() {
@@ -31,9 +31,11 @@ async function canAccessImage(storageKey: string) {
     eq(wardrobeItem.processedImageStorageKey, storageKey),
     eq(wardrobeItem.thumbnailImageStorageKey, storageKey),
   ]
-  const filters = canAccessAdmin(currentUser.role)
-    ? [or(...ownershipFilters)]
-    : [eq(wardrobeItem.userId, currentUser.id), or(...ownershipFilters)]
+  // Private photos are only ever served to their owner, admins included.
+  const filters = [
+    eq(wardrobeItem.userId, currentUser.id),
+    or(...ownershipFilters),
+  ]
 
   const [item] = await db
     .select({ id: wardrobeItem.id })
@@ -55,7 +57,20 @@ export async function GET(
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
 
-  const object = await getObjectStorage().getObject(storageKey)
+  const storage = getObjectStorage()
+  if (storage instanceof R2ObjectStorage) {
+    // Send the browser straight to R2 with a short-lived signed link instead
+    // of streaming every photo through this function.
+    return NextResponse.redirect(storage.getSignedReadUrl(storageKey), {
+      status: 302,
+      headers: {
+        'Cache-Control': 'private, max-age=3000',
+        Vary: 'Cookie',
+      },
+    })
+  }
+
+  const object = await storage.getObject(storageKey)
   return new NextResponse(object.body, {
     headers: {
       'Cache-Control': 'private, max-age=900, stale-while-revalidate=3600',

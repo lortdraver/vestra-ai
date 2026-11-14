@@ -1,4 +1,5 @@
 import { and, eq, isNull } from 'drizzle-orm'
+import { isUuid } from '@/lib/validation/uuid'
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -55,6 +56,10 @@ export async function PATCH(
   }
 
   const { id } = (await params) as { id: string }
+
+  if (!isUuid(id)) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  }
   const parsed = patchSchema.safeParse(await request.json().catch(() => ({})))
   if (!parsed.success) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
@@ -126,6 +131,9 @@ export async function DELETE(
 
     stage = 'AUTHENTICATED'
     const { id } = (await params) as { id: string }
+    if (!isUuid(id)) {
+      return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    }
     const parsed = deleteSchema.safeParse(
       await request.json().catch(() => ({})),
     )

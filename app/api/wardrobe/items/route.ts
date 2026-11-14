@@ -42,6 +42,9 @@ import {
   validateImageFile,
 } from '@/lib/wardrobe/validation'
 
+// Background removal, image processing and AI calls can take a while.
+export const maxDuration = 60
+
 async function getCurrentUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
   return session?.user?.id ?? null
@@ -151,6 +154,8 @@ export async function GET(request: Request) {
   const category = url.searchParams.get('category')?.trim()
   const season = url.searchParams.get('season')?.trim()
   const style = url.searchParams.get('style')?.trim()
+  // Treat % and _ in the search box as literal characters, not wildcards.
+  const pattern = `%${(search ?? '').replace(/[\\%_]/g, (char) => `\\${char}`)}%`
 
   const filters = [
     eq(wardrobeItem.userId, userId),
@@ -160,10 +165,10 @@ export async function GET(request: Request) {
     style ? sql`${wardrobeItem.styles} ? ${style}` : undefined,
     search
       ? or(
-          ilike(wardrobeItem.name, `%${search}%`),
-          ilike(wardrobeItem.clothingType, `%${search}%`),
-          ilike(wardrobeItem.brand, `%${search}%`),
-          ilike(wardrobeItem.material, `%${search}%`),
+          ilike(wardrobeItem.name, pattern),
+          ilike(wardrobeItem.clothingType, pattern),
+          ilike(wardrobeItem.brand, pattern),
+          ilike(wardrobeItem.material, pattern),
         )
       : undefined,
   ].filter(Boolean)

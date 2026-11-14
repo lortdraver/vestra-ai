@@ -142,6 +142,27 @@ export class R2ObjectStorage implements ObjectStorage {
     }
   }
 
+  /**
+   * A short-lived presigned GET link, so the browser loads the photo straight
+   * from R2 instead of through a serverless function. Signing times are
+   * aligned to the hour, so the link stays identical (and cacheable) for an
+   * hour and is valid for at least one more.
+   */
+  getSignedReadUrl(storageKey: string) {
+    const url = this.getObjectUrl(storageKey)
+    const hour = 3_600_000
+    return presignGetUrl({
+      origin: url.origin,
+      host: url.host,
+      path: url.pathname,
+      accessKeyId: this.config.accessKeyId,
+      secretAccessKey: this.config.secretAccessKey,
+      region: 'auto',
+      signedAt: new Date(Math.floor(Date.now() / hour) * hour),
+      expiresSeconds: 7200,
+    })
+  }
+
   private async request(
     method: string,
     storageKey: string | null,
@@ -255,4 +276,63 @@ export class R2ObjectStorage implements ObjectStorage {
 
 function sanitizeStorageError(message: string) {
   return message.replace(/Credential=[^,\s]+/g, 'Credential=<redacted>')
+}
+
+/** AWS Signature V4 query-string presigning for a GET request. */
+export function presignGetUrl(input: {
+  origin: string
+  host: string
+  path: string
+  accessKeyId: string
+  secretAccessKey: string
+  region: string
+  signedAt: Date
+  expiresSeconds: number
+}) {
+  const amzDate = input.signedAt.toISOString().replace(/[:-]|\.\d{3}/g, '')
+  const dateStamp = amzDate.slice(0, 8)
+  const credentialScope = `${dateStamp}/${input.region}/s3/aws4_request`
+  const params: Array<[string, string]> = [
+    ['X-Amz-Algorithm', 'AWS4-HMAC-SHA256'],
+    ['X-Amz-Credential', `${input.accessKeyId}/${credentialScope}`],
+    ['X-Amz-Date', amzDate],
+    ['X-Amz-Expires', String(input.expiresSeconds)],
+    ['X-Amz-SignedHeaders', 'host'],
+  ]
+  const canonicalQuery = params
+    .map(([key, value]) => `${awsEncode(key)}=${awsEncode(value)}`)
+    .sort()
+    .join('&')
+  const canonicalRequest = [
+    'GET',
+    input.path,
+    canonicalQuery,
+    `host:${input.host}\n`,
+    'host',
+    'UNSIGNED-PAYLOAD',
+  ].join('\n')
+  const stringToSign = [
+    'AWS4-HMAC-SHA256',
+    amzDate,
+    credentialScope,
+    sha256Hex(canonicalRequest),
+  ].join('\n')
+  const signingKey = hmac(
+    hmac(
+      hmac(hmac(`AWS4${input.secretAccessKey}`, dateStamp), input.region),
+      's3',
+    ),
+    'aws4_request',
+  )
+  const signature = createHmac('sha256', signingKey)
+    .update(stringToSign)
+    .digest('hex')
+  return `${input.origin}${input.path}?${canonicalQuery}&X-Amz-Signature=${signature}`
+}
+
+function awsEncode(value: string) {
+  return encodeURIComponent(value).replace(
+    /[!'()*]/g,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  )
 }
