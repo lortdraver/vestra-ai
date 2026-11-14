@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Camera, Home, Shirt, Sparkles, User } from 'lucide-react'
+import { Home, Shirt, Sparkles, User } from 'lucide-react'
 import type { Locale } from '@/lib/i18n/config'
 import {
   dashboardNavItems,
@@ -18,12 +18,6 @@ export const dashboardNavIcons: Record<DashboardNavKey, typeof Home> = {
   stylist: Sparkles,
   me: User,
 }
-
-const addLabel = {
-  az: 'Geyim əlavə et',
-  en: 'Add an item',
-  ru: 'Добавить вещь',
-} as const
 
 /** Desktop navigation: a fixed left rail with the four main sections. */
 export function DashboardSidebar({ locale }: { locale: Locale }) {
@@ -59,13 +53,6 @@ export function DashboardSidebar({ locale }: { locale: Locale }) {
           )
         })}
       </nav>
-      <Link
-        href="/dashboard/wardrobe?add=1"
-        className="mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-4 text-sm font-medium text-background transition-opacity hover:opacity-90"
-      >
-        <Camera className="size-4" aria-hidden="true" />
-        {addLabel[locale]}
-      </Link>
     </aside>
   )
 }
