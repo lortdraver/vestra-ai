@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { LocalScanPanel } from '@/components/wardrobe/local-scan-panel'
 import type { ApiErrorCode } from '@/lib/api/errors'
 import type { Dictionary } from '@/lib/i18n/dictionaries'
 import type { Locale } from '@/lib/i18n/config'
@@ -1055,6 +1056,24 @@ export function WardrobePageClient({
                     ? t.states.imageReady
                     : t.help.image}
               </p>
+              {!editingItem && (
+                <LocalScanPanel
+                  imageUrl={imagePreview?.url}
+                  locale={locale}
+                  onResult={(suggestion) => {
+                    setForm((current) => ({
+                      ...current,
+                      category: suggestion.category,
+                      clothingType: suggestion.clothingType,
+                      colors: suggestion.colors,
+                      seasons: suggestion.seasons,
+                      styles: suggestion.styles,
+                      material: suggestion.material,
+                    }))
+                    setAdvancedManualMode(true)
+                  }}
+                />
+              )}
               {imagePreview && (
                 <div className="overflow-hidden rounded-xl border border-foreground/10 bg-background shadow-sm">
                   <div className="aspect-[4/3] bg-[radial-gradient(circle_at_top,_var(--muted),_transparent_55%),linear-gradient(135deg,_var(--background),_var(--muted))]">
