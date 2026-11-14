@@ -175,7 +175,7 @@ export function AppHeader({
   )
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-border bg-background">
       <div data-testid="mobile-app-header" className={MOBILE_TOP_BAR_CLASS}>
         <Link
           href="/dashboard"
