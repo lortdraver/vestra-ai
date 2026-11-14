@@ -39,6 +39,7 @@ import {
   getWardrobeFormalityLabel,
   getWardrobeFormalityFromLevel,
   getWardrobeFormalityLevel,
+  getWardrobeColorFamilyLabel,
   getWardrobeRoleLabel,
   getWardrobeStyleTagLabel,
   getWardrobeSubtypeLabel,
@@ -175,10 +176,6 @@ function toggleValue(values: string[], value: string) {
   return values.includes(value)
     ? values.filter((item) => item !== value)
     : [...values, value]
-}
-
-function getOptionLabel(labels: Record<string, string>, value: string) {
-  return labels[value] ?? value
 }
 
 function formatBytes(bytes: number) {
@@ -318,6 +315,9 @@ export function WardrobePageClient({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCompressing, setIsCompressing] = useState(false)
   const [advancedManualMode, setAdvancedManualMode] = useState(false)
+  // True when the free in-browser scan has already filled the form, so the
+  // paid server analysis is skipped after saving.
+  const [scannedLocally, setScannedLocally] = useState(false)
   const [processingStepIndex, setProcessingStepIndex] = useState(0)
   const [analyzingItemId, setAnalyzingItemId] = useState<string | null>(null)
   const [isSavingCorrections, setIsSavingCorrections] = useState(false)
@@ -502,6 +502,7 @@ export function WardrobePageClient({
     setImageColorHints(null)
     setEditingItem(null)
     setAdvancedManualMode(false)
+    setScannedLocally(false)
   }
 
   const startEdit = (item: WardrobeItemDto) => {
@@ -739,7 +740,8 @@ export function WardrobePageClient({
           mode: editingItem ? 'edit' : 'create',
         })
       }
-      const savedItem = editingItem
+      const skipServerAnalysis = Boolean(editingItem) || scannedLocally
+      const savedItem = skipServerAnalysis
         ? data.item
         : { ...data.item, analysisStatus: 'analyzing' as const }
       setProcessingStepIndex(processingSteps.length - 1)
@@ -751,7 +753,7 @@ export function WardrobePageClient({
       selectItem(savedItem)
       resetForm()
       setToastMessage(editingItem ? t.toast.updated : t.toast.created)
-      if (!editingItem) {
+      if (!skipServerAnalysis) {
         window.setTimeout(() => {
           void runAnalysisInBackground(data.item, {
             createCompletedAt: itemCreationCompletedAt,
@@ -1063,6 +1065,12 @@ export function WardrobePageClient({
                   onResult={(suggestion) => {
                     setForm((current) => ({
                       ...current,
+                      name: current.name.trim()
+                        ? current.name
+                        : getWardrobeSubtypeLabel(
+                            locale,
+                            suggestion.clothingType,
+                          ),
                       category: suggestion.category,
                       clothingType: suggestion.clothingType,
                       colors: suggestion.colors,
@@ -1071,6 +1079,7 @@ export function WardrobePageClient({
                       material: suggestion.material,
                     }))
                     setAdvancedManualMode(true)
+                    setScannedLocally(true)
                   }}
                 />
               )}
@@ -1271,7 +1280,9 @@ export function WardrobePageClient({
               ? dictionary.common.loading
               : editingItem
                 ? t.actions.save
-                : t.upload.analyzeAndSave}
+                : scannedLocally
+                  ? t.actions.save
+                  : t.upload.analyzeAndSave}
           </Button>
 
           {editingItem && (
@@ -1465,28 +1476,47 @@ export function WardrobePageClient({
                       {item.name}
                     </h2>
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {getOptionLabel(
-                        t.options.categories,
+                      {getWardrobeRoleLabel(
+                        locale,
                         item.effectiveAnalysis?.detectedCategory ??
                           item.category,
                       )}
                       {' · '}
-                      {item.effectiveAnalysis?.detectedClothingType ??
-                        item.clothingType}
+                      {getWardrobeSubtypeLabel(
+                        locale,
+                        item.effectiveAnalysis?.detectedClothingType ??
+                          item.clothingType,
+                      )}
                     </p>
                   </div>
                   <TagList
                     values={[
-                      ...(item.effectiveAnalysis?.colors ?? item.colors),
-                      ...(item.effectiveAnalysis?.season ?? item.seasons),
-                      ...(item.effectiveAnalysis?.style ?? item.styles),
+                      ...(item.effectiveAnalysis?.colors ?? item.colors).map(
+                        (color) => getWardrobeColorFamilyLabel(locale, color),
+                      ),
+                      ...(item.effectiveAnalysis?.season ?? item.seasons).map(
+                        (season) =>
+                          (t.options.seasons as Record<string, string>)[
+                            season
+                          ] ?? season,
+                      ),
+                      ...(item.effectiveAnalysis?.style ?? item.styles).map(
+                        (style) => getWardrobeStyleTagLabel(locale, style),
+                      ),
                     ]}
                   />
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <AnalysisStatusBadge
-                      label={t.analysis.status[item.analysisStatus]}
-                      status={item.analysisStatus}
-                    />
+                    {/* Items already sorted by the in-browser scan or by hand
+                        don't need a pending-analysis badge. */}
+                    {!(
+                      item.analysisStatus === 'pending' &&
+                      item.category !== unresolvedWardrobeRole
+                    ) && (
+                      <AnalysisStatusBadge
+                        label={t.analysis.status[item.analysisStatus]}
+                        status={item.analysisStatus}
+                      />
+                    )}
                     {item.effectiveAnalysis?.confidenceScore !== undefined && (
                       <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
                         {t.card.confidence}{' '}
