@@ -190,7 +190,7 @@ function ActionCard({
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3 rounded-2xl border border-foreground/10 bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      className="group flex min-w-0 items-center gap-3 rounded-2xl border border-foreground/10 bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
     >
       <span className="grid size-11 shrink-0 place-items-center rounded-full bg-muted transition group-hover:bg-foreground group-hover:text-background">
         <Icon className="size-5" aria-hidden="true" />
@@ -270,14 +270,14 @@ export default async function DashboardPage() {
         </section>
       ) : (
         <>
-          <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-            <section className="flex flex-col gap-4 rounded-3xl border border-foreground/10 bg-card p-5 shadow-sm md:p-6">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+            <section className="flex min-w-0 flex-col gap-4 rounded-3xl border border-foreground/10 bg-card p-5 shadow-sm md:p-6">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-accent">
+                <p className="shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-[0.08em] text-accent">
                   {t.outfitOfDay}
                 </p>
                 {home.outfitTitle ? (
-                  <p className="truncate text-sm text-muted-foreground">
+                  <p className="min-w-0 truncate text-sm text-muted-foreground">
                     {home.outfitTitle}
                   </p>
                 ) : null}
@@ -314,7 +314,7 @@ export default async function DashboardPage() {
               </div>
             </section>
 
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
+            <div className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-1">
               <ActionCard
                 href="/dashboard/wardrobe?add=1"
                 icon={Camera}
