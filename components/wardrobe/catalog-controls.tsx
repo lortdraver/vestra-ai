@@ -146,7 +146,7 @@ export function CatalogFilterBar({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
         {options.types.length > 0 && (
           <select
             value={filters.type}
@@ -154,7 +154,7 @@ export function CatalogFilterBar({
               onChange({ ...filters, type: event.target.value })
             }
             aria-label={t.type}
-            className="h-9 rounded-full border border-input bg-background px-3 text-sm"
+            className="h-9 w-full min-w-0 max-w-full truncate rounded-full border border-input bg-background px-3 text-sm sm:w-auto sm:max-w-56"
           >
             <option value="">{t.allTypes}</option>
             {options.types.map((type) => (
@@ -171,16 +171,18 @@ export function CatalogFilterBar({
               onChange({ ...filters, material: event.target.value })
             }
             aria-label={t.material}
-            className="h-9 rounded-full border border-input bg-background px-3 text-sm"
+            className="h-9 w-full min-w-0 max-w-full truncate rounded-full border border-input bg-background px-3 text-sm sm:w-auto sm:max-w-56"
           >
             <option value="">{t.allMaterials}</option>
             {options.materials.map((material) => (
               <option key={material} value={material}>
-                {material}
+                {material.length > 28 ? `${material.slice(0, 27)}…` : material}
               </option>
             ))}
           </select>
         )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           aria-pressed={filters.favoritesOnly}
