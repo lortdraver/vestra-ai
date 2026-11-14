@@ -48,6 +48,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  // Never let iOS shrink the page to fit an element that is too wide; the
+  // layout is built for the device width. Zooming in stays available.
+  minimumScale: 1,
   viewportFit: 'cover',
   colorScheme: 'light',
   themeColor: '#faf8f5',

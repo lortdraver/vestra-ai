@@ -130,6 +130,7 @@
   /* iOS Safari zooms the whole page out when anything is wider than the
      screen; clipping on <html> as well keeps the layout at device width. */
   html {
+    overflow-x: hidden;
     overflow-x: clip;
   }
   body {
