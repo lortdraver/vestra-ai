@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { DashboardAccountSettingsSection } from '@/components/dashboard-account-settings-section'
 import { formatDate } from '@/lib/i18n/format'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -285,6 +286,11 @@ export default async function AccountPage() {
           )}
         </AccountCard>
       </section>
+      <DashboardAccountSettingsSection
+        dictionary={dictionary}
+        locale={locale}
+        role={currentUser?.role}
+      />
     </div>
   )
 }

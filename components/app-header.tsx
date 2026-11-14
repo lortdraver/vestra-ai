@@ -4,17 +4,12 @@ import { useEffect, useRef, useState, type ComponentType } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  CalendarDays,
   CreditCard,
   HeartHandshake,
-  Home,
-  Images,
   LogOut,
   Cookie,
   Shield,
-  Shirt,
   SlidersHorizontal,
-  Sparkles,
   User,
   UserCog,
   X,
@@ -40,19 +35,16 @@ import {
 import type { Locale } from '@/lib/i18n/config'
 import type { Dictionary } from '@/lib/i18n/dictionaries'
 import {
-  DESKTOP_NAV_CLASS,
   MOBILE_BOTTOM_NAV_CLASS,
   MOBILE_TOP_BAR_CLASS,
 } from '@/lib/ui/responsive'
 import { cn } from '@/lib/utils'
-
-const navItems = [
-  { href: '/dashboard', key: 'home' },
-  { href: '/dashboard/wardrobe', key: 'wardrobe' },
-  { href: '/dashboard/stylist', key: 'stylist' },
-  { href: '/dashboard/planner', key: 'planner' },
-  { href: '/dashboard/outfits', key: 'outfits' },
-] as const
+import {
+  dashboardNavItems,
+  getDashboardNavLabel,
+  isDashboardNavActive,
+} from '@/lib/ui/dashboard-nav'
+import { dashboardNavIcons } from '@/components/dashboard-sidebar'
 
 type AppHeaderUser = {
   name?: string | null
@@ -78,35 +70,6 @@ const menuIcons: Record<
   stylistPreferences: SlidersHorizontal,
   privacy: Shield,
   admin: HeartHandshake,
-}
-
-const mobileNavIcons: Record<
-  (typeof navItems)[number]['key'],
-  ComponentType<{ className?: string }>
-> = {
-  home: Home,
-  wardrobe: Shirt,
-  stylist: Sparkles,
-  planner: CalendarDays,
-  outfits: Images,
-}
-
-function getNavLabel(
-  dictionary: Dictionary,
-  locale: Locale,
-  key: (typeof navItems)[number]['key'],
-) {
-  if (key === 'planner') {
-    return {
-      az: 'Planlayıcı',
-      en: 'Planner',
-      ru: 'План',
-    }[locale]
-  }
-
-  return dictionary.dashboard[
-    key as keyof typeof dictionary.dashboard
-  ] as string
 }
 
 export function AppHeader({
@@ -255,40 +218,8 @@ export function AppHeader({
 
       <div className="hidden md:block">
         <div className="mx-auto flex h-16 max-w-[1680px] items-center justify-between gap-3 px-6 xl:px-8">
-          <div className="flex min-w-0 items-center gap-8">
-            <Link
-              href="/dashboard"
-              className="truncate font-serif text-lg font-semibold tracking-tight text-foreground"
-            >
-              {dictionary.common.brand}
-            </Link>
-            <nav
-              aria-label={dictionary.common.mainNavigation}
-              className={DESKTOP_NAV_CLASS}
-            >
-              {navItems.map((item) => {
-                const isActive =
-                  item.href === '/dashboard'
-                    ? pathname === '/dashboard'
-                    : pathname.startsWith(item.href)
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={isActive ? 'page' : undefined}
-                    className={cn(
-                      'rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                      isActive
-                        ? 'bg-secondary text-foreground'
-                        : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-                    )}
-                  >
-                    {getNavLabel(dictionary, locale, item.key)}
-                  </Link>
-                )
-              })}
-            </nav>
-          </div>
+          {/* Logo and section links live in the desktop sidebar. */}
+          <div aria-hidden="true" />
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <div>
@@ -538,12 +469,9 @@ export function AppHeader({
           aria-label={dictionary.common.mobileNavigation}
           className={MOBILE_BOTTOM_NAV_CLASS}
         >
-          {navItems.map((item) => {
-            const isActive =
-              item.href === '/dashboard'
-                ? pathname === '/dashboard'
-                : pathname.startsWith(item.href)
-            const Icon = mobileNavIcons[item.key]
+          {dashboardNavItems.map((item) => {
+            const isActive = isDashboardNavActive(pathname, item)
+            const Icon = dashboardNavIcons[item.key]
 
             return (
               <Link
@@ -551,15 +479,15 @@ export function AppHeader({
                 href={item.href}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'grid min-h-12 min-w-0 place-items-center gap-0.5 rounded-lg px-1 py-1 text-[0.68rem] font-medium leading-none transition-colors',
+                  'grid min-h-12 min-w-0 place-items-center gap-0.5 rounded-lg px-1 py-1 text-[0.7rem] font-medium leading-none transition-colors',
                   isActive
                     ? 'bg-secondary text-foreground'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
                 )}
               >
-                <Icon className="size-4" aria-hidden="true" />
+                <Icon className="size-5" aria-hidden="true" />
                 <span className="max-w-full truncate">
-                  {getNavLabel(dictionary, locale, item.key)}
+                  {getDashboardNavLabel(locale, item.key)}
                 </span>
               </Link>
             )

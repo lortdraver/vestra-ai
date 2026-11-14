@@ -8,13 +8,12 @@ import { EmailVerificationBanner } from '@/components/account/email-verification
 import { PublicFooter } from '@/components/public-footer'
 import { getDictionary, getLocale } from '@/lib/i18n/server'
 import { eq } from 'drizzle-orm'
-import { SubscriptionOverview } from '@/components/subscription/subscription-overview'
+import { DashboardSidebar } from '@/components/dashboard-sidebar'
 import {
   getFallbackSubscriptionSnapshot,
   getSubscriptionSnapshot,
 } from '@/lib/subscription/server'
 import { DASHBOARD_CONTENT_CLASS } from '@/lib/ui/responsive'
-import { getAiAvailability } from '@/lib/ai/availability'
 
 export default async function DashboardLayout({
   children,
@@ -34,7 +33,8 @@ export default async function DashboardLayout({
   const currentUser = userRows[0]
 
   return (
-    <div className="flex min-h-svh flex-col bg-background">
+    <div className="flex min-h-svh flex-col bg-background md:pl-60">
+      <DashboardSidebar locale={locale} />
       <AppHeader
         user={{
           name: session.user.name,
@@ -53,13 +53,6 @@ export default async function DashboardLayout({
           dictionary={dictionary}
         />
       )}
-      <SubscriptionOverview
-        dictionary={dictionary}
-        subscription={subscription}
-        userId={session.user.id}
-        locale={locale}
-        aiAvailability={getAiAvailability()}
-      />
       <main className={DASHBOARD_CONTENT_CLASS}>{children}</main>
       <PublicFooter
         locale={locale}
