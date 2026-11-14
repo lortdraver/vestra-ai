@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { RuleStylistProvider } from '@/lib/stylist/rule-provider'
 import {
   getStylistModelCapability,
   getStylistProvider,
@@ -239,28 +240,24 @@ describe('stylist provider behavior', () => {
     })
   })
 
-  it('returns a clear configuration error when real credentials are missing', () => {
+  it('falls back to the free rule-based stylist when real credentials are missing', () => {
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('STYLIST_AI_PROVIDER', 'api')
     vi.stubEnv('AI_API_KEY', '')
     vi.stubEnv('AI_API_BASE_URL', 'https://openrouter.ai/api/v1')
     vi.stubEnv('AI_MODEL_ID', '')
 
-    expect(() => getStylistProvider()).toThrow(
-      'Real stylist provider is missing required environment variables',
-    )
+    expect(getStylistProvider()).toBeInstanceOf(RuleStylistProvider)
   })
 
-  it('does not silently fall back to mock when no provider is configured', () => {
+  it('uses the rule-based stylist, not the mock, when no provider is configured', () => {
     vi.stubEnv('NODE_ENV', 'development')
     vi.stubEnv('STYLIST_AI_PROVIDER', undefined)
     vi.stubEnv('AI_API_KEY', '')
     vi.stubEnv('AI_API_BASE_URL', '')
     vi.stubEnv('AI_MODEL_ID', '')
 
-    expect(() => getStylistProvider()).toThrow(
-      'For local mock mode, set STYLIST_AI_PROVIDER=mock explicitly',
-    )
+    expect(getStylistProvider()).toBeInstanceOf(RuleStylistProvider)
   })
 
   it('falls back from strict json_schema to json_object once', async () => {
@@ -2093,5 +2090,57 @@ describe('stylist generation diagnostics', () => {
     ).toBe('work')
     expect(getStylistRequestType({ message: 'private request' })).toBe('custom')
     expect(getStylistRequestType(null)).toBe('unknown')
+  })
+})
+
+describe('rule-based stylist', () => {
+  it('builds complete outfits only from owned items', async () => {
+    const result = await new RuleStylistProvider().generateOutfit({
+      userId: 'user_1',
+      locale: 'ru',
+      request: {
+        message: 'на учёбу',
+        locale: 'ru',
+        lockedItemIds: [],
+        wearHistoryMode: 'none',
+      },
+      wardrobeItems: [...wardrobe, ...extraWardrobe],
+      missingItems: [],
+      candidateCount: 3,
+    })
+
+    expect(result.status).toBe('success')
+    if (result.status !== 'success') return
+    const owned = new Set(
+      [...wardrobe, ...extraWardrobe].map((item) => item.id),
+    )
+    for (const candidate of result.candidates) {
+      const roles = candidate.items.map((item) => item.role)
+      expect(roles).toContain('shoes')
+      expect(
+        roles.includes('one_piece') ||
+          (roles.includes('top') && roles.includes('bottom')),
+      ).toBe(true)
+      for (const item of candidate.items) {
+        expect(owned.has(item.wardrobeItemId)).toBe(true)
+      }
+    }
+  })
+
+  it('reports missing pieces instead of inventing items', async () => {
+    const result = await new RuleStylistProvider().generateOutfit({
+      userId: 'user_1',
+      locale: 'en',
+      request: {
+        message: 'outfit',
+        locale: 'en',
+        lockedItemIds: [],
+        wearHistoryMode: 'none',
+      },
+      wardrobeItems: wardrobe.filter((item) => item.role !== 'shoes'),
+      missingItems: ['shoes'],
+    })
+
+    expect(result.status).toBe('insufficient_wardrobe')
   })
 })

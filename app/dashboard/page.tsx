@@ -66,9 +66,9 @@ const plannerCopy = {
 } as const
 
 const unavailableLabel = {
-  az: 'Müvəqqəti əlçatan deyil',
-  en: 'Temporarily unavailable',
-  ru: 'Временно недоступен',
+  az: 'Pulsuz rejim',
+  en: 'Free mode',
+  ru: 'Бесплатный режим',
 } as const
 
 export default async function DashboardPage() {

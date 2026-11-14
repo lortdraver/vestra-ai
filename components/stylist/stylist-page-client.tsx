@@ -116,7 +116,7 @@ export function StylistPageClient({
 }: {
   dictionary: Dictionary
   locale: Locale
-  /** False while the paid AI stylist is switched off on the server. */
+  /** False while the paid AI stylist is off; the free rule-based stylist runs. */
   aiAvailable?: boolean
 }) {
   const t = dictionary.stylist
@@ -239,7 +239,6 @@ export function StylistPageClient({
     message: string
     quickRequest?: QuickRequestId
   }) => {
-    if (!aiAvailable) return
     if (generationInFlightRef.current) return
 
     generationInFlightRef.current = true
@@ -510,7 +509,7 @@ export function StylistPageClient({
             <button
               key={id}
               type="button"
-              disabled={isLoading || !aiAvailable}
+              disabled={isLoading}
               onClick={() =>
                 void requestOutfit({ message: label, quickRequest: id })
               }
@@ -569,12 +568,9 @@ export function StylistPageClient({
               value={message}
               onChange={(event) => setMessage(event.target.value)}
               placeholder={t.inputPlaceholder}
-              disabled={isLoading || !aiAvailable}
+              disabled={isLoading}
             />
-            <Button
-              type="submit"
-              disabled={isLoading || !aiAvailable || !message.trim()}
-            >
+            <Button type="submit" disabled={isLoading || !message.trim()}>
               <Send />
               {t.actions.send}
             </Button>
@@ -1152,15 +1148,15 @@ function StylistConfidence({ label, value }: { label: string; value: number }) {
 
 const unavailableCopy = {
   az: {
-    title: 'AI stilist müvəqqəti dayandırılıb',
-    body: 'Tezliklə qayıdacaq. Bu arada qarderobunuza geyim əlavə edə və saxlanmış obrazlara baxa bilərsiniz.',
+    title: 'Pulsuz rejim',
+    body: 'Obrazlar rəng, mövsüm və tədbir qaydalarına görə yalnız sizin geyimlərinizdən yığılır. Sərbəst mətn sorğuları sadələşdirilmiş şəkildə başa düşülür.',
   },
   en: {
-    title: 'The AI stylist is paused for now',
-    body: 'It will be back soon. Meanwhile you can keep adding clothes and browse your saved outfits.',
+    title: 'Free mode',
+    body: 'Outfits are put together from your own clothes using colour, season and occasion rules. Free-text requests are understood in a simplified way.',
   },
   ru: {
-    title: 'AI-стилист временно на паузе',
-    body: 'Скоро вернётся. А пока можно добавлять вещи в гардероб и смотреть сохранённые образы.',
+    title: 'Бесплатный режим',
+    body: 'Образы собираются только из ваших вещей по правилам сочетания цветов, сезона и повода. Свободный текст запроса понимается упрощённо.',
   },
 } as const
