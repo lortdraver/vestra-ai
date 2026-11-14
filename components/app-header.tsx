@@ -98,9 +98,9 @@ function getNavLabel(
 ) {
   if (key === 'planner') {
     return {
-      az: 'Planlay\u0131c\u0131',
+      az: 'Planlayıcı',
       en: 'Planner',
-      ru: '\u041f\u043b\u0430\u043d',
+      ru: 'План',
     }[locale]
   }
 
@@ -586,7 +586,7 @@ function getMobileAccountCopy(locale: Locale): MobileAccountCopy {
     az: {
       title: 'Hesab',
       accountSection: 'Hesab',
-      quickActions: 'S\u00fcr\u0259tli \u0259m\u0259liyyatlar',
+      quickActions: 'Sürətli əməliyyatlar',
     },
     en: {
       title: 'Account',
@@ -594,10 +594,9 @@ function getMobileAccountCopy(locale: Locale): MobileAccountCopy {
       quickActions: 'Quick actions',
     },
     ru: {
-      title: '\u0410\u043a\u043a\u0430\u0443\u043d\u0442',
-      accountSection: '\u0410\u043a\u043a\u0430\u0443\u043d\u0442',
-      quickActions:
-        '\u0411\u044b\u0441\u0442\u0440\u044b\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044f',
+      title: 'Аккаунт',
+      accountSection: 'Аккаунт',
+      quickActions: 'Быстрые действия',
     },
   }[locale]
 }

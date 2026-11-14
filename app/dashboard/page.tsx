@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { DashboardAccountSettingsSection } from '@/components/dashboard-account-settings-section'
+import { getAiAvailability } from '@/lib/ai/availability'
 
 export async function generateMetadata(): Promise<Metadata> {
   const dictionary = await getDictionary()
@@ -45,29 +46,33 @@ const sections = [
 
 const plannerCopy = {
   az: {
-    title: 'Planlayici',
+    title: 'Planlayıcı',
     description:
-      'Bugunun havasi, planiniz ve qarderobunuzdaki real geyimlerle ne geyinmeyi secin.',
-    cta: 'Plani ac',
-    milestone: 'Aktiv: hava uygun planlama',
+      'Bu günün havası, planınız və qarderobunuzdakı real geyimlərlə nə geyinəcəyinizi seçin.',
+    cta: 'Planı aç',
   },
   en: {
     title: 'Planner',
     description:
       'See today’s weather, planned outfit, and generate weather-aware options from clothes you own.',
     cta: 'Open planner',
-    milestone: 'Live: weather-aware planning',
   },
   ru: {
     title: 'План',
     description:
       'Смотрите погоду на сегодня, запланированный образ и варианты из ваших вещей.',
     cta: 'Открыть план',
-    milestone: 'Активно: план по погоде',
   },
 } as const
 
+const unavailableLabel = {
+  az: 'Müvəqqəti əlçatan deyil',
+  en: 'Temporarily unavailable',
+  ru: 'Временно недоступен',
+} as const
+
 export default async function DashboardPage() {
+  const ai = getAiAvailability()
   const [session, dictionary, locale] = await Promise.all([
     auth.api.getSession({ headers: await headers() }),
     getDictionary(),
@@ -116,9 +121,11 @@ export default async function DashboardPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="mt-auto flex flex-col gap-3">
-                <p className="text-xs font-medium uppercase tracking-wider text-accent">
-                  {content.milestone}
-                </p>
+                {section.key === 'stylist' && !ai.stylist ? (
+                  <p className="w-fit rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                    {unavailableLabel[locale]}
+                  </p>
+                ) : null}
                 <Link
                   href={section.href}
                   className={buttonVariants({

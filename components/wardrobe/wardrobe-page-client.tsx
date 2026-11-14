@@ -292,9 +292,12 @@ function makeWearIdempotencyKey(scope: string) {
 export function WardrobePageClient({
   dictionary,
   locale,
+  serverAnalysisAvailable = true,
 }: {
   dictionary: Dictionary
   locale: Locale
+  /** False while the paid server-side AI analysis is switched off. */
+  serverAnalysisAvailable?: boolean
 }) {
   const t = dictionary.wardrobe
   const [items, setItems] = useState<WardrobeItemDto[]>([])
@@ -740,7 +743,8 @@ export function WardrobePageClient({
           mode: editingItem ? 'edit' : 'create',
         })
       }
-      const skipServerAnalysis = Boolean(editingItem) || scannedLocally
+      const skipServerAnalysis =
+        Boolean(editingItem) || scannedLocally || !serverAnalysisAvailable
       const savedItem = skipServerAnalysis
         ? data.item
         : { ...data.item, analysisStatus: 'analyzing' as const }
@@ -1280,7 +1284,7 @@ export function WardrobePageClient({
               ? dictionary.common.loading
               : editingItem
                 ? t.actions.save
-                : scannedLocally
+                : scannedLocally || !serverAnalysisAvailable
                   ? t.actions.save
                   : t.upload.analyzeAndSave}
           </Button>
@@ -1684,7 +1688,11 @@ export function WardrobePageClient({
                 setCorrections={setCorrections}
                 isAnalyzing={analyzingItemId === selectedItem.id}
                 isSavingCorrections={isSavingCorrections}
-                onAnalyze={() => void triggerAnalysis(selectedItem)}
+                onAnalyze={
+                  serverAnalysisAvailable
+                    ? () => void triggerAnalysis(selectedItem)
+                    : undefined
+                }
                 onSaveCorrections={() => void saveCorrections(selectedItem)}
               />
             </div>
@@ -1698,7 +1706,11 @@ export function WardrobePageClient({
               setCorrections={setCorrections}
               isAnalyzing={analyzingItemId === selectedItem.id}
               isSavingCorrections={isSavingCorrections}
-              onAnalyze={() => void triggerAnalysis(selectedItem)}
+              onAnalyze={
+                serverAnalysisAvailable
+                  ? () => void triggerAnalysis(selectedItem)
+                  : undefined
+              }
               onSaveCorrections={() => void saveCorrections(selectedItem)}
             />
           </div>
@@ -1989,7 +2001,7 @@ function AnalysisPanel({
   setCorrections: React.Dispatch<React.SetStateAction<AnalysisCorrectionState>>
   isAnalyzing: boolean
   isSavingCorrections: boolean
-  onAnalyze: () => void
+  onAnalyze?: () => void
   onSaveCorrections: () => void
 }) {
   const t = dictionary.wardrobe.analysis
@@ -2049,7 +2061,7 @@ function AnalysisPanel({
         ) : null}
       </div>
 
-      {item.analysisStatus === 'pending' && (
+      {item.analysisStatus === 'pending' && onAnalyze && (
         <Button type="button" className="mt-4" onClick={onAnalyze}>
           <Brain />
           {t.actions.analyze}
@@ -2079,10 +2091,12 @@ function AnalysisPanel({
               ? getAnalysisErrorMessage(dictionary, item.analysisError)
               : t.messages.failed}
           </p>
-          <Button type="button" variant="outline" onClick={onAnalyze}>
-            <RefreshCw />
-            {t.actions.retry}
-          </Button>
+          {onAnalyze && (
+            <Button type="button" variant="outline" onClick={onAnalyze}>
+              <RefreshCw />
+              {t.actions.retry}
+            </Button>
+          )}
         </div>
       )}
 

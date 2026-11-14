@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { getDictionary, getLocale } from '@/lib/i18n/server'
 import { WardrobePageClient } from '@/components/wardrobe/wardrobe-page-client'
+import { getAiAvailability } from '@/lib/ai/availability'
 
 export async function generateMetadata(): Promise<Metadata> {
   const dictionary = await getDictionary()
@@ -14,5 +15,11 @@ export default async function WardrobePage() {
   const dictionary = await getDictionary()
   const locale = await getLocale()
 
-  return <WardrobePageClient dictionary={dictionary} locale={locale} />
+  return (
+    <WardrobePageClient
+      dictionary={dictionary}
+      locale={locale}
+      serverAnalysisAvailable={getAiAvailability().analysis}
+    />
+  )
 }

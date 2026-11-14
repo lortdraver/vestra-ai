@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { formatDate } from '@/lib/i18n/format'
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { Check, Crown } from 'lucide-react'
@@ -92,7 +93,7 @@ export default async function PricingPage() {
                       subscription.cancelAtPeriodEnd && subscription.accessUntil
                         ? copy.accessUntil.replace(
                             '{date}',
-                            subscription.accessUntil.toLocaleDateString(),
+                            formatDate(subscription.accessUntil, locale),
                           )
                         : null
                     }
@@ -140,7 +141,7 @@ export default async function PricingPage() {
                       subscription.cancelAtPeriodEnd && subscription.accessUntil
                         ? copy.accessUntil.replace(
                             '{date}',
-                            subscription.accessUntil.toLocaleDateString(),
+                            formatDate(subscription.accessUntil, locale),
                           )
                         : null
                     }

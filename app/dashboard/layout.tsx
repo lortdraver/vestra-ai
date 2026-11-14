@@ -14,6 +14,7 @@ import {
   getSubscriptionSnapshot,
 } from '@/lib/subscription/server'
 import { DASHBOARD_CONTENT_CLASS } from '@/lib/ui/responsive'
+import { getAiAvailability } from '@/lib/ai/availability'
 
 export default async function DashboardLayout({
   children,
@@ -57,6 +58,7 @@ export default async function DashboardLayout({
         subscription={subscription}
         userId={session.user.id}
         locale={locale}
+        aiAvailability={getAiAvailability()}
       />
       <main className={DASHBOARD_CONTENT_CLASS}>{children}</main>
       <PublicFooter

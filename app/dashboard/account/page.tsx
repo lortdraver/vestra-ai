@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { formatDate } from '@/lib/i18n/format'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { and, count, eq, isNull } from 'drizzle-orm'
@@ -127,7 +128,7 @@ export default async function AccountPage() {
             />
             <AccountDetail
               label={dictionary.account.registrationDate}
-              value={currentUser.createdAt.toLocaleDateString()}
+              value={formatDate(currentUser.createdAt, locale)}
             />
             <AccountDetail
               label={dictionary.account.currentPlan}
@@ -139,7 +140,7 @@ export default async function AccountPage() {
                 subscription.isTrialActive && subscription.trialEndsAt
                   ? dictionary.subscription.trialActive.replace(
                       '{date}',
-                      subscription.trialEndsAt.toLocaleDateString(),
+                      formatDate(subscription.trialEndsAt, locale),
                     )
                   : dictionary.subscription.freeActive
               }
@@ -224,11 +225,11 @@ export default async function AccountPage() {
               {subscription.cancelAtPeriodEnd
                 ? billingCopy.ends.replace(
                     '{date}',
-                    subscription.currentPeriodEnd.toLocaleDateString(),
+                    formatDate(subscription.currentPeriodEnd, locale),
                   )
                 : billingCopy.nextBilling.replace(
                     '{date}',
-                    subscription.currentPeriodEnd.toLocaleDateString(),
+                    formatDate(subscription.currentPeriodEnd, locale),
                   )}
             </p>
           ) : null}
@@ -236,7 +237,7 @@ export default async function AccountPage() {
             <p className="text-sm text-muted-foreground">
               {billingCopy.graceUntil.replace(
                 '{date}',
-                subscription.graceUntil.toLocaleDateString(),
+                formatDate(subscription.graceUntil, locale),
               )}
             </p>
           ) : null}
@@ -244,7 +245,7 @@ export default async function AccountPage() {
             <p className="rounded-lg border border-accent/20 bg-accent/10 px-3 py-2 text-sm text-accent">
               {billingCopy.accessUntil.replace(
                 '{date}',
-                subscription.accessUntil.toLocaleDateString(),
+                formatDate(subscription.accessUntil, locale),
               )}
             </p>
           ) : null}

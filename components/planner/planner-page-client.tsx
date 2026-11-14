@@ -121,7 +121,14 @@ function weatherSuitabilityMessage(
   }[level]
 }
 
-export function PlannerPageClient({ locale }: { locale: Locale }) {
+export function PlannerPageClient({
+  locale,
+  aiAvailable = true,
+}: {
+  locale: Locale
+  /** False while the paid AI stylist is switched off on the server. */
+  aiAvailable?: boolean
+}) {
   const t = getPlannerCopy(locale)
   const [locationName, setLocationName] = useState(() =>
     typeof window === 'undefined'
@@ -658,11 +665,17 @@ export function PlannerPageClient({ locale }: { locale: Locale }) {
               />
             </label>
 
+            {!aiAvailable && (
+              <p role="status" className="text-sm text-muted-foreground">
+                {aiPausedLabel[locale]}
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 onClick={() => void generateForDay()}
-                disabled={isLoading}
+                disabled={isLoading || !aiAvailable}
+                title={aiAvailable ? undefined : aiPausedLabel[locale]}
               >
                 <Sparkles className="size-4" />
                 {isLoading ? t.loading : t.generate}
@@ -817,3 +830,9 @@ function OutfitOptionCard({
     </article>
   )
 }
+
+const aiPausedLabel = {
+  az: 'AI stilist müvəqqəti dayandırılıb — saxlanmış obrazlardan seçin',
+  en: 'The AI stylist is paused — choose from saved outfits',
+  ru: 'AI-стилист на паузе — выберите из сохранённых образов',
+} as const
