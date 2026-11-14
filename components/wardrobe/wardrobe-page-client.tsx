@@ -18,14 +18,18 @@ import {
   Trash2,
   Upload,
   X,
+  BarChart3,
+  Plus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LocalScanPanel } from '@/components/wardrobe/local-scan-panel'
+import { getDashboardNavLabel } from '@/lib/ui/dashboard-nav'
 import { FirstOutfitChecklist } from '@/components/wardrobe/first-outfit-checklist'
 import {
+  colorSwatches,
   CatalogFilterBar,
   CatalogPagination,
 } from '@/components/wardrobe/catalog-controls'
@@ -58,6 +62,7 @@ import {
   getWardrobeRoleLabel,
   getWardrobeStyleTagLabel,
   getWardrobeSubtypeLabel,
+  normalizeWardrobeColorFamily,
   unresolvedWardrobeRole,
   unresolvedWardrobeSubtype,
   wardrobeFormalityValues,
@@ -335,6 +340,13 @@ export function WardrobePageClient({
     useState<CatalogFilters>(emptyCatalogFilters)
   const [catalogPage, setCatalogPage] = useState(1)
   const catalogTopRef = useRef<HTMLDivElement>(null)
+  const [showInsights, setShowInsights] = useState(false)
+  useEffect(() => {
+    // Links such as "Add an item" on the home page open /dashboard/wardrobe?add=1.
+    if (new URLSearchParams(window.location.search).get('add') === '1') {
+      window.setTimeout(scrollToAddItem, 150)
+    }
+  }, [])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCompressing, setIsCompressing] = useState(false)
@@ -1031,7 +1043,21 @@ export function WardrobePageClient({
 
   return (
     <div className={WARDROBE_LAYOUT_CLASS}>
-      <section className={WARDROBE_UPLOAD_PANEL_CLASS}>
+      <button
+        type="button"
+        onClick={() => scrollToAddItem()}
+        aria-label={addItemLabel[locale]}
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-4 z-40 grid size-14 place-items-center rounded-full bg-foreground text-background shadow-lg lg:hidden"
+      >
+        <Plus className="size-6" aria-hidden="true" />
+      </button>
+      <section
+        id="add-item"
+        className={cn(
+          WARDROBE_UPLOAD_PANEL_CLASS,
+          'order-last scroll-mt-20 lg:order-none',
+        )}
+      >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
@@ -1351,20 +1377,36 @@ export function WardrobePageClient({
         </form>
       </section>
 
-      <section className="grid gap-4">
-        <InsightsPanel
-          dictionary={dictionary}
-          locale={locale}
-          insights={insights}
-          range={insightsRange}
-          dismissedItemIds={dismissedInsightItemIds}
-          onRangeChange={setInsightsRange}
-          onDismissItem={(itemId) =>
-            setDismissedInsightItemIds((current) =>
-              new Set(current).add(itemId),
-            )
-          }
-        />
+      <section className="grid min-w-0 gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="font-serif text-3xl font-medium tracking-tight">
+            {getDashboardNavLabel(locale, 'wardrobe')}
+          </h1>
+          <button
+            type="button"
+            onClick={() => setShowInsights((value) => !value)}
+            aria-expanded={showInsights}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-input px-3 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <BarChart3 className="size-4" aria-hidden="true" />
+            {insightsToggleLabel[locale]}
+          </button>
+        </div>
+        {showInsights && (
+          <InsightsPanel
+            dictionary={dictionary}
+            locale={locale}
+            insights={insights}
+            range={insightsRange}
+            dismissedItemIds={dismissedInsightItemIds}
+            onRangeChange={setInsightsRange}
+            onDismissItem={(itemId) =>
+              setDismissedInsightItemIds((current) =>
+                new Set(current).add(itemId),
+              )
+            }
+          />
+        )}
 
         {!hasActiveFilters && !isLoading && (
           <FirstOutfitChecklist locale={locale} items={items} />
@@ -1523,69 +1565,16 @@ export function WardrobePageClient({
                       )}
                     />
                   </button>
-                  <div className="absolute left-2.5 top-2.5 flex max-w-[calc(100%-4rem)] flex-wrap gap-1.5">
-                    <span className="rounded-full bg-background/85 px-2 py-1 text-xs font-medium shadow-sm backdrop-blur">
-                      {t.card.status[getDisplayStatus(item)]}
-                    </span>
-                  </div>
                   <CardContent className="grid gap-2 p-3 sm:p-3.5">
                     <div className="min-w-0">
                       <h2 className="truncate font-medium leading-snug">
                         {item.name}
                       </h2>
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {getWardrobeRoleLabel(
-                          locale,
-                          item.effectiveAnalysis?.detectedCategory ??
-                            item.category,
-                        )}
-                        {' · '}
-                        {getWardrobeSubtypeLabel(
-                          locale,
-                          item.effectiveAnalysis?.detectedClothingType ??
-                            item.clothingType,
-                        )}
-                      </p>
                     </div>
-                    <TagList
-                      values={[
-                        ...(item.effectiveAnalysis?.colors ?? item.colors).map(
-                          (color) => getWardrobeColorFamilyLabel(locale, color),
-                        ),
-                        ...(item.effectiveAnalysis?.season ?? item.seasons).map(
-                          (season) =>
-                            (t.options.seasons as Record<string, string>)[
-                              season
-                            ] ?? season,
-                        ),
-                        ...(item.effectiveAnalysis?.style ?? item.styles).map(
-                          (style) => getWardrobeStyleTagLabel(locale, style),
-                        ),
-                      ]}
+                    <ColorDots
+                      locale={locale}
+                      colors={item.effectiveAnalysis?.colors ?? item.colors}
                     />
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {/* Items already sorted by the in-browser scan or by hand
-                        don't need a pending-analysis badge. */}
-                      {!(
-                        item.analysisStatus === 'pending' &&
-                        item.category !== unresolvedWardrobeRole
-                      ) && (
-                        <AnalysisStatusBadge
-                          label={t.analysis.status[item.analysisStatus]}
-                          status={item.analysisStatus}
-                        />
-                      )}
-                      {item.effectiveAnalysis?.confidenceScore !==
-                        undefined && (
-                        <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
-                          {t.card.confidence}{' '}
-                          {Math.round(
-                            item.effectiveAnalysis.confidenceScore * 100,
-                          )}
-                          %
-                        </span>
-                      )}
-                    </div>
                     <WearSummary dictionary={dictionary} item={item} compact />
                     <div className="grid grid-cols-3 gap-1.5">
                       <Button
@@ -1958,19 +1947,6 @@ function PreviewPane({
   )
 }
 
-function getDisplayStatus(item: WardrobeItemDto) {
-  const ageMs = Date.now() - new Date(item.createdAt).getTime()
-  const ageDays = ageMs / 86_400_000
-
-  if (ageDays < 14) return 'new'
-  if ((item.effectiveAnalysis?.confidenceScore ?? 0) > 0.85) {
-    return 'oftenWorn'
-  }
-  if (ageDays > 90) return 'notWornLong'
-
-  return 'inLaundry'
-}
-
 function OnboardingPanel({ dictionary }: { dictionary: Dictionary }) {
   const steps = [
     dictionary.onboarding.steps.add,
@@ -2023,31 +1999,6 @@ function ConfidenceMeter({ label, value }: { label: string; value: number }) {
         />
       </div>
     </div>
-  )
-}
-
-function AnalysisStatusBadge({
-  label,
-  status,
-}: {
-  label: string
-  status: WardrobeItemDto['analysisStatus']
-}) {
-  const className =
-    status === 'done'
-      ? 'bg-green-100 text-green-800'
-      : status === 'failed'
-        ? 'bg-destructive/10 text-destructive'
-        : status === 'analyzing'
-          ? 'bg-accent/20 text-foreground'
-          : 'bg-secondary text-secondary-foreground'
-
-  return (
-    <span
-      className={`inline-flex w-fit rounded-md px-2 py-1 text-xs ${className}`}
-    >
-      {label}
-    </span>
   )
 }
 
@@ -2604,24 +2555,6 @@ function CheckboxGroup<T extends string>({
   )
 }
 
-function TagList({ values }: { values: string[] }) {
-  const tags = values.filter(Boolean).slice(0, 6)
-  if (tags.length === 0) return null
-
-  return (
-    <div className="flex flex-wrap gap-1">
-      {tags.map((value) => (
-        <span
-          key={value}
-          className="rounded-md bg-secondary px-2 py-1 text-xs text-secondary-foreground"
-        >
-          {value}
-        </span>
-      ))}
-    </div>
-  )
-}
-
 function WearSummary({
   dictionary,
   item,
@@ -3019,3 +2952,50 @@ function Detail({
     </div>
   )
 }
+
+function ColorDots({ locale, colors }: { locale: Locale; colors: string[] }) {
+  const families = Array.from(
+    new Set(
+      colors
+        .map((color) => normalizeWardrobeColorFamily(color))
+        .filter((color): color is NonNullable<typeof color> => Boolean(color)),
+    ),
+  ).slice(0, 4)
+  if (families.length === 0) return null
+  return (
+    <div
+      className="flex items-center gap-1"
+      aria-label={families
+        .map((color) => getWardrobeColorFamilyLabel(locale, color))
+        .join(', ')}
+    >
+      {families.map((color) => (
+        <span
+          key={color}
+          className="size-3 rounded-full border border-foreground/15"
+          style={{ backgroundColor: colorSwatches[color] }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function scrollToAddItem() {
+  const panel = document.getElementById('add-item')
+  panel?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  panel?.querySelector<HTMLInputElement>('input[type="file"]')?.focus({
+    preventScroll: true,
+  })
+}
+
+const insightsToggleLabel = {
+  az: 'Statistika',
+  en: 'Stats',
+  ru: 'Статистика',
+} as const
+
+const addItemLabel = {
+  az: 'Geyim əlavə et',
+  en: 'Add an item',
+  ru: 'Добавить вещь',
+} as const

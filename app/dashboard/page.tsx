@@ -228,7 +228,7 @@ export default async function DashboardPage() {
     <div className="flex flex-col gap-6 md:gap-8">
       <header className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <p className="text-sm capitalize text-muted-foreground">
+          <p className="text-sm text-muted-foreground first-letter:uppercase">
             {formatToday(locale)}
           </p>
           <h1 className="mt-1 font-serif text-3xl font-medium tracking-tight md:text-4xl">
