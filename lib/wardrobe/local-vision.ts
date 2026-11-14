@@ -250,7 +250,7 @@ type Model = {
   processor: (image: unknown) => Promise<unknown>
   textModel: (inputs: unknown) => Promise<{ text_embeds: Tensor }>
   visionModel: (inputs: unknown) => Promise<{ image_embeds: Tensor }>
-  RawImage: { fromURL: (url: string) => Promise<unknown> }
+  RawImage: { fromBlob: (blob: Blob) => Promise<unknown> }
 }
 type Tensor = { dims: number[]; data: Float32Array }
 type LabelEmbeddings = Record<
@@ -444,9 +444,9 @@ function top(keys: [string, string[]][], probs: number[], minShare = 0) {
     .sort((a, b) => b.p - a.p)
 }
 
-/** Recognises a clothing photo (object URL or http URL) in the browser. */
+/** Recognises a clothing photo in the browser. */
 export async function scanClothingImage(
-  imageUrl: string,
+  photo: Blob,
   locale: Locale,
   onProgress?: (p: LocalVisionProgress) => void,
 ): Promise<LocalVisionSuggestion> {
@@ -454,7 +454,7 @@ export async function scanClothingImage(
   const labels = await loadLabels(model, onProgress)
   onProgress?.({ stage: 'scanning' })
 
-  const image = await model.RawImage.fromURL(imageUrl)
+  const image = await model.RawImage.fromBlob(photo)
   const inputs = await model.processor(image)
   const vec = rows((await model.visionModel(inputs)).image_embeds)[0]
 

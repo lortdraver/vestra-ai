@@ -111,7 +111,10 @@ export function LocalScanPanel({
     const run = async () => {
       setStatus({ kind: 'working', progress: { stage: 'scanning' } })
       try {
-        const result = await scanClothingImage(imageUrl, locale, (progress) => {
+        // Read the photo right away: the form revokes its preview URL later,
+        // and the first model download can take a minute.
+        const photo = await fetch(imageUrl).then((r) => r.blob())
+        const result = await scanClothingImage(photo, locale, (progress) => {
           if (!cancelled) setStatus({ kind: 'working', progress })
         })
         if (cancelled) return
