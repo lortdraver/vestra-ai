@@ -13,7 +13,7 @@ import type { Locale } from '@/lib/i18n/config'
 const TRANSFORMERS_URL =
   'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2'
 const MODEL_ID = 'Marqo/marqo-fashionSigLIP'
-const LABEL_CACHE_KEY = 'vestra-local-vision-labels-v1'
+const LABEL_CACHE_KEY = 'vestra-local-vision-labels-v2'
 const TEMPLATES = [
   'a photo of {}',
   'a product photo of {}',
@@ -22,7 +22,10 @@ const TEMPLATES = [
 
 // [app subtype key, English descriptions]
 const SUBTYPES: [string, string[]][] = [
-  ['t_shirt', ['a t-shirt', 'a short sleeve tee']],
+  [
+    't_shirt',
+    ['a t-shirt', 'a short sleeve tee', 'a football jersey', 'a sports jersey'],
+  ],
   ['shirt', ['a button-up shirt', 'a collared shirt']],
   ['polo', ['a polo shirt']],
   [
