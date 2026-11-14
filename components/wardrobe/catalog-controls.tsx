@@ -13,7 +13,7 @@ import {
 } from '@/lib/wardrobe/catalog-filters'
 import { cn } from '@/lib/utils'
 
-const swatches: Record<string, string> = {
+export const colorSwatches: Record<string, string> = {
   black: '#1c1b19',
   white: '#ffffff',
   gray: '#9a9792',
@@ -94,7 +94,7 @@ export function CatalogFilterBar({
         ? filters.colors.filter((value) => value !== color)
         : [...filters.colors, color],
     })
-  const orderedColors = Object.keys(swatches).filter((color) =>
+  const orderedColors = Object.keys(colorSwatches).filter((color) =>
     options.colors.includes(color),
   )
 
@@ -126,7 +126,7 @@ export function CatalogFilterBar({
               >
                 <span
                   className="grid size-6 place-items-center rounded-full border border-foreground/10"
-                  style={{ backgroundColor: swatches[color] }}
+                  style={{ backgroundColor: colorSwatches[color] }}
                 >
                   {active && (
                     <Check
