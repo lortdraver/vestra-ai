@@ -54,7 +54,7 @@ const subscriptionPageSource = readFileSync(
   'utf8',
 )
 const dashboardPageSource = readFileSync(
-  join(process.cwd(), 'app/dashboard/page.tsx'),
+  join(process.cwd(), 'app/dashboard/account/page.tsx'),
   'utf8',
 )
 const dashboardAccountSettingsSource = readFileSync(
@@ -131,7 +131,7 @@ describe('responsive UI contracts', () => {
     expect(MOBILE_TOP_BAR_CLASS).not.toContain('sticky')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('fixed')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('w-screen')
-    expect(MOBILE_BOTTOM_NAV_CLASS).toContain('grid-cols-5')
+    expect(MOBILE_BOTTOM_NAV_CLASS).toContain('grid-cols-4')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('env(safe-area-inset-bottom)')
     expect(MOBILE_BOTTOM_NAV_CLASS).toContain('md:hidden')
     expect(MOBILE_TOP_BAR_CLASS).toContain('min-h-14')

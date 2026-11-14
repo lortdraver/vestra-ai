@@ -25,4 +25,4 @@ export const WARDROBE_CARD_ACTION_CLASS =
 export const DESKTOP_NAV_CLASS = 'hidden items-center gap-1 md:flex'
 
 export const MOBILE_BOTTOM_NAV_CLASS =
-  'fixed inset-x-0 bottom-0 z-50 grid w-screen grid-cols-5 border-t border-border bg-background/95 px-1.5 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-1.5 shadow-[0_-12px_30px_rgba(0,0,0,0.12)] backdrop-blur-xl md:hidden'
+  'fixed inset-x-0 bottom-0 z-50 grid w-screen grid-cols-4 border-t border-border bg-background/95 px-1.5 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-1.5 shadow-[0_-12px_30px_rgba(0,0,0,0.12)] backdrop-blur-xl md:hidden'
