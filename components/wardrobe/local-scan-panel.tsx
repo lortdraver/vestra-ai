@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { ScanLine } from 'lucide-react'
 import type { Locale } from '@/lib/i18n/config'
 import {
@@ -60,6 +60,21 @@ const copy: Record<
   },
 }
 
+// Hidden switch while the feature is being tested: open any page with
+// ?scan=1 to turn it on in this browser, ?scan=0 to turn it off again.
+const FLAG_KEY = 'vestra-local-scan'
+function readScanFlag() {
+  try {
+    const param = new URLSearchParams(window.location.search).get('scan')
+    if (param === '1') window.localStorage.setItem(FLAG_KEY, '1')
+    if (param === '0') window.localStorage.removeItem(FLAG_KEY)
+    return window.localStorage.getItem(FLAG_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+const subscribeToNothing = () => () => {}
+
 type Status =
   | { kind: 'idle' }
   | { kind: 'working'; progress: LocalVisionProgress }
@@ -79,6 +94,11 @@ export function LocalScanPanel({
   locale: Locale
   onResult: (suggestion: LocalVisionSuggestion) => void
 }) {
+  const enabled = useSyncExternalStore(
+    subscribeToNothing,
+    readScanFlag,
+    () => false,
+  )
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const onResultRef = useRef(onResult)
   useEffect(() => {
@@ -86,7 +106,7 @@ export function LocalScanPanel({
   })
 
   useEffect(() => {
-    if (!imageUrl) return
+    if (!imageUrl || !enabled) return
     let cancelled = false
     const run = async () => {
       setStatus({ kind: 'working', progress: { stage: 'scanning' } })
@@ -106,9 +126,9 @@ export function LocalScanPanel({
     return () => {
       cancelled = true
     }
-  }, [imageUrl, locale])
+  }, [imageUrl, locale, enabled])
 
-  if (!imageUrl || status.kind === 'idle') return null
+  if (!enabled || !imageUrl || status.kind === 'idle') return null
   const t = copy[locale]
 
   if (status.kind === 'working') {
