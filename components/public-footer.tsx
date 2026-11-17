@@ -17,49 +17,44 @@ export function PublicFooter({
   const groups = resolveFooterLinkGroups(copy, authenticated)
   const year = new Date().getFullYear()
 
+  const links = [
+    ...groups.product.links,
+    ...groups.help.links,
+    ...groups.legal.links,
+  ]
+
+  // One compact block: the main sections now live in the top navigation, so
+  // the footer only carries the links people look for at the bottom.
   return (
     <footer
       className={
         className ??
-        'border-t border-border px-6 py-8 text-sm text-muted-foreground md:px-10'
+        'border-t border-border px-6 py-6 text-sm text-muted-foreground md:px-10'
       }
     >
-      <div className="mx-auto grid max-w-6xl gap-8 sm:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1fr_1fr]">
-        <div className="grid gap-3">
+      <div className="mx-auto flex max-w-6xl flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <p>
           <Link
             href={authenticated ? '/dashboard' : '/'}
-            className="font-serif text-xl font-semibold tracking-tight text-foreground underline-offset-4 hover:underline"
+            className="font-serif text-base font-semibold text-foreground"
           >
             Vestra
-          </Link>
-          <p className="max-w-xs leading-relaxed">{copy.description}</p>
-          <p>
-            © {year} Vestra. {copy.copyright}
-          </p>
-        </div>
-
-        <FooterLinkGroup
-          title={groups.product.title}
-          links={groups.product.links}
-        />
-
-        <FooterLinkGroup title={groups.help.title} links={groups.help.links} />
-
-        <nav aria-label={groups.legal.title} className="grid gap-3">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            {groups.legal.title}
-          </h2>
-          <div className="grid gap-2">
-            {groups.legal.links.map((link) => (
-              <FooterLink key={`${link.href}:${link.label}`} href={link.href}>
-                {link.label}
-              </FooterLink>
-            ))}
-            <CookiePreferencesButton
-              label={copy.cookiePreferences}
-              className="min-h-10 w-fit text-left"
-            />
-          </div>
+          </Link>{' '}
+          · © {year}
+        </p>
+        <nav
+          aria-label={groups.legal.title}
+          className="flex flex-wrap items-center gap-x-4 gap-y-1"
+        >
+          {links.map((link) => (
+            <FooterLink key={`${link.href}:${link.label}`} href={link.href}>
+              {link.label}
+            </FooterLink>
+          ))}
+          <CookiePreferencesButton
+            label={copy.cookiePreferences}
+            className="min-h-10 text-left"
+          />
         </nav>
       </div>
     </footer>
@@ -132,29 +127,6 @@ function resolveFooterLinks(
 
     return href ? [{ label: link.label, href }] : []
   })
-}
-
-function FooterLinkGroup({
-  title,
-  links,
-}: {
-  title: string
-  links: FooterResolvedLink[]
-}) {
-  return (
-    <nav aria-label={title} className="grid gap-3">
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-        {title}
-      </h2>
-      <div className="grid gap-2">
-        {links.map((link) => (
-          <FooterLink key={`${link.href}:${link.label}`} href={link.href}>
-            {link.label}
-          </FooterLink>
-        ))}
-      </div>
-    </nav>
-  )
 }
 
 function FooterLink({ href, children }: { href: string; children: ReactNode }) {

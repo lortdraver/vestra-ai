@@ -7,7 +7,7 @@ import { auth } from '@/lib/auth'
 import { trackServerEvent } from '@/lib/analytics/server'
 import { getBillingCopy } from '@/lib/billing/copy'
 import { getPaddleDiagnostics } from '@/lib/billing/paddle-config'
-import { getLocale } from '@/lib/i18n/server'
+import { getDictionary, getLocale } from '@/lib/i18n/server'
 import { getSubscriptionSnapshot } from '@/lib/subscription/server'
 import { buttonVariants } from '@/components/ui/button'
 import {
@@ -16,6 +16,7 @@ import {
   PaddleCheckoutButton,
 } from '@/components/billing/pricing-client'
 import { PublicFooter } from '@/components/public-footer'
+import { PublicHeader } from '@/components/public-header'
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale()
@@ -45,6 +46,12 @@ export default async function PricingPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PublicHeader
+        locale={locale}
+        dictionary={await getDictionary()}
+        current="/pricing"
+        signedIn={Boolean(session?.user)}
+      />
       <main className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-10 md:px-6">
         <section className="grid gap-3">
           {paddleDiagnostics.environment === 'sandbox' ? (
