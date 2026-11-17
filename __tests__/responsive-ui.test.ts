@@ -181,7 +181,7 @@ describe('responsive UI contracts', () => {
     expect(dashboardAccountSettingsSource).toContain('openCookiePreferences')
     expect(dashboardAccountSettingsSource).toContain('authClient.signOut')
     expect(dashboardAccountSettingsSource).toContain(
-      'href="/dashboard/account#support"',
+      'href="/dashboard/support"',
     )
     expect(dashboardAccountSettingsSource).toContain('href="/faq"')
     expect(dashboardAccountSettingsSource).toContain('href="/terms"')

@@ -8,7 +8,7 @@ export const dashboardNavItems = [
   {
     href: '/dashboard/account',
     key: 'me',
-    also: ['/dashboard/subscription', '/dashboard/admin'],
+    also: ['/dashboard/subscription', '/dashboard/admin', '/dashboard/support'],
   },
 ] as const
 

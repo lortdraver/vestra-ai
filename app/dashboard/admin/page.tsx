@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
+import { MessageCircle } from 'lucide-react'
 import { headers } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import { desc, eq } from 'drizzle-orm'
@@ -75,13 +77,22 @@ export default async function AdminPage({
   ])
 
   return (
-    <AdminAnalyticsDashboard
-      snapshot={snapshot}
-      preset={preset}
-      locale={locale}
-      dictionary={dictionary}
-      securityEvents={recentSecurityEvents}
-      auditEvents={recentAuditLogs}
-    />
+    <>
+      <Link
+        href="/dashboard/admin/support"
+        className="mb-4 inline-flex h-10 w-fit items-center gap-2 rounded-full bg-foreground px-4 text-sm font-medium text-background"
+      >
+        <MessageCircle className="size-4" aria-hidden="true" />
+        Support chats
+      </Link>
+      <AdminAnalyticsDashboard
+        snapshot={snapshot}
+        preset={preset}
+        locale={locale}
+        dictionary={dictionary}
+        securityEvents={recentSecurityEvents}
+        auditEvents={recentAuditLogs}
+      />
+    </>
   )
 }

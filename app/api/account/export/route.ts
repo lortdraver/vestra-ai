@@ -76,6 +76,22 @@ export async function GET() {
           .where(inArray(schema.wearLogItem.wearLogId, wearLogIds))
       : []
 
+  const [supportThread] = await db
+    .select()
+    .from(schema.supportThread)
+    .where(eq(schema.supportThread.userId, userId))
+    .limit(1)
+  const supportMessages = supportThread
+    ? await db
+        .select({
+          senderRole: schema.supportMessage.senderRole,
+          body: schema.supportMessage.body,
+          createdAt: schema.supportMessage.createdAt,
+        })
+        .from(schema.supportMessage)
+        .where(eq(schema.supportMessage.threadId, supportThread.id))
+    : []
+
   const body = JSON.stringify(
     {
       exportedAt: new Date().toISOString(),
@@ -89,6 +105,7 @@ export async function GET() {
       wearLogItems,
       stylistPreferences: preferences,
       subscriptions,
+      supportMessages,
     },
     null,
     2,

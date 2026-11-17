@@ -876,3 +876,53 @@ export const rateLimitBucket = pgTable(
     resetAtIdx: index('rate_limit_bucket_reset_at_idx').on(table.resetAt),
   }),
 )
+
+// In-app support chat: one conversation per user with the Vestra team.
+export const supportThread = pgTable(
+  'support_thread',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('userId')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    status: text('status').notNull().default('open'),
+    unreadByAdmin: boolean('unreadByAdmin').notNull().default(false),
+    unreadByUser: boolean('unreadByUser').notNull().default(false),
+    lastMessageAt: timestamp('lastMessageAt', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdAt: timestamp('createdAt', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    userIdx: uniqueIndex('support_thread_user_idx').on(table.userId),
+    lastMessageIdx: index('support_thread_last_message_idx').on(
+      table.lastMessageAt,
+    ),
+  }),
+)
+
+export const supportMessage = pgTable(
+  'support_message',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    threadId: uuid('threadId')
+      .notNull()
+      .references(() => supportThread.id, { onDelete: 'cascade' }),
+    senderRole: text('senderRole').notNull(),
+    senderId: text('senderId').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    body: text('body').notNull(),
+    createdAt: timestamp('createdAt', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    threadCreatedIdx: index('support_message_thread_created_idx').on(
+      table.threadId,
+      table.createdAt,
+    ),
+  }),
+)
