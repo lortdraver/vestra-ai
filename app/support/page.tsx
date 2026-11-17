@@ -58,14 +58,22 @@ export default async function SupportPage() {
                 </p>
               </div>
             </div>
-            {contactEmail ? (
+            <div className="mt-5 flex flex-wrap items-center gap-3">
               <a
-                href={`mailto:${contactEmail}`}
-                className="mt-5 inline-flex min-h-11 items-center rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground outline-none transition hover:bg-primary/90 focus-visible:ring-3 focus-visible:ring-ring/50"
+                href="/dashboard/support"
+                className="inline-flex min-h-11 items-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground outline-none transition hover:bg-primary/90 focus-visible:ring-3 focus-visible:ring-ring/50"
               >
-                {contactEmail}
+                {chatLabel[locale]}
               </a>
-            ) : null}
+              {contactEmail ? (
+                <a
+                  href={`mailto:${contactEmail}`}
+                  className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+                >
+                  {contactEmail}
+                </a>
+              ) : null}
+            </div>
           </section>
 
           <section className="rounded-2xl border border-border bg-muted/30 p-5">
@@ -109,3 +117,9 @@ export default async function SupportPage() {
     </div>
   )
 }
+
+const chatLabel = {
+  az: 'Çatda yazın',
+  en: 'Chat with us',
+  ru: 'Написать в чат',
+} as const

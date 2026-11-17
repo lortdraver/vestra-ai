@@ -79,6 +79,9 @@ export async function deleteUserAppData(userId: string) {
 
     await tx.delete(schema.wearLog).where(eq(schema.wearLog.userId, userId))
     await tx
+      .delete(schema.supportThread)
+      .where(eq(schema.supportThread.userId, userId))
+    await tx
       .delete(schema.outfitPlan)
       .where(eq(schema.outfitPlan.userId, userId))
     await tx

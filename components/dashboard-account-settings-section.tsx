@@ -93,7 +93,7 @@ export function DashboardAccountSettingsSection({
           })}
 
           <Link
-            href="/dashboard/account#support"
+            href="/dashboard/support"
             className={cn(
               buttonVariants({ variant: 'outline' }),
               'min-h-12 justify-start rounded-xl px-3 text-sm',
