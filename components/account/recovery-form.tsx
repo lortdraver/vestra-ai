@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import type { Dictionary } from '@/lib/i18n/dictionaries'
 import {
@@ -173,9 +174,8 @@ export function RecoveryForm({
           <>
             <div className="flex flex-col gap-2">
               <Label htmlFor="password">{dictionary.auth.password}</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
@@ -192,9 +192,8 @@ export function RecoveryForm({
               <Label htmlFor="confirm-password">
                 {dictionary.auth.confirmPassword}
               </Label>
-              <Input
+              <PasswordInput
                 id="confirm-password"
-                type="password"
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 required

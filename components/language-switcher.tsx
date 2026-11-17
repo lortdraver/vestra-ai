@@ -1,8 +1,14 @@
 'use client'
 
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { defaultLocale, locales, type Locale } from '@/lib/i18n/config'
+import {
+  defaultLocale,
+  localeCookieName,
+  locales,
+  type Locale,
+} from '@/lib/i18n/config'
 
 const languageNames: Record<Locale, string> = {
   az: 'AZ',
@@ -22,15 +28,18 @@ export function LanguageSwitcher({
   onLocaleChange?: (locale: Locale) => void
 }) {
   const router = useRouter()
+  const [pendingLocale, setPendingLocale] = useState<Locale | null>(null)
+  const [isPending, startTransition] = useTransition()
+  const shownLocale = isPending && pendingLocale ? pendingLocale : currentLocale
 
-  const handleChange = async (locale: Locale) => {
-    await fetch('/api/locale', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ locale }),
-    })
+  const handleChange = (locale: Locale) => {
+    if (locale === currentLocale) return
+    setPendingLocale(locale)
+    // Set the cookie right here instead of waiting for a server round trip,
+    // then re-render the page in the new language.
+    writeLocaleCookie(locale)
     onLocaleChange?.(locale)
-    router.refresh()
+    startTransition(() => router.refresh())
   }
 
   return (
@@ -41,6 +50,7 @@ export function LanguageSwitcher({
           : 'grid grid-cols-3 gap-2',
       )}
       aria-label={label}
+      aria-busy={isPending}
     >
       {locales.map((locale) => (
         <button
@@ -48,16 +58,21 @@ export function LanguageSwitcher({
           type="button"
           onClick={() => handleChange(locale)}
           className={cn(
-            'grid place-items-center rounded-md text-xs font-medium transition-colors hover:bg-secondary hover:text-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground',
+            'grid place-items-center rounded-md text-xs font-medium transition-colors disabled:cursor-wait disabled:opacity-70 hover:bg-secondary hover:text-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground',
             variant === 'compact'
               ? 'min-h-9 min-w-9 px-1.5 text-muted-foreground sm:min-h-8 sm:min-w-8 sm:px-2'
               : 'min-h-11 min-w-11 px-3 text-foreground',
           )}
-          aria-pressed={locale === currentLocale}
+          aria-pressed={locale === shownLocale}
+          disabled={isPending}
         >
           {languageNames[locale] ?? languageNames[defaultLocale]}
         </button>
       ))}
     </div>
   )
+}
+
+function writeLocaleCookie(locale: Locale) {
+  document.cookie = `${localeCookieName}=${locale}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`
 }

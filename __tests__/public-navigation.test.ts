@@ -25,7 +25,7 @@ describe('public navigation and help pages', () => {
   })
 
   it('exposes product and legal navigation from the homepage footer', () => {
-    expect(landingPageSource).toContain('siteFooterCopy')
+    expect(landingPageSource).toContain('<PublicHeader')
     expect(landingPageSource).toContain('<PublicFooter')
     expect(siteFooterCopy.en.product.links.map((link) => link.key)).toEqual([
       'home',
@@ -106,7 +106,7 @@ describe('public navigation and help pages', () => {
     expect(faqAccordionSource).toContain('aria-controls={panelId}')
     expect(faqAccordionSource).toContain('min-h-14')
     expect(publicFooterSource).toContain('min-h-10')
-    expect(publicFooterSource).toContain('sm:grid-cols')
+    expect(publicFooterSource).toContain('flex-wrap')
   })
 
   it('localizes public footer groups for AZ, EN, and RU', () => {

@@ -11,20 +11,24 @@ import {
 } from '@/lib/auth-diagnostics/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import type { Dictionary } from '@/lib/i18n/dictionaries'
 
 export function AuthForm({
   mode,
   dictionary,
+  locale = 'en',
 }: {
   mode: 'sign-in' | 'sign-up'
   dictionary: Dictionary
+  locale?: 'az' | 'en' | 'ru'
 }) {
   const router = useRouter()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -54,6 +58,11 @@ export function AuthForm({
 
     if (!email.includes('@')) {
       setError(dictionary.auth.invalidEmail)
+      return
+    }
+
+    if (isSignUp && password !== confirmPassword) {
+      setError(dictionary.auth.passwordResetErrors.passwordMismatch)
       return
     }
 
@@ -141,6 +150,7 @@ export function AuthForm({
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
+              maxLength={60}
               autoComplete="name"
               placeholder={dictionary.auth.namePlaceholder}
             />
@@ -154,15 +164,16 @@ export function AuthForm({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            maxLength={254}
             autoComplete="email"
             placeholder={dictionary.auth.emailPlaceholder}
           />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="password">{dictionary.auth.password}</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
+            locale={locale}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -174,7 +185,29 @@ export function AuthForm({
                 : dictionary.auth.passwordPlaceholder
             }
           />
+          {isSignUp && (
+            <p className="text-xs text-muted-foreground">
+              {dictionary.auth.passwordRequirements}
+            </p>
+          )}
         </div>
+        {isSignUp && (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="confirm-password">
+              {dictionary.auth.confirmPassword}
+            </Label>
+            <PasswordInput
+              id="confirm-password"
+              locale={locale}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength={8}
+              autoComplete="new-password"
+              placeholder={dictionary.auth.confirmPasswordPlaceholder}
+            />
+          </div>
+        )}
 
         {error && (
           <p className="text-sm text-destructive" role="alert">

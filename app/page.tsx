@@ -4,9 +4,8 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getDictionary, getLocale } from '@/lib/i18n/server'
 import { buttonVariants } from '@/components/ui/button'
-import { LanguageSwitcher } from '@/components/language-switcher'
 import { PublicFooter } from '@/components/public-footer'
-import { siteFooterCopy } from '@/lib/public-content/copy'
+import { PublicHeader } from '@/components/public-header'
 import { landingCopy } from '@/lib/public-content/landing-copy'
 import { LandingStyles } from '@/components/landing/landing-styles'
 import { HeroShowcase } from '@/components/landing/hero-showcase'
@@ -23,54 +22,12 @@ export default async function LandingPage() {
 
   const dictionary = await getDictionary()
   const locale = await getLocale()
-  const footerCopy = siteFooterCopy[locale]
   const copy = landingCopy[locale]
-  const publicLinks = [
-    {
-      href: '/pricing',
-      label: getFooterLabel(footerCopy.product.links, 'pricing'),
-    },
-    { href: '/faq', label: getFooterLabel(footerCopy.help.links, 'faq') },
-    {
-      href: '/support',
-      label: getFooterLabel(footerCopy.help.links, 'support'),
-    },
-  ]
 
   return (
     <div className="landing flex min-h-svh flex-col bg-background">
       <LandingStyles />
-      <header className="flex items-center justify-between gap-4 px-6 py-5 md:px-10">
-        <span className="font-serif text-xl font-semibold tracking-tight text-foreground">
-          {dictionary.common.brand}
-        </span>
-        <nav className="flex items-center gap-3">
-          <div className="hidden items-center gap-1 md:flex">
-            {publicLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-          <LanguageSwitcher
-            currentLocale={locale}
-            label={dictionary.common.language}
-          />
-          <Link
-            href="/sign-in"
-            className={buttonVariants({ variant: 'ghost' })}
-          >
-            {dictionary.common.signIn}
-          </Link>
-          <Link href="/sign-up" className={buttonVariants()}>
-            {dictionary.common.signUp}
-          </Link>
-        </nav>
-      </header>
+      <PublicHeader locale={locale} dictionary={dictionary} current="/" />
 
       <main className="flex-1">
         <section className="relative overflow-x-clip px-6 md:px-10">
@@ -120,11 +77,4 @@ export default async function LandingPage() {
       <PublicFooter locale={locale} className="px-6 pb-6 pt-3 md:px-10" />
     </div>
   )
-}
-
-function getFooterLabel(
-  links: { key: string; label: string }[],
-  key: string,
-): string {
-  return links.find((link) => link.key === key)?.label ?? key
 }

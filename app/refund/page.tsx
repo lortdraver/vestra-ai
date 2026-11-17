@@ -1,7 +1,6 @@
-import Link from 'next/link'
 import type { Metadata } from 'next'
 import { PublicFooter } from '@/components/public-footer'
-import { buttonVariants } from '@/components/ui/button'
+import { PublicHeader } from '@/components/public-header'
 import { getDictionary, getLocale } from '@/lib/i18n/server'
 import { getRefundCopy } from '@/lib/legal/copy'
 
@@ -21,20 +20,7 @@ export default async function RefundPage() {
 
   return (
     <div className="min-h-svh bg-background">
-      <header className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:px-8">
-        <Link
-          href="/"
-          className="font-serif text-xl font-semibold tracking-tight text-foreground"
-        >
-          {dictionary.common.brand}
-        </Link>
-        <Link
-          href="/sign-in"
-          className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-        >
-          {dictionary.common.signIn}
-        </Link>
-      </header>
+      <PublicHeader locale={locale} dictionary={dictionary} />
 
       <main className="mx-auto max-w-5xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
         <section className="border-b border-border pb-8">

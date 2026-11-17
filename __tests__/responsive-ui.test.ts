@@ -95,8 +95,8 @@ describe('responsive UI contracts', () => {
     expect(dashboardLayoutSource).toContain(
       'pb-[calc(env(safe-area-inset-bottom)+6.75rem)]',
     )
-    expect(publicFooterSource).toContain('sm:grid-cols-2')
-    expect(publicFooterSource).toContain('lg:grid-cols')
+    expect(publicFooterSource).toContain('flex-wrap')
+    expect(publicFooterSource).toContain('md:flex-row')
     expect(publicFooterSource).toContain('min-h-10')
     expect(dashboardLayoutSource).not.toContain('max-w-6xl flex-1')
   })

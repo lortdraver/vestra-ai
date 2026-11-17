@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { getDictionary } from '@/lib/i18n/server'
+import { getDictionary, getLocale } from '@/lib/i18n/server'
 import { AuthForm } from '@/components/auth-form'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -21,7 +21,11 @@ export default async function SignInPage() {
 
   return (
     <main className="flex min-h-svh items-center justify-center bg-background px-4">
-      <AuthForm mode="sign-in" dictionary={dictionary} />
+      <AuthForm
+        mode="sign-in"
+        dictionary={dictionary}
+        locale={await getLocale()}
+      />
     </main>
   )
 }

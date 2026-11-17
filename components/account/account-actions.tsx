@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import type { Dictionary } from '@/lib/i18n/dictionaries'
 
@@ -128,9 +129,8 @@ export function AccountActions({
           <Label htmlFor="account-delete-password">
             {t.deleteAccountPasswordLabel}
           </Label>
-          <Input
+          <PasswordInput
             id="account-delete-password"
-            type="password"
             autoComplete="current-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
